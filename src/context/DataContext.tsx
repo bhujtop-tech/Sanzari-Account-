@@ -161,8 +161,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Attempt seed on mount
-    initializeStoreDataIfEmpty().catch(console.error);
+    // Non-blocking background seeding
+    initializeStoreDataIfEmpty().catch(console.warn);
 
     const unsubWallets = subscribeWallets((w) => setWallets(w));
     const unsubCustomers = subscribeCustomers((c) => setCustomers(c));
@@ -177,7 +177,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubReturns = subscribeReturns((r) => setReturns(r));
     const unsubSettings = subscribeSettings((s) => setSettings(s));
 
-    const timer = setTimeout(() => setLoading(false), 300);
+    // Show UI instantly (50ms)
+    const timer = setTimeout(() => setLoading(false), 50);
 
     return () => {
       unsubWallets();

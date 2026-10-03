@@ -180,16 +180,24 @@ export async function cleanDuplicateCustomersInFirestore(): Promise<void> {
 
 export async function initializeStoreDataIfEmpty(): Promise<boolean> {
   try {
-    // Run cleanup on mount
-    cleanDuplicateProductsInFirestore().catch(console.warn);
-    cleanDuplicateWalletsInFirestore().catch(console.warn);
-    cleanDuplicateCustomersInFirestore().catch(console.warn);
+    // Quick check: If store is already initialized locally, return immediately (0ms)
+    if (localStorage.getItem('sanzari_store_initialized_v2') === 'true') {
+      return false;
+    }
 
     const currentDate = getCurrentDateString();
     const currentMonth = getMonthKey(currentDate);
 
-    // 1. Check Wallets
-    const walletsSnap = await getDocs(collection(db, 'wallets'));
+    // Fetch snapshot checks in parallel for ultra-fast response
+    const [walletsSnap, productsSnap, customersSnap, salesSnap, expensesSnap] = await Promise.all([
+      getDocs(collection(db, 'wallets')),
+      getDocs(collection(db, 'products')),
+      getDocs(collection(db, 'customers')),
+      getDocs(collection(db, 'sales')),
+      getDocs(collection(db, 'expenses')),
+    ]);
+
+    // 1. Wallets
     if (walletsSnap.empty) {
       console.log('Seeding initial wallets...');
       const batch = writeBatch(db);
@@ -204,8 +212,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       await batch.commit();
     }
 
-    // 2. Check Products
-    const productsSnap = await getDocs(collection(db, 'products'));
+    // 2. Products
     if (productsSnap.empty) {
       console.log('Seeding initial products...');
       const batch = writeBatch(db);
@@ -234,8 +241,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       await batch.commit();
     }
 
-    // 3. Check Customers
-    const customersSnap = await getDocs(collection(db, 'customers'));
+    // 3. Customers
     if (customersSnap.empty) {
       console.log('Seeding initial customers...');
       const batch = writeBatch(db);
@@ -250,8 +256,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       await batch.commit();
     }
 
-    // 4. Check Sales
-    const salesSnap = await getDocs(collection(db, 'sales'));
+    // 4. Sales
     if (salesSnap.empty) {
       console.log('Seeding initial sales...');
       const batch = writeBatch(db);
@@ -331,8 +336,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       await batch.commit();
     }
 
-    // 5. Check Expenses
-    const expensesSnap = await getDocs(collection(db, 'expenses'));
+    // 5. Expenses
     if (expensesSnap.empty) {
       console.log('Seeding initial expenses...');
       const batch = writeBatch(db);
@@ -352,16 +356,8 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       await batch.commit();
     }
 
-    // 6. Settings
-    const setRef = doc(db, 'settings', 'store_config');
-    const setSnap = await getDoc(setRef);
-    if (!setSnap.exists()) {
-      await setDoc(setRef, {
-        ...DEFAULT_SETTINGS,
-        updatedAt: new Date().toISOString(),
-      });
-    }
-
+    // Mark store initialized locally so subsequent app loads skip network checks
+    localStorage.setItem('sanzari_store_initialized_v2', 'true');
     return true;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'initial_seed');
