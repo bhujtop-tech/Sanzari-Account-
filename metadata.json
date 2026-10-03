@@ -1,0 +1,6 @@
+{
+  "name": "SANZARI ACCOUNTS",
+  "description": "Mobile-first business accounting and inventory management app for Sanzari Store.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

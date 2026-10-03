@@ -1,0 +1,294 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile with role definition",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string", "maxLength": 150 },
+        "displayName": { "type": "string", "maxLength": 100 },
+        "role": { "type": "string", "enum": ["owner", "manager", "staff"] },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["email", "role", "createdAt", "updatedAt"]
+    },
+    "Wallet": {
+      "title": "Wallet",
+      "description": "Business partner wallet account (Rizwan, Avesh, Sahil)",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 100 },
+        "partnerKey": { "type": "string", "enum": ["rizwan", "avesh", "sahil"] },
+        "openingBalance": { "type": "number" },
+        "currentBalance": { "type": "number" },
+        "color": { "type": "string", "maxLength": 20 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "partnerKey", "openingBalance", "currentBalance", "createdAt", "updatedAt"]
+    },
+    "Customer": {
+      "title": "Customer",
+      "description": "Customer contact and pending balance record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "city": { "type": "string", "maxLength": 80 },
+        "totalOrders": { "type": "number" },
+        "totalSpent": { "type": "number" },
+        "pendingBalance": { "type": "number" },
+        "lastPurchaseDate": { "type": "string", "maxLength": 50 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "totalOrders", "totalSpent", "pendingBalance", "createdAt", "updatedAt"]
+    },
+    "Product": {
+      "title": "Product",
+      "description": "Inventory product item",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "category": { "type": "string", "maxLength": 80 },
+        "unit": { "type": "string", "maxLength": 30 },
+        "sellingPrice": { "type": "number" },
+        "purchaseCost": { "type": "number" },
+        "currentStock": { "type": "number" },
+        "lowStockThreshold": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "category", "unit", "sellingPrice", "purchaseCost", "currentStock", "lowStockThreshold", "createdAt", "updatedAt"]
+    },
+    "Sale": {
+      "title": "Sale",
+      "description": "Sale transaction header",
+      "type": "object",
+      "properties": {
+        "saleNumber": { "type": "string", "maxLength": 50 },
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "customerPhone": { "type": "string", "maxLength": 30 },
+        "salesPerson": { "type": "string", "maxLength": 50 },
+        "walletId": { "type": "string", "maxLength": 128 },
+        "walletName": { "type": "string", "maxLength": 100 },
+        "date": { "type": "string", "maxLength": 50 },
+        "monthKey": { "type": "string", "maxLength": 20 },
+        "subtotal": { "type": "number" },
+        "discount": { "type": "number" },
+        "total": { "type": "number" },
+        "paidAmount": { "type": "number" },
+        "pendingAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Partial", "Pending"] },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "UPI", "Bank", "Other"] },
+        "itemCount": { "type": "number" },
+        "items": { "type": "array" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["saleNumber", "customerId", "salesPerson", "walletId", "date", "monthKey", "subtotal", "total", "paidAmount", "pendingAmount", "paymentStatus", "createdAt", "updatedAt"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "Customer settlement payment against pending dues",
+      "type": "object",
+      "properties": {
+        "customerId": { "type": "string", "maxLength": 128 },
+        "customerName": { "type": "string", "maxLength": 120 },
+        "saleId": { "type": "string", "maxLength": 128 },
+        "walletId": { "type": "string", "maxLength": 128 },
+        "walletName": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "number" },
+        "paymentMethod": { "type": "string", "enum": ["Cash", "UPI", "Bank", "Other"] },
+        "date": { "type": "string", "maxLength": 50 },
+        "monthKey": { "type": "string", "maxLength": 20 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["customerId", "customerName", "walletId", "amount", "paymentMethod", "date", "monthKey", "createdAt", "updatedAt"]
+    },
+    "Expense": {
+      "title": "Expense",
+      "description": "Business expense voucher",
+      "type": "object",
+      "properties": {
+        "walletId": { "type": "string", "maxLength": 128 },
+        "walletName": { "type": "string", "maxLength": 100 },
+        "category": { "type": "string", "enum": ["Courier", "Packaging", "Advertising", "Travel", "Salary", "Commission", "Office", "Vendor", "Other"] },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 50 },
+        "monthKey": { "type": "string", "maxLength": 20 },
+        "description": { "type": "string", "maxLength": 300 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["walletId", "category", "amount", "date", "monthKey", "description", "createdAt", "updatedAt"]
+    },
+    "Transfer": {
+      "title": "Transfer",
+      "description": "Internal wallet to wallet transfer (Total business balance unchanged)",
+      "type": "object",
+      "properties": {
+        "fromWalletId": { "type": "string", "maxLength": 128 },
+        "fromWalletName": { "type": "string", "maxLength": 100 },
+        "toWalletId": { "type": "string", "maxLength": 128 },
+        "toWalletName": { "type": "string", "maxLength": 100 },
+        "amount": { "type": "number" },
+        "date": { "type": "string", "maxLength": 50 },
+        "monthKey": { "type": "string", "maxLength": 20 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["fromWalletId", "fromWalletName", "toWalletId", "toWalletName", "amount", "date", "monthKey", "createdAt", "updatedAt"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Stock purchase voucher from supplier/vendor",
+      "type": "object",
+      "properties": {
+        "vendorId": { "type": "string", "maxLength": 128 },
+        "vendorName": { "type": "string", "maxLength": 120 },
+        "productId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 120 },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 30 },
+        "purchaseCost": { "type": "number" },
+        "totalCost": { "type": "number" },
+        "walletId": { "type": "string", "maxLength": 128 },
+        "walletName": { "type": "string", "maxLength": 100 },
+        "paymentStatus": { "type": "string", "enum": ["Paid", "Unpaid", "Partial"] },
+        "date": { "type": "string", "maxLength": 50 },
+        "monthKey": { "type": "string", "maxLength": 20 },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["vendorName", "productId", "productName", "quantity", "unit", "purchaseCost", "totalCost", "paymentStatus", "date", "monthKey", "createdAt", "updatedAt"]
+    },
+    "Vendor": {
+      "title": "Vendor",
+      "description": "Supplier contact and pending dues record",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "maxLength": 120 },
+        "phone": { "type": "string", "maxLength": 30 },
+        "city": { "type": "string", "maxLength": 80 },
+        "productsSupplied": { "type": "string", "maxLength": 200 },
+        "totalPurchases": { "type": "number" },
+        "pendingPayment": { "type": "number" },
+        "notes": { "type": "string", "maxLength": 500 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["name", "phone", "totalPurchases", "pendingPayment", "createdAt", "updatedAt"]
+    },
+    "StockMovement": {
+      "title": "StockMovement",
+      "description": "Stock audit movement trail",
+      "type": "object",
+      "properties": {
+        "productId": { "type": "string", "maxLength": 128 },
+        "productName": { "type": "string", "maxLength": 120 },
+        "type": { "type": "string", "enum": ["OPENING", "PURCHASE", "SALE", "DAMAGE", "LOSS", "ADJUSTMENT"] },
+        "quantity": { "type": "number" },
+        "unit": { "type": "string", "maxLength": 30 },
+        "referenceId": { "type": "string", "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 300 },
+        "date": { "type": "string", "maxLength": 50 },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["productId", "type", "quantity", "date", "createdAt", "updatedAt"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "Audit trails for edits and deletions in the financial system",
+      "type": "object",
+      "properties": {
+        "userEmail": { "type": "string", "maxLength": 150 },
+        "action": { "type": "string", "maxLength": 80 },
+        "recordType": { "type": "string", "maxLength": 80 },
+        "recordId": { "type": "string", "maxLength": 128 },
+        "oldValue": { "type": "string", "maxLength": 2000 },
+        "newValue": { "type": "string", "maxLength": 2000 },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["userEmail", "action", "recordType", "recordId", "timestamp"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Application settings and configurations",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string", "maxLength": 100 },
+        "currency": { "type": "string", "maxLength": 10 },
+        "dateFormat": { "type": "string", "maxLength": 20 },
+        "allowNegativeStock": { "type": "boolean" },
+        "allowNegativeWallet": { "type": "boolean" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["businessName", "currency", "dateFormat", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "User accounts and permissions"
+    },
+    "/wallets/{walletId}": {
+      "schema": { "$ref": "#/entities/Wallet" },
+      "description": "Business partner wallets"
+    },
+    "/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer profiles and ledgers"
+    },
+    "/products/{productId}": {
+      "schema": { "$ref": "#/entities/Product" },
+      "description": "Inventory products list"
+    },
+    "/sales/{saleId}": {
+      "schema": { "$ref": "#/entities/Sale" },
+      "description": "Sales records"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "#/entities/Payment" },
+      "description": "Pending payment settlements"
+    },
+    "/expenses/{expenseId}": {
+      "schema": { "$ref": "#/entities/Expense" },
+      "description": "Business expenses"
+    },
+    "/transfers/{transferId}": {
+      "schema": { "$ref": "#/entities/Transfer" },
+      "description": "Internal wallet transfers"
+    },
+    "/purchases/{purchaseId}": {
+      "schema": { "$ref": "#/entities/Purchase" },
+      "description": "Stock purchases"
+    },
+    "/vendors/{vendorId}": {
+      "schema": { "$ref": "#/entities/Vendor" },
+      "description": "Vendors list"
+    },
+    "/stockMovements/{movementId}": {
+      "schema": { "$ref": "#/entities/StockMovement" },
+      "description": "Stock movement audit trail"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "#/entities/AuditLog" },
+      "description": "Financial audit logs"
+    },
+    "/settings/{settingId}": {
+      "schema": { "$ref": "#/entities/Settings" },
+      "description": "Store configuration and preferences"
+    }
+  }
+}
