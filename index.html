@@ -2,6 +2,49 @@
 <html lang="en" class="h-full bg-[#f8f9fa] antialiased">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      (function() {
+        if (typeof window !== 'undefined') {
+          // Suppress errors injected by third-party browser extensions
+          window.addEventListener('error', function(event) {
+            if (
+              event &&
+              ((event.filename && (event.filename.includes('chrome-extension://') || event.filename.includes('moz-extension://') || event.filename.includes('safari-extension://') || event.filename.includes('frame_ant'))) ||
+               (event.message && event.message.includes('Cannot set property fetch of #<Window>')))
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          }, true);
+
+          // Define getter & setter for window.fetch and Window.prototype.fetch so any extension can set it safely
+          try {
+            var currentFetch = typeof window.fetch === 'function' ? window.fetch.bind(window) : undefined;
+            var fetchDescriptor = {
+              get: function() {
+                return currentFetch;
+              },
+              set: function(fn) {
+                currentFetch = fn;
+              },
+              configurable: true,
+              enumerable: true
+            };
+
+            try {
+              Object.defineProperty(window, 'fetch', fetchDescriptor);
+            } catch (e1) {}
+
+            if (typeof Window !== 'undefined' && Window.prototype) {
+              try {
+                Object.defineProperty(Window.prototype, 'fetch', fetchDescriptor);
+              } catch (e2) {}
+            }
+          } catch (e) {}
+        }
+      })();
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <title>SANZARI ACCOUNTS</title>
     <meta name="description" content="Mobile-first business accounting and inventory management app for Sanzari Store." />

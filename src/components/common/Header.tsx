@@ -3,10 +3,21 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { SlideMenu } from './SlideMenu';
 import { ProfileModalCard } from './ProfileModalCard';
-import { Menu, Sparkles, Store, Plus, Receipt, ArrowDownLeft, Share2, Check, User } from 'lucide-react';
+import { Menu, Sparkles, Store, Plus, Receipt, ArrowDownLeft, Share2, Check, User, Luggage, FolderPlus } from 'lucide-react';
 
 export const Header: React.FC = () => {
-  const { settings, setIsAiAssistantOpen, setIsAddSaleOpen, setIsAddExpenseOpen, setIsAddPaymentOpen } = useData();
+  const {
+    settings,
+    businessMode,
+    setBusinessMode,
+    setIsAiAssistantOpen,
+    setIsAddSaleOpen,
+    setIsAddExpenseOpen,
+    setIsAddPaymentOpen,
+    setIsAddTourBookingOpen,
+    setIsAddTourBatchOpen,
+    setIsAddTourExpenseOpen,
+  } = useData();
   const { currentUserProfile, userPermissions } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -29,8 +40,8 @@ export const Header: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-30 bg-[#f8f9fa]/95 backdrop-blur-md border-b border-zinc-200/60 px-3 sm:px-8 py-2.5 flex items-center justify-between transition-all">
-        {/* Left: Slide Menu Toggle & Brand */}
-        <div className="flex items-center gap-2">
+        {/* Left: Slide Menu Toggle & Brand & Mode Badge */}
+        <div className="flex items-center gap-2 sm:gap-3">
           <button
             onClick={() => setIsMenuOpen(true)}
             aria-label="Open Slide Menu"
@@ -40,50 +51,79 @@ export const Header: React.FC = () => {
           </button>
 
           <div className="min-w-0">
-            <h1 className="font-black text-xs sm:text-base tracking-tight text-zinc-950 flex items-center gap-1.5 truncate">
-              SANZARI ACCOUNTS
-            </h1>
+            <div className="flex items-center gap-1.5">
+              <h1 className="font-black text-xs sm:text-base tracking-tight text-zinc-950 flex items-center gap-1.5 truncate">
+                {businessMode === 'tourism' ? 'SANZARI TOURS & TRAVELS' : 'SANZARI DRY FRUITS'}
+              </h1>
+              {/* Active Mode Pill Tag */}
+              <span className="hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-zinc-950 text-white border border-zinc-800">
+                {businessMode === 'tourism' ? '✈️ Tourism' : '🌰 Dry Fruits'}
+              </span>
+            </div>
             <p className="text-[10px] font-semibold text-zinc-500 flex items-center gap-1 truncate">
               <Store size={10} className="text-zinc-400 shrink-0" />
-              <span className="truncate">{settings.businessName || 'Sanzari Store'}</span>
+              <span className="truncate">
+                {businessMode === 'tourism' ? 'Tours & Group Bookings Portal' : settings.businessName || 'Dry Fruits & Spices Portal'}
+              </span>
             </p>
           </div>
         </div>
 
         {/* Right: Desktop Quick Actions & AI Trigger & Compact Profile Avatar */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Desktop Quick Actions */}
+          {/* Desktop Quick Actions (Contextual for mode) */}
           <div className="hidden md:flex items-center gap-2 mr-1">
-            {userPermissions?.canAddSale && (
-              <button
-                onClick={() => setIsAddSaleOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
-              >
-                <Plus size={14} className="stroke-[3]" />
-                <span>+ Sale</span>
-              </button>
-            )}
+            {businessMode === 'tourism' ? (
+              <>
+                <button
+                  onClick={() => setIsAddTourBookingOpen(true)}
+                  className="px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                >
+                  <Plus size={14} className="stroke-[3]" />
+                  <span>+ Booking</span>
+                </button>
+                <button
+                  onClick={() => setIsAddTourBatchOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200/80 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                >
+                  <FolderPlus size={14} />
+                  <span>+ Tour Date</span>
+                </button>
+              </>
+            ) : (
+              <>
+                {userPermissions?.canAddSale && (
+                  <button
+                    onClick={() => setIsAddSaleOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  >
+                    <Plus size={14} className="stroke-[3]" />
+                    <span>+ Sale</span>
+                  </button>
+                )}
 
-            {userPermissions?.canAddExpense && (
-              <button
-                onClick={() => setIsAddExpenseOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-amber-300 text-xs font-bold flex items-center gap-1 border border-zinc-800 shadow-xs transition-transform active:scale-95 cursor-pointer"
-              >
-                <Receipt size={14} />
-                <span>+ Expense</span>
-              </button>
-            )}
+                {userPermissions?.canAddExpense && (
+                  <button
+                    onClick={() => setIsAddExpenseOpen(true)}
+                    className="px-3 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-amber-300 text-xs font-bold flex items-center gap-1 border border-zinc-800 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  >
+                    <Receipt size={14} />
+                    <span>+ Expense</span>
+                  </button>
+                )}
 
-            <button
-              onClick={() => setIsAddPaymentOpen(true)}
-              className="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 text-xs font-bold border border-zinc-200 shadow-2xs flex items-center gap-1 transition-transform active:scale-95 cursor-pointer"
-            >
-              <ArrowDownLeft size={14} className="text-emerald-600" />
-              <span>+ Payment</span>
-            </button>
+                <button
+                  onClick={() => setIsAddPaymentOpen(true)}
+                  className="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 text-xs font-bold border border-zinc-200 shadow-2xs flex items-center gap-1 transition-transform active:scale-95 cursor-pointer"
+                >
+                  <ArrowDownLeft size={14} className="text-emerald-600" />
+                  <span>+ Payment</span>
+                </button>
+              </>
+            )}
           </div>
 
-          {/* Share Public Link Button (Icon on mobile, text on desktop) */}
+          {/* Share Public Link Button */}
           <button
             onClick={handleSharePublicLink}
             title="Copy Public Share Link (No Login Required)"
@@ -102,7 +142,7 @@ export const Header: React.FC = () => {
             <span className="hidden sm:inline">Ask</span> AI
           </button>
 
-          {/* Compact Circular Profile Avatar Button (Icon Only on Mobile!) */}
+          {/* Compact Circular Profile Avatar Button */}
           <button
             onClick={() => setIsProfileOpen(true)}
             title="Account Options & Switch User"
@@ -124,3 +164,4 @@ export const Header: React.FC = () => {
     </>
   );
 };
+

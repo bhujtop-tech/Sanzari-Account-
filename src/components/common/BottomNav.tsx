@@ -17,15 +17,26 @@ import {
   Settings,
   ShieldCheck,
   Sparkles,
+  Luggage,
+  FolderPlus,
+  Plane,
+  Store,
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 export const BottomNav: React.FC = () => {
-  const { activeTab, setActiveTab, activeMoreSection, setActiveMoreSection, setIsAiAssistantOpen } = useData();
+  const {
+    activeTab,
+    setActiveTab,
+    activeMoreSection,
+    setActiveMoreSection,
+    setIsAiAssistantOpen,
+    businessMode,
+  } = useData();
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
 
-  const tabs: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+  const dryFruitTabs: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'home', label: 'Home', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales', icon: ShoppingBag },
     { id: 'stock', label: 'Stock', icon: Boxes },
@@ -33,17 +44,34 @@ export const BottomNav: React.FC = () => {
     { id: 'more', label: 'More', icon: Grid2X2 },
   ];
 
-  const moreItems: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
+  const tourismTabs: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+    { id: 'home', label: 'Tours', icon: Plane },
+    { id: 'stock', label: 'Tour Dates', icon: CalendarDays },
+    { id: 'sales', label: 'Bookings', icon: Luggage },
+    { id: 'accounts', label: 'Wallets', icon: WalletCards },
+    { id: 'more', label: 'More', icon: Grid2X2 },
+  ];
+
+  const tabs = businessMode === 'tourism' ? tourismTabs : dryFruitTabs;
+
+  const dryFruitMoreItems: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
     { id: 'customers', label: 'Customers', icon: Users, desc: 'Grahak Ledger & Udhari' },
     { id: 'products', label: 'Products', icon: Package, desc: 'Pricing & Catalog' },
     { id: 'expenses', label: 'Expenses', icon: Receipt, desc: 'Daily Business Expenses' },
     { id: 'purchases', label: 'Purchases', icon: Truck, desc: 'Vendor Inward Supplies' },
-    { id: 'vendors', label: 'Vendors', icon: Building2, desc: 'Supplier Accounts' },
+    { id: 'vendors', label: 'Vendors', icon: Building2, desc: 'Suppliers & Mills' },
     { id: 'users', label: 'Users & Staff', icon: ShieldCheck, desc: 'Roles & Staff Control' },
     { id: 'monthly', label: 'Month Folders', icon: CalendarDays, desc: 'Monthly Organization' },
     { id: 'reports', label: 'Reports', icon: BarChart3, desc: 'P&L & Wallet Summary' },
     { id: 'settings', label: 'Settings', icon: Settings, desc: 'Store & Data Controls' },
   ];
+
+  const tourismMoreItems: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
+    { id: 'customers', label: 'Customers & Travelers', icon: Users, desc: 'Passenger directory & contacts' },
+    { id: 'settings', label: 'Settings', icon: Settings, desc: 'App & Data Controls' },
+  ];
+
+  const moreItems = businessMode === 'tourism' ? tourismMoreItems : dryFruitMoreItems;
 
   const handleTabClick = (tabId: NavTab) => {
     if (tabId === 'more') {
@@ -75,13 +103,19 @@ export const BottomNav: React.FC = () => {
                 onClick={() => handleTabClick(tab.id)}
                 className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'text-zinc-950 font-semibold'
+                    ? businessMode === 'tourism'
+                      ? 'text-blue-600 font-bold'
+                      : 'text-zinc-950 font-semibold'
                     : 'text-zinc-600 hover:text-zinc-900 font-medium'
                 }`}
               >
                 <div
                   className={`relative p-1 rounded-xl transition-all ${
-                    isActive ? 'bg-zinc-100 text-zinc-950 scale-105' : ''
+                    isActive
+                      ? businessMode === 'tourism'
+                        ? 'bg-blue-50 text-blue-600 scale-105'
+                        : 'bg-zinc-100 text-zinc-950 scale-105'
+                      : ''
                   }`}
                 >
                   <Icon size={20} className={isActive ? 'stroke-[2.5]' : 'stroke-[1.75]'} />
@@ -116,8 +150,10 @@ export const BottomNav: React.FC = () => {
 
               <div className="flex items-center justify-between mb-4">
                 <div>
-                  <h3 className="text-lg font-bold text-zinc-900">Sanzari Modules</h3>
-                  <p className="text-xs text-zinc-500">Quick access to inventory, expenses, and reports</p>
+                  <h3 className="text-lg font-bold text-zinc-900">
+                    {businessMode === 'tourism' ? 'Sanzari Tourism' : 'Sanzari Store'} Modules
+                  </h3>
+                  <p className="text-xs text-zinc-500">Quick access to all accounts, bookings & reports</p>
                 </div>
                 <button
                   onClick={() => setIsMoreMenuOpen(false)}
@@ -133,7 +169,7 @@ export const BottomNav: React.FC = () => {
                   setIsMoreMenuOpen(false);
                   setIsAiAssistantOpen(true);
                 }}
-                className="w-full mb-4 p-3.5 rounded-2xl bg-linear-to-r from-amber-50 to-indigo-50 border border-amber-200/60 flex items-center gap-3 text-left transition-transform active:scale-98 cursor-pointer"
+                className="w-full mb-4 p-3.5 rounded-2xl bg-gradient-to-r from-amber-50 to-indigo-50 border border-amber-200/60 flex items-center gap-3 text-left transition-transform active:scale-98 cursor-pointer"
               >
                 <div className="w-10 h-10 rounded-xl bg-white shadow-2xs flex items-center justify-center text-amber-500">
                   <Sparkles size={20} className="fill-amber-400" />
@@ -143,7 +179,7 @@ export const BottomNav: React.FC = () => {
                     AI Business Assistant
                     <span className="px-1.5 py-0.2 bg-amber-500 text-white text-[9px] rounded-full font-bold">SMART</span>
                   </h4>
-                  <p className="text-[11px] text-zinc-600">Ask sales, balances, stock in English/Urdu</p>
+                  <p className="text-[11px] text-zinc-600">Ask sales, tour bookings, and balances</p>
                 </div>
               </button>
 
@@ -187,3 +223,4 @@ export const BottomNav: React.FC = () => {
     </>
   );
 };
+

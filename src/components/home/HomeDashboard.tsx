@@ -36,15 +36,9 @@ export const HomeDashboard: React.FC = () => {
     setActiveTab,
     setActiveMoreSection,
     products,
+    setSelectedActivityItem,
+    setIsViewAllActivityOpen,
   } = useData();
-
-  // Dynamic greeting based on hour
-  const getGreeting = () => {
-    const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 17) return 'Good afternoon';
-    return 'Good evening';
-  };
 
   // Find partner wallets
   const rizwanWallet = wallets.find((w) => w.partnerKey === 'rizwan' || w.name.toLowerCase().includes('rizwan'));
@@ -54,17 +48,7 @@ export const HomeDashboard: React.FC = () => {
   const lowStockCount = products.filter((p) => p.currentStock <= p.lowStockThreshold).length;
 
   return (
-    <div className="space-y-6 pb-28 md:pb-12 max-w-5xl mx-auto">
-      {/* Top Greeting & Brand */}
-      <div className="pt-2">
-        <p className="text-xs font-semibold text-zinc-600 uppercase tracking-wider">
-          {getGreeting()}
-        </p>
-        <h2 className="text-2xl sm:text-3xl font-black tracking-tight text-zinc-950 mt-0.5">
-          Sanzari Accounts
-        </h2>
-      </div>
-
+    <div className="space-y-6 pb-36 sm:pb-32 max-w-5xl mx-auto pt-2">
       {/* Hero: TOTAL BALANCE Card */}
       <motion.div
         initial={{ opacity: 0, y: 15 }}
@@ -258,24 +242,25 @@ export const HomeDashboard: React.FC = () => {
           <h3 className="text-xs font-bold text-zinc-600 uppercase tracking-wider">
             Recent Activity
           </h3>
-          <span className="text-[11px] text-zinc-600">Latest 5</span>
+          <span className="text-[11px] font-semibold text-zinc-500">Latest 5</span>
         </div>
 
         {recentActivity.length === 0 ? (
-          <div className="p-8 text-center rounded-2xl bg-white border border-dashed border-zinc-200 text-zinc-600 text-xs">
+          <div className="p-8 text-center rounded-2xl bg-white border border-dashed border-zinc-200 text-zinc-600 text-xs font-medium">
             No transactions yet. Start by recording a sale or expense.
           </div>
         ) : (
           <div className="space-y-2">
-            {recentActivity.map((item) => {
+            {recentActivity.slice(0, 5).map((item) => {
               return (
-                <div
+                <button
                   key={item.id}
-                  className="p-3.5 rounded-2xl bg-white border border-zinc-200/70 shadow-2xs flex items-center justify-between transition-all hover:border-zinc-300"
+                  onClick={() => setSelectedActivityItem(item)}
+                  className="w-full p-3.5 rounded-2xl bg-white border border-zinc-200/70 shadow-2xs flex items-center justify-between transition-all hover:border-zinc-300 hover:shadow-xs active:scale-98 text-left cursor-pointer"
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
                     <div
-                      className={`w-9 h-9 rounded-xl flex items-center justify-center ${
+                      className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
                         item.isPositive
                           ? 'bg-emerald-50 text-emerald-600'
                           : 'bg-rose-50 text-rose-600'
@@ -283,15 +268,15 @@ export const HomeDashboard: React.FC = () => {
                     >
                       {item.isPositive ? <ArrowDownLeft size={16} /> : <ArrowUpRight size={16} />}
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-900">{item.title}</h4>
-                      <p className="text-[11px] text-zinc-600">
+                    <div className="min-w-0">
+                      <h4 className="text-xs font-bold text-zinc-900 truncate">{item.title}</h4>
+                      <p className="text-[11px] text-zinc-500 truncate">
                         {item.subtitle} • {item.date}
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right shrink-0 ml-2">
                     <div
                       className={`text-xs font-extrabold tracking-tight ${
                         item.isPositive ? 'text-emerald-600' : 'text-rose-600'
@@ -301,12 +286,25 @@ export const HomeDashboard: React.FC = () => {
                       {formatCurrency(item.amount)}
                     </div>
                     {item.walletName && (
-                      <span className="text-[10px] text-zinc-600">{item.walletName}</span>
+                      <span className="text-[10px] text-zinc-500 block truncate max-w-[100px] font-medium">
+                        {item.walletName}
+                      </span>
                     )}
                   </div>
-                </div>
+                </button>
               );
             })}
+
+            {/* View All Button */}
+            <div className="pt-2">
+              <button
+                onClick={() => setIsViewAllActivityOpen(true)}
+                className="w-full py-3 px-4 rounded-2xl bg-zinc-100 hover:bg-zinc-200/90 text-zinc-900 text-xs font-bold transition-all active:scale-98 cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs border border-zinc-200/60"
+              >
+                <span>View All Activity ({recentActivity.length})</span>
+                <span className="text-zinc-500">→</span>
+              </button>
+            </div>
           </div>
         )}
       </div>

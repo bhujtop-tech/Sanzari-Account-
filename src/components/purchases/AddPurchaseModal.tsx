@@ -328,12 +328,35 @@ export const AddPurchaseModal: React.FC<{ isOpen: boolean; onClose: () => void }
               )}
             </div>
 
-            <ProductSearchSelector
-              products={products}
-              selectedProductId={selectedProductId}
-              formatCurrency={formatCurrency}
-              onSelectProduct={(p) => handleProductChange(p.id)}
-            />
+            {!selectedProduct ? (
+              <ProductSearchSelector
+                products={products}
+                selectedProductId={selectedProductId}
+                formatCurrency={formatCurrency}
+                onSelectProduct={(p) => handleProductChange(p.id)}
+              />
+            ) : (
+              <div className="p-3 rounded-2xl bg-white border border-zinc-200 flex items-center justify-between">
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs font-black text-zinc-900">{selectedProduct.name}</span>
+                    <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-zinc-100 text-zinc-600">
+                      {selectedProduct.category}
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-zinc-500 font-semibold block mt-0.5">
+                    Stock: {selectedProduct.currentStock} {selectedProduct.unit}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedProductId('')}
+                  className="text-xs font-bold text-zinc-600 hover:text-zinc-900 px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 cursor-pointer"
+                >
+                  Change
+                </button>
+              </div>
+            )}
 
             {/* Per Kg / Per Gram Pricing Unit Mode */}
             {selectedProduct &&

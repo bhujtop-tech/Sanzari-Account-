@@ -34,7 +34,7 @@ export const SalesList: React.FC = () => {
   }, [filteredSales]);
 
   return (
-    <div className="space-y-4 pb-28 md:pb-12 max-w-5xl mx-auto">
+    <div className="space-y-4 pb-36 sm:pb-32 max-w-5xl mx-auto">
       {/* Top Header */}
       <div className="flex items-center justify-between pt-1">
         <div>

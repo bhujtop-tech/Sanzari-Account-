@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { Lock, KeyRound, ShieldCheck, ArrowRight, Mail } from 'lucide-react';
+import { useData } from '../../context/DataContext';
+import { Lock, KeyRound, ShieldCheck, ArrowRight, Mail, Plane, Store } from 'lucide-react';
 import { motion } from 'motion/react';
 
 export const AuthScreen: React.FC = () => {
   const { loginWithEmail, loginWithPin, demoLogin } = useAuth();
+  const { businessMode, setBusinessMode } = useData();
   const [authMode, setAuthMode] = useState<'email' | 'pin'>('email');
 
   const [email, setEmail] = useState('');
@@ -65,26 +67,76 @@ export const AuthScreen: React.FC = () => {
         className="w-full max-w-sm bg-white rounded-[32px] p-7 shadow-2xl border border-zinc-200/80 text-center"
       >
         {/* Sanzari Store Logo */}
-        <div className="w-16 h-16 rounded-3xl bg-zinc-950 text-white flex items-center justify-center mx-auto mb-4 shadow-xl shadow-zinc-950/15">
-          <span className="text-2xl font-black tracking-tighter">S</span>
+        <div className="w-16 h-16 rounded-3xl bg-zinc-950 text-white flex items-center justify-center mx-auto mb-3 shadow-xl shadow-zinc-950/15">
+          <span className="text-2xl font-black tracking-tighter">SZ</span>
         </div>
 
         <h1 className="text-xl font-black tracking-tight text-zinc-950">
-          SANZARI STORE LOG IN
+          SANZARI ACCOUNTS
         </h1>
-        <p className="text-xs text-zinc-500 mt-1 font-medium">
-          Multi-User &amp; Staff Internal Access Portal
+        <p className="text-xs text-zinc-500 mt-0.5 font-medium">
+          Dry Fruits &amp; Tourism Unified Portal
         </p>
 
+        {/* Business Portal Selector on Login Page */}
+        <div className="my-4 text-left">
+          <label className="block text-[10px] font-extrabold text-zinc-500 uppercase tracking-wider mb-2">
+            Select Business Portal to Login:
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setBusinessMode('dryfruit')}
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                businessMode === 'dryfruit'
+                  ? 'bg-zinc-950 text-white border-zinc-800 ring-2 ring-zinc-700 shadow-md'
+                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">🌰</span>
+                {businessMode === 'dryfruit' && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+              </div>
+              <div className="font-extrabold text-xs tracking-tight">Dry Fruits</div>
+              <div className={`text-[10px] truncate ${businessMode === 'dryfruit' ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                Store &amp; Inventory
+              </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setBusinessMode('tourism')}
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer relative overflow-hidden ${
+                businessMode === 'tourism'
+                  ? 'bg-zinc-950 text-white border-zinc-800 ring-2 ring-zinc-700 shadow-md'
+                  : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border-zinc-200'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xl">✈️</span>
+                {businessMode === 'tourism' && (
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                )}
+              </div>
+              <div className="font-extrabold text-xs tracking-tight">Tours &amp; Travels</div>
+              <div className={`text-[10px] truncate ${businessMode === 'tourism' ? 'text-zinc-300' : 'text-zinc-500'}`}>
+                Dates &amp; Bookings
+              </div>
+            </button>
+          </div>
+        </div>
+
         {/* Auth Mode Toggle */}
-        <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/80 my-4">
+        <div className="flex bg-zinc-100 p-1 rounded-2xl border border-zinc-200/80 my-3">
           <button
             type="button"
             onClick={() => {
               setAuthMode('email');
               setError(null);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               authMode === 'email'
                 ? 'bg-white text-zinc-950 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800'
@@ -98,7 +150,7 @@ export const AuthScreen: React.FC = () => {
               setAuthMode('pin');
               setError(null);
             }}
-            className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all cursor-pointer ${
+            className={`flex-1 py-1.5 text-xs font-bold rounded-xl transition-all cursor-pointer ${
               authMode === 'pin'
                 ? 'bg-white text-zinc-950 shadow-xs'
                 : 'text-zinc-500 hover:text-zinc-800'
@@ -158,7 +210,7 @@ export const AuthScreen: React.FC = () => {
               disabled={isSubmitting || !email.trim() || !password.trim()}
               className="w-full py-3.5 px-4 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-lg transition-transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
             >
-              <span>{isSubmitting ? 'Authenticating...' : 'LOG IN TO STORE'}</span>
+              <span>{isSubmitting ? 'Authenticating...' : `ENTER ${businessMode === 'tourism' ? 'SANZARI TOURS' : 'SANZARI STORE'}`}</span>
               <ArrowRight size={15} />
             </button>
           </form>
@@ -193,7 +245,7 @@ export const AuthScreen: React.FC = () => {
               disabled={isSubmitting || !pin.trim()}
               className="w-full py-3.5 px-4 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-lg transition-transform active:scale-98 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-40"
             >
-              <span>{isSubmitting ? 'Verifying PIN...' : 'UNLOCK STORE ADMIN'}</span>
+              <span>{isSubmitting ? 'Verifying PIN...' : `UNLOCK ADMIN (${businessMode === 'tourism' ? 'TOURS' : 'STORE'})`}</span>
               <ArrowRight size={15} />
             </button>
           </form>
@@ -211,7 +263,7 @@ export const AuthScreen: React.FC = () => {
           </button>
         </div>
 
-        <div className="mt-5 flex items-center justify-center gap-1 text-[11px] text-zinc-400 font-medium">
+        <div className="mt-4 flex items-center justify-center gap-1 text-[11px] text-zinc-400 font-medium">
           <Lock size={12} />
           <span>Secured for Sanzari Accounts</span>
         </div>
@@ -219,3 +271,4 @@ export const AuthScreen: React.FC = () => {
     </div>
   );
 };
+

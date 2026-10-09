@@ -1,12 +1,124 @@
-export type PartnerKey = 'rizwan' | 'avesh' | 'sahil';
+export type BusinessMode = 'dryfruit' | 'tourism';
+
+export type PartnerKey = 'rizwan' | 'avesh' | 'sahil' | 'bus' | 'other';
+
+export type WalletScope = 'dryfruit' | 'tourism' | 'all';
 
 export interface Wallet {
   id: string;
   name: string;
   partnerKey: PartnerKey;
+  scope?: WalletScope;
   openingBalance: number;
   currentBalance: number;
   color?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+// ==========================================
+// SANZARI TOURISM & TRAVEL TYPES
+// ==========================================
+export type TourStatus = 'Upcoming' | 'Ongoing' | 'Completed' | 'Cancelled';
+export type TourType = 'Group Tour' | 'Private Tour' | 'Custom Package';
+export type TravelClass = 'AC Train' | 'Non-AC Train' | 'Non-AC Sleeper' | 'Flight' | 'Volvo Bus' | 'Self Drive';
+export type TourPaymentMode = 'Online' | 'Offline';
+export type TourBookingStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
+
+export interface TourMember {
+  id?: string;
+  name: string;
+  age: number | string;
+  gender: 'Male' | 'Female' | 'Child';
+  phone?: string;
+  idProof?: string; // Aadhaar / Voter / Passport / DL
+  seatBerthPreference?: string; // e.g. Lower, Middle, Upper, Side Lower
+  notes?: string;
+}
+
+export interface TourBatch {
+  id: string;
+  title: string; // e.g. "Kashmir Autumn Deluxe Tour"
+  destination: string; // e.g. "Kashmir (Srinagar - Gulmarg - Pahalgam)"
+  departureDate: string; // YYYY-MM-DD e.g. "2026-10-10"
+  returnDate: string; // YYYY-MM-DD e.g. "2026-10-17"
+  durationDays: number; // e.g. 7
+  tourType: TourType; // 'Group Tour' | 'Private Tour'
+  basePricePerPerson: number;
+  // Multi-tier prices
+  priceNonAcTrain?: number;
+  priceAcTrain?: number;
+  priceFlight?: number;
+  priceChildHalf?: number;
+  totalSeats: number;
+  bookedSeats: number;
+  status: TourStatus;
+  travelMode: TravelClass | string;
+  pickupCity: string; // e.g. "Ahmedabad / Surat / Mumbai"
+  hotelDetails?: string;
+  inclusions?: string[];
+  monthKey: string; // YYYY-MM
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TourBooking {
+  id: string;
+  bookingNumber: string; // e.g. "SZ-TOUR-101"
+  tourBatchId?: string;
+  tourTitle: string;
+  destination: string;
+  tourDate: string; // YYYY-MM-DD
+  monthKey: string; // YYYY-MM
+  
+  // Primary Customer
+  customerName: string;
+  customerPhone: string;
+  customerEmail?: string;
+  city?: string;
+  emergencyContact?: string;
+  
+  // Members & Passenger list
+  membersCount: number;
+  members: TourMember[];
+  
+  // Tour & Travel Options
+  tourType: TourType; // 'Group Tour' | 'Private Tour'
+  travelClass: TravelClass; // 'AC Train' | 'Non-AC Sleeper' | 'Flight' | 'Volvo Bus'
+  packageCategory?: 'Standard' | 'Deluxe' | 'Super Deluxe' | 'Luxury';
+  
+  // Financials
+  totalAmount: number;
+  advancePaid: number;
+  pendingAmount: number;
+  paymentStatus: PaymentStatus; // 'Paid' | 'Partial' | 'Pending'
+  paymentMode: TourPaymentMode; // 'Online' | 'Offline'
+  paymentMethod: PaymentMethod; // 'UPI' | 'Cash' | 'Bank' | 'Other'
+  walletId?: string;
+  walletName: string; // e.g. "Rizwan", "Sahil", "Avesh", "Bank"
+  
+  // Additional Notes & Status
+  specialNotes?: string;
+  bookingStatus: TourBookingStatus;
+  
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface TourExpense {
+  id: string;
+  tourBatchId?: string;
+  tourTitle?: string;
+  destination?: string;
+  category: 'Hotel & Stay' | 'Train & Transport' | 'Food & Meals' | 'Sightseeing & Entry' | 'Guide & Staff' | 'Other';
+  amount: number;
+  walletId?: string;
+  walletName: string;
+  date: string;
+  monthKey: string;
+  description: string;
+  notes?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -130,6 +242,8 @@ export interface Transfer {
   date: string;
   monthKey: string;
   notes?: string;
+  createdBy?: string;
+  userEmail?: string;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -263,7 +377,7 @@ export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 
 
 export interface ActivityItem {
   id: string;
-  type: 'sale' | 'expense' | 'payment' | 'purchase' | 'transfer';
+  type: 'sale' | 'expense' | 'payment' | 'purchase' | 'transfer' | 'tourBooking' | 'tourExpense';
   title: string;
   subtitle: string;
   amount: number;
@@ -271,4 +385,19 @@ export interface ActivityItem {
   date: string;
   rawDate: string;
   walletName?: string;
+  walletId?: string;
+  notes?: string;
+  customerName?: string;
+  vendorName?: string;
+  category?: string;
+  paymentMethod?: string;
+  paymentStatus?: string;
+  createdBy?: string;
+  userEmail?: string;
+  items?: SaleItem[];
+  fromWalletName?: string;
+  toWalletName?: string;
+  fromWalletId?: string;
+  toWalletId?: string;
+  originalData?: any;
 }

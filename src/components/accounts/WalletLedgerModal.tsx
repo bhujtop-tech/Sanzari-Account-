@@ -21,6 +21,8 @@ export const WalletLedgerModal: React.FC = () => {
     expenses,
     transfers,
     purchases,
+    tourBookings,
+    tourExpenses,
     formatCurrency,
     formatDate,
     setSelectedSaleId,
@@ -30,13 +32,13 @@ export const WalletLedgerModal: React.FC = () => {
 
   // Compile full ledger for this wallet
   const ledgerItems = useMemo(() => {
-    if (!selectedWalletId) return [];
+    if (!selectedWalletId || !wallet) return [];
 
     const list: Array<{
       id: string;
       date: string;
       rawDate: string;
-      type: 'sale' | 'payment' | 'expense' | 'transfer_in' | 'transfer_out' | 'purchase';
+      type: 'sale' | 'payment' | 'expense' | 'transfer_in' | 'transfer_out' | 'purchase' | 'tour_booking' | 'tour_expense';
       title: string;
       subtitle: string;
       amount: number;
@@ -44,9 +46,15 @@ export const WalletLedgerModal: React.FC = () => {
       refId?: string;
     }> = [];
 
+    const matchesWallet = (wId?: string, wName?: string) => {
+      if (wId && wId === selectedWalletId) return true;
+      if (wName && wallet.name && wName.toLowerCase().trim() === wallet.name.toLowerCase().trim()) return true;
+      return false;
+    };
+
     // Sales paid into this wallet
     sales.forEach((s) => {
-      if (s.walletId === selectedWalletId && s.paidAmount > 0) {
+      if (matchesWallet(s.walletId, s.walletName) && s.paidAmount > 0) {
         list.push({
           id: `sale-${s.id}`,
           date: formatDate(s.date),
@@ -57,6 +65,38 @@ export const WalletLedgerModal: React.FC = () => {
           amount: s.paidAmount,
           isPositive: true,
           refId: s.id,
+        });
+      }
+    });
+
+    // Tour Bookings advance paid into this wallet
+    tourBookings.forEach((tb) => {
+      if (matchesWallet(tb.walletId, tb.walletName) && tb.advancePaid > 0) {
+        list.push({
+          id: `tb-${tb.id}`,
+          date: formatDate(tb.tourDate),
+          rawDate: tb.tourDate || tb.createdAt || '',
+          type: 'tour_booking',
+          title: `Tour Advance • ${tb.tourTitle}`,
+          subtitle: `${tb.customerName} (${tb.membersCount} Pax)`,
+          amount: tb.advancePaid,
+          isPositive: true,
+        });
+      }
+    });
+
+    // Tour Expenses paid from this wallet
+    tourExpenses.forEach((te) => {
+      if (matchesWallet(te.walletId, te.walletName) && te.amount > 0) {
+        list.push({
+          id: `te-${te.id}`,
+          date: formatDate(te.date),
+          rawDate: te.date || te.createdAt || '',
+          type: 'tour_expense',
+          title: `Tour Exp • ${te.category}`,
+          subtitle: te.description || te.tourTitle || 'Tour Expense',
+          amount: te.amount,
+          isPositive: false,
         });
       }
     });
@@ -96,25 +136,29 @@ export const WalletLedgerModal: React.FC = () => {
     // Transfers In
     transfers.forEach((t) => {
       if (t.toWalletId === selectedWalletId) {
+        const reasonStr = t.notes ? `Reason: ${t.notes}` : 'Reason: Internal Transfer';
+        const byStr = t.createdBy || t.userEmail ? ` • By: ${t.createdBy || t.userEmail}` : '';
         list.push({
           id: `tf-in-${t.id}`,
           date: formatDate(t.date),
           rawDate: t.date || t.createdAt || '',
           type: 'transfer_in',
-          title: `Transfer from ${t.fromWalletName}`,
-          subtitle: t.notes || 'Internal Transfer',
+          title: `Received from ${t.fromWalletName}`,
+          subtitle: `${reasonStr}${byStr}`,
           amount: t.amount,
           isPositive: true,
         });
       }
       if (t.fromWalletId === selectedWalletId) {
+        const reasonStr = t.notes ? `Reason: ${t.notes}` : 'Reason: Internal Transfer';
+        const byStr = t.createdBy || t.userEmail ? ` • By: ${t.createdBy || t.userEmail}` : '';
         list.push({
           id: `tf-out-${t.id}`,
           date: formatDate(t.date),
           rawDate: t.date || t.createdAt || '',
           type: 'transfer_out',
-          title: `Transfer to ${t.toWalletName}`,
-          subtitle: t.notes || 'Internal Transfer',
+          title: `Transferred to ${t.toWalletName}`,
+          subtitle: `${reasonStr}${byStr}`,
           amount: t.amount,
           isPositive: false,
         });
@@ -138,7 +182,7 @@ export const WalletLedgerModal: React.FC = () => {
     });
 
     return list.sort((a, b) => (b.rawDate > a.rawDate ? 1 : b.rawDate < a.rawDate ? -1 : 0));
-  }, [selectedWalletId, sales, payments, expenses, transfers, purchases]);
+  }, [selectedWalletId, wallet, sales, payments, expenses, transfers, purchases, tourBookings, tourExpenses]);
 
   const moneyIn = useMemo(() => {
     return ledgerItems

@@ -32,8 +32,23 @@ import {
   AppUser,
   AuditLog,
   StoreSettings,
+  TourBatch,
+  TourBooking,
+  TourExpense,
+  PaymentMethod,
+  PaymentStatus,
+  ExpenseCategory,
+  TourPaymentMode,
 } from '../types';
-import { INITIAL_WALLETS, INITIAL_PRODUCTS, INITIAL_CUSTOMERS, DEFAULT_SETTINGS } from '../data/initialData';
+import {
+  INITIAL_WALLETS,
+  INITIAL_PRODUCTS,
+  INITIAL_CUSTOMERS,
+  DEFAULT_SETTINGS,
+  INITIAL_TOUR_BATCHES,
+  INITIAL_TOUR_BOOKINGS,
+  INITIAL_TOUR_EXPENSES,
+} from '../data/initialData';
 
 // Format current date helpers
 export const getCurrentDateString = () => {
@@ -52,6 +67,24 @@ export const generateSaleNumber = () => {
   const random = Math.floor(10 + Math.random() * 90);
   return `SALE-${timestamp}${random}`;
 };
+
+// Recursively strip undefined values to prevent Firestore unsupported field value errors
+export function sanitizeForFirestore<T>(data: T): T {
+  if (data === null || data === undefined) return data;
+  if (Array.isArray(data)) {
+    return data.map((item) => sanitizeForFirestore(item)) as unknown as T;
+  }
+  if (typeof data === 'object' && !(data instanceof Date)) {
+    const cleanObj: Record<string, any> = {};
+    for (const [key, val] of Object.entries(data as Record<string, any>)) {
+      if (val !== undefined) {
+        cleanObj[key] = sanitizeForFirestore(val);
+      }
+    }
+    return cleanObj as T;
+  }
+  return data;
+}
 
 // ----------------------------------------------------
 // INITIALIZATION / SEEDING SERVICE
@@ -180,11 +213,6 @@ export async function cleanDuplicateCustomersInFirestore(): Promise<void> {
 
 export async function initializeStoreDataIfEmpty(): Promise<boolean> {
   try {
-    // Quick check: If store is already initialized locally, return immediately (0ms)
-    if (localStorage.getItem('sanzari_store_initialized_v2') === 'true') {
-      return false;
-    }
-
     const currentDate = getCurrentDateString();
     const currentMonth = getMonthKey(currentDate);
 
@@ -197,9 +225,11 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
       getDocs(collection(db, 'expenses')),
     ]);
 
+    let seeded = false;
+
     // 1. Wallets
     if (walletsSnap.empty) {
-      console.log('Seeding initial wallets...');
+      console.log('Seeding initial wallets into Firebase Firestore...');
       const batch = writeBatch(db);
       for (const w of INITIAL_WALLETS) {
         const wRef = doc(collection(db, 'wallets'));
@@ -210,6 +240,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
         });
       }
       await batch.commit();
+      seeded = true;
     }
 
     // 2. Products
@@ -420,7 +451,60 @@ export async function deleteAppUser(uid: string): Promise<void> {
     throw error;
   }
 }
+export async function ensureTourWalletsExist(): Promise<void> {
+  try {
+    const snap = await getDocs(collection(db, 'wallets'));
+    const existingNames = snap.docs.map((d) => (d.data().name || '').toLowerCase().trim());
+
+    const tourWalletsToAdd = [
+      {
+        name: 'Rizwan (Tour)',
+        partnerKey: 'rizwan' as const,
+        scope: 'tourism' as const,
+        openingBalance: 0,
+        currentBalance: 0,
+        color: '#0ea5e9',
+      },
+      {
+        name: 'Sahil (Tour)',
+        partnerKey: 'sahil' as const,
+        scope: 'tourism' as const,
+        openingBalance: 0,
+        currentBalance: 0,
+        color: '#a855f7',
+      },
+      {
+        name: 'Bus (Tour)',
+        partnerKey: 'bus' as const,
+        scope: 'tourism' as const,
+        openingBalance: 0,
+        currentBalance: 0,
+        color: '#f59e0b',
+      },
+    ];
+
+    for (const tw of tourWalletsToAdd) {
+      if (!existingNames.includes(tw.name.toLowerCase().trim())) {
+        const wRef = doc(collection(db, 'wallets'));
+        await setDoc(
+          wRef,
+          sanitizeForFirestore({
+            ...tw,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          })
+        );
+      }
+    }
+  } catch (err) {
+    console.warn('ensureTourWalletsExist warning:', err);
+  }
+}
+
 export function subscribeWallets(callback: (wallets: Wallet[]) => void) {
+  // Ensure tour wallets exist in the background
+  ensureTourWalletsExist().catch(() => {});
+
   const q = query(collection(db, 'wallets'));
   return onSnapshot(
     q,
@@ -451,6 +535,41 @@ export function subscribeWallets(callback: (wallets: Wallet[]) => void) {
       handleFirestoreError(error, OperationType.LIST, 'wallets');
     }
   );
+}
+
+export async function addWallet(data: Omit<Wallet, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
+  try {
+    const docRef = await addDoc(collection(db, 'wallets'), {
+      ...data,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    });
+    return docRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'wallets');
+    throw error;
+  }
+}
+
+export async function updateWallet(id: string, data: Partial<Wallet>): Promise<void> {
+  try {
+    await updateDoc(doc(db, 'wallets', id), {
+      ...data,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `wallets/${id}`);
+    throw error;
+  }
+}
+
+export async function deleteWallet(id: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'wallets', id));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `wallets/${id}`);
+    throw error;
+  }
 }
 
 // ----------------------------------------------------
@@ -651,6 +770,54 @@ export async function adjustStock(
   }
 }
 
+// Safe number conversion helper to prevent NaN in Firestore writes
+export function safeNum(val: any, defaultVal = 0): number {
+  if (val === undefined || val === null || val === '') return defaultVal;
+  const n = Number(val);
+  return isNaN(n) ? defaultVal : n;
+}
+
+// Wallet resolution helper to ensure a real Firestore document exists
+export async function getOrResolveWalletDoc(walletId: string, walletName?: string) {
+  if (walletId && !walletId.startsWith('init_')) {
+    try {
+      const wRef = doc(db, 'wallets', walletId);
+      const snap = await getDoc(wRef);
+      if (snap.exists()) {
+        return { id: walletId, name: snap.data().name || walletName || 'Rizwan' };
+      }
+    } catch {
+      // Fallback
+    }
+  }
+
+  // Search existing wallets in Firestore
+  try {
+    const walletsSnap = await getDocs(collection(db, 'wallets'));
+    if (!walletsSnap.empty) {
+      const matched = walletName
+        ? walletsSnap.docs.find((d) => (d.data().name || '').toLowerCase().trim() === walletName.toLowerCase().trim())
+        : null;
+      const targetDoc = matched || walletsSnap.docs[0];
+      return { id: targetDoc.id, name: targetDoc.data().name || walletName || 'Rizwan' };
+    }
+  } catch {
+    // Fallback
+  }
+
+  // Create default wallet doc if collection is empty
+  const newWRef = await addDoc(collection(db, 'wallets'), {
+    name: walletName || 'Rizwan',
+    type: 'BANK',
+    accountNumber: '',
+    currentBalance: 0,
+    isDefault: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+  return { id: newWRef.id, name: walletName || 'Rizwan' };
+}
+
 // ----------------------------------------------------
 // SALES (ATOMIC CREATION & RECORDING)
 // ----------------------------------------------------
@@ -688,17 +855,81 @@ export async function createSale(params: {
     const saleNumber = generateSaleNumber();
     const monthKey = getMonthKey(params.sale.date);
 
+    // Wallet resolution: use supplied wallet ID if valid, else resolve fast
+    let walletId = params.sale.walletId;
+    let walletName = params.sale.walletName || 'Rizwan';
+    if (!walletId || walletId.startsWith('init_')) {
+      const resolvedWallet = await getOrResolveWalletDoc(walletId, walletName);
+      walletId = resolvedWallet.id;
+      walletName = resolvedWallet.name;
+    }
+
+    // Product resolution: only fetch product collection if an item lacks a real Firestore ID
+    const needsProductSearch = params.sale.items.some((item) => !item.productId || item.productId.startsWith('init_'));
+    let allProductDocs: Array<{ id: string; name: string }> = [];
+    if (needsProductSearch) {
+      try {
+        const productsSnap = await getDocs(collection(db, 'products'));
+        allProductDocs = productsSnap.docs.map((d) => ({ id: d.id, name: d.data().name || '' }));
+      } catch {
+        // Fallback
+      }
+    }
+
+    const resolvedItems = params.sale.items.map((item) => {
+      let pId = item.productId;
+      if (!pId || pId.startsWith('init_')) {
+        const match = allProductDocs.find(
+          (pd) => getProductBaseKey(pd.name) === getProductBaseKey(item.productName)
+        );
+        if (match) pId = match.id;
+      }
+      const qty = safeNum(item.quantity, 1);
+      const price = safeNum(item.sellingPrice, 0);
+      return {
+        ...item,
+        productId: pId || '',
+        quantity: qty,
+        sellingPrice: price,
+        purchaseCost: safeNum(item.purchaseCost, 0),
+        lineTotal: safeNum(item.lineTotal, qty * price),
+      };
+    });
+
+    // Customer resolution
+    let customerId = params.sale.customerId;
+    if (customerId && customerId.startsWith('init_')) {
+      try {
+        const custsSnap = await getDocs(collection(db, 'customers'));
+        const matchCust = custsSnap.docs.find(
+          (cd) => (cd.data().name || '').toLowerCase().trim() === (params.sale.customerName || '').toLowerCase().trim()
+        );
+        customerId = matchCust ? matchCust.id : '';
+      } catch {
+        customerId = '';
+      }
+    }
+
+    const subtotal = safeNum(params.sale.subtotal);
+    const discount = safeNum(params.sale.discount);
+    const total = safeNum(params.sale.total);
+    const paidAmount = safeNum(params.sale.paidAmount);
+    const pendingAmount = safeNum(params.sale.pendingAmount);
+
     let createdSale: Sale | null = null;
 
     await runTransaction(db, async (transaction) => {
-      // 1. Fetch wallet
-      const walletRef = doc(db, 'wallets', params.sale.walletId);
-      const walletSnap = await transaction.get(walletRef);
-      if (!walletSnap.exists()) throw new Error('Selected Wallet not found');
-      const currentWalletBalance = walletSnap.data().currentBalance || 0;
+      // ========================================================
+      // 1. ALL READS FIRST (Firestore requires reads before writes)
+      // ========================================================
 
-      // 2. Fetch customer (if existing)
-      let customerRef = params.sale.customerId ? doc(db, 'customers', params.sale.customerId) : null;
+      // Read 1: Wallet
+      const walletRef = doc(db, 'wallets', walletId);
+      const walletSnap = await transaction.get(walletRef);
+      const currentWalletBalance = walletSnap.exists() ? safeNum(walletSnap.data().currentBalance) : 0;
+
+      // Read 2: Customer (if existing)
+      let customerRef = customerId ? doc(db, 'customers', customerId) : null;
       let customerData: Customer | null = null;
       if (customerRef) {
         const custSnap = await transaction.get(customerRef);
@@ -707,25 +938,39 @@ export async function createSale(params: {
         }
       }
 
-      // If customer doesn't exist yet, create a new customer doc ref
       if (!customerRef || !customerData) {
         customerRef = doc(collection(db, 'customers'));
       }
 
-      // 3. Update customer stats
-      const prevTotalSpent = customerData ? customerData.totalSpent : 0;
-      const prevTotalOrders = customerData ? customerData.totalOrders : 0;
-      const prevPending = customerData ? customerData.pendingBalance : 0;
+      // Read 3: Products in parallel
+      const validProductItems = resolvedItems.filter((i) => i.productId && !i.productId.startsWith('init_'));
+      const productRefs = validProductItems.map((i) => doc(db, 'products', i.productId));
+      const pSnaps = await Promise.all(productRefs.map((ref) => transaction.get(ref)));
 
-      const newTotalSpent = prevTotalSpent + params.sale.total;
+      const productSnapshots = validProductItems.map((item, idx) => ({
+        item,
+        ref: productRefs[idx],
+        currentStock: pSnaps[idx].exists() ? safeNum(pSnaps[idx].data().currentStock) : 0,
+      }));
+
+      // ========================================================
+      // 2. ALL WRITES AFTER ALL READS
+      // ========================================================
+
+      // Write 1: Customer stats
+      const prevTotalSpent = customerData ? safeNum(customerData.totalSpent) : 0;
+      const prevTotalOrders = customerData ? safeNum(customerData.totalOrders) : 0;
+      const prevPending = customerData ? safeNum(customerData.pendingBalance) : 0;
+
+      const newTotalSpent = prevTotalSpent + total;
       const newTotalOrders = prevTotalOrders + 1;
-      const newPending = prevPending + params.sale.pendingAmount;
+      const newPending = prevPending + pendingAmount;
 
       transaction.set(
         customerRef,
         {
-          name: params.sale.customerName,
-          phone: params.sale.customerPhone,
+          name: params.sale.customerName || 'Walk-in Customer',
+          phone: params.sale.customerPhone || '',
           totalSpent: newTotalSpent,
           totalOrders: newTotalOrders,
           pendingBalance: newPending,
@@ -736,19 +981,32 @@ export async function createSale(params: {
         { merge: true }
       );
 
-      // 4. Update Wallet balance if paidAmount > 0
-      if (params.sale.paidAmount > 0) {
-        transaction.update(walletRef, {
-          currentBalance: currentWalletBalance + params.sale.paidAmount,
-          updatedAt: new Date().toISOString(),
-        });
+      // Write 2: Wallet balance
+      if (paidAmount > 0) {
+        transaction.set(
+          walletRef,
+          {
+            currentBalance: currentWalletBalance + paidAmount,
+            updatedAt: new Date().toISOString(),
+          },
+          { merge: true }
+        );
       }
 
-      // 5. Create Sale doc
+      // Write 3: Create Sale document
       const saleRef = doc(collection(db, 'sales'));
       const fullSaleData: Omit<Sale, 'id'> = {
         ...params.sale,
+        walletId,
+        walletName,
         customerId: customerRef.id,
+        subtotal,
+        discount,
+        total,
+        paidAmount,
+        pendingAmount,
+        itemCount: resolvedItems.length,
+        items: resolvedItems,
         saleNumber,
         monthKey,
         createdAt: new Date().toISOString(),
@@ -758,17 +1016,17 @@ export async function createSale(params: {
       transaction.set(saleRef, fullSaleData);
       createdSale = { id: saleRef.id, ...fullSaleData };
 
-      // 6. If paidAmount > 0, log Payment
-      if (params.sale.paidAmount > 0) {
+      // Write 4: Payment document
+      if (paidAmount > 0) {
         const paymentRef = doc(collection(db, 'payments'));
         const paymentData: Omit<Payment, 'id'> = {
           customerId: customerRef.id,
           customerName: params.sale.customerName,
           saleId: saleRef.id,
-          walletId: params.sale.walletId,
-          walletName: params.sale.walletName,
-          amount: params.sale.paidAmount,
-          paymentMethod: params.sale.paymentMethod,
+          walletId,
+          walletName,
+          amount: paidAmount,
+          paymentMethod: params.sale.paymentMethod || 'UPI',
           date: params.sale.date,
           monthKey,
           notes: `Payment for ${saleNumber}`,
@@ -778,44 +1036,37 @@ export async function createSale(params: {
         transaction.set(paymentRef, paymentData);
       }
 
-      // 7. Update product stock & log movements
-      for (const item of params.sale.items) {
-        if (item.productId) {
-          const productRef = doc(db, 'products', item.productId);
-          const pSnap = await transaction.get(productRef);
-          if (pSnap.exists()) {
-            const currentStock = pSnap.data().currentStock || 0;
-            const newStock = Math.max(0, currentStock - item.quantity);
-            transaction.update(productRef, {
-              currentStock: newStock,
-              updatedAt: new Date().toISOString(),
-            });
+      // Write 5: Stock update & movement log
+      for (const ps of productSnapshots) {
+        const newStock = Math.max(0, ps.currentStock - ps.item.quantity);
+        transaction.update(ps.ref, {
+          currentStock: newStock,
+          updatedAt: new Date().toISOString(),
+        });
 
-            const stockMoveRef = doc(collection(db, 'stockMovements'));
-            transaction.set(stockMoveRef, {
-              productId: item.productId,
-              productName: item.productName,
-              type: 'SALE',
-              quantity: -item.quantity,
-              unit: item.unit,
-              referenceId: saleRef.id,
-              date: params.sale.date,
-              notes: `Sale ${saleNumber} to ${params.sale.customerName}`,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString(),
-            });
-          }
-        }
+        const stockMoveRef = doc(collection(db, 'stockMovements'));
+        transaction.set(stockMoveRef, {
+          productId: ps.item.productId,
+          productName: ps.item.productName,
+          type: 'SALE',
+          quantity: -ps.item.quantity,
+          unit: ps.item.unit,
+          referenceId: saleRef.id,
+          date: params.sale.date,
+          notes: `Sale ${saleNumber} to ${params.sale.customerName}`,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      // 8. Audit log
+      // Write 6: Audit log
       const auditRef = doc(collection(db, 'auditLogs'));
       transaction.set(auditRef, {
         userEmail: params.userEmail,
         action: 'CREATE_SALE',
         recordType: 'sale',
         recordId: saleRef.id,
-        newValue: JSON.stringify({ saleNumber, total: params.sale.total, paid: params.sale.paidAmount }),
+        newValue: JSON.stringify({ saleNumber, total, paid: paidAmount }),
         timestamp: new Date().toISOString(),
       });
     });
@@ -823,6 +1074,112 @@ export async function createSale(params: {
     return createdSale!;
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'sales');
+    throw error;
+  }
+}
+
+export async function deleteSale(saleId: string, userEmail: string): Promise<void> {
+  try {
+    const saleRef = doc(db, 'sales', saleId);
+    const saleSnap = await getDoc(saleRef);
+    if (!saleSnap.exists()) {
+      throw new Error('Sale record not found');
+    }
+
+    const saleData = { id: saleSnap.id, ...(saleSnap.data() as Omit<Sale, 'id'>) };
+
+    await runTransaction(db, async (transaction) => {
+      // 1. ALL READS FIRST
+      let walletRef = saleData.walletId ? doc(db, 'wallets', saleData.walletId) : null;
+      let walletSnap = null;
+      let currentWalletBalance = 0;
+      if (walletRef) {
+        walletSnap = await transaction.get(walletRef);
+        if (walletSnap.exists()) {
+          currentWalletBalance = safeNum(walletSnap.data().currentBalance);
+        }
+      }
+
+      let customerRef = saleData.customerId ? doc(db, 'customers', saleData.customerId) : null;
+      let customerSnap = null;
+      let customerData: Customer | null = null;
+      if (customerRef) {
+        customerSnap = await transaction.get(customerRef);
+        if (customerSnap.exists()) {
+          customerData = { id: customerSnap.id, ...(customerSnap.data() as Omit<Customer, 'id'>) };
+        }
+      }
+
+      const items = saleData.items || [];
+      const validItems = items.filter((i) => i.productId && !i.productId.startsWith('init_'));
+      const productRefs = validItems.map((i) => doc(db, 'products', i.productId));
+      const pSnaps = await Promise.all(productRefs.map((ref) => transaction.get(ref)));
+
+      // 2. ALL WRITES SECOND
+      // Restore product stock
+      validItems.forEach((item, idx) => {
+        const pSnap = pSnaps[idx];
+        if (pSnap.exists()) {
+          const curStock = safeNum(pSnap.data().currentStock);
+          transaction.update(productRefs[idx], {
+            currentStock: curStock + safeNum(item.quantity),
+            updatedAt: new Date().toISOString(),
+          });
+
+          const stockMoveRef = doc(collection(db, 'stockMovements'));
+          transaction.set(stockMoveRef, {
+            productId: item.productId,
+            productName: item.productName,
+            type: 'SALE_CANCELLED',
+            quantity: safeNum(item.quantity),
+            unit: item.unit,
+            referenceId: saleId,
+            date: getCurrentDateString(),
+            notes: `Stock restored from deleted Sale ${saleData.saleNumber}`,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      });
+
+      // Deduct paid amount from wallet
+      if (walletRef && walletSnap && walletSnap.exists() && safeNum(saleData.paidAmount) > 0) {
+        transaction.update(walletRef, {
+          currentBalance: Math.max(0, currentWalletBalance - safeNum(saleData.paidAmount)),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Revert customer statistics
+      if (customerRef && customerData) {
+        const newTotalSpent = Math.max(0, safeNum(customerData.totalSpent) - safeNum(saleData.total));
+        const newTotalOrders = Math.max(0, safeNum(customerData.totalOrders) - 1);
+        const newPending = Math.max(0, safeNum(customerData.pendingBalance) - safeNum(saleData.pendingAmount));
+
+        transaction.update(customerRef, {
+          totalSpent: newTotalSpent,
+          totalOrders: newTotalOrders,
+          pendingBalance: newPending,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      // Delete the sale document
+      transaction.delete(saleRef);
+
+      // Audit log
+      const auditRef = doc(collection(db, 'auditLogs'));
+      transaction.set(auditRef, {
+        userEmail,
+        action: 'DELETE_SALE',
+        recordType: 'sale',
+        recordId: saleId,
+        oldValue: JSON.stringify({ saleNumber: saleData.saleNumber, total: saleData.total }),
+        timestamp: new Date().toISOString(),
+      });
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `sales/${saleId}`);
     throw error;
   }
 }
@@ -856,7 +1213,28 @@ export async function recordSalesReturn(params: {
     let newReturnId = '';
 
     await runTransaction(db, async (transaction) => {
-      // 1. Create return record
+      // 1. ALL READS FIRST
+      const productRef = params.salesReturn.productId ? doc(db, 'products', params.salesReturn.productId) : null;
+      let productSnap = null;
+      if (productRef) {
+        productSnap = await transaction.get(productRef);
+      }
+
+      let customerRef = null;
+      let customerSnap = null;
+      if (params.salesReturn.refundMethod === 'DeductPending' && params.salesReturn.customerId) {
+        customerRef = doc(db, 'customers', params.salesReturn.customerId);
+        customerSnap = await transaction.get(customerRef);
+      }
+
+      let walletRef = null;
+      let walletSnap = null;
+      if (params.salesReturn.refundMethod === 'WalletRefund' && params.salesReturn.walletId) {
+        walletRef = doc(db, 'wallets', params.salesReturn.walletId);
+        walletSnap = await transaction.get(walletRef);
+      }
+
+      // 2. ALL WRITES SECOND
       const returnRef = doc(collection(db, 'returns'));
       newReturnId = returnRef.id;
 
@@ -868,10 +1246,7 @@ export async function recordSalesReturn(params: {
       };
       transaction.set(returnRef, returnData);
 
-      // 2. Add returned quantity back to product stock
-      const productRef = doc(db, 'products', params.salesReturn.productId);
-      const productSnap = await transaction.get(productRef);
-      if (productSnap.exists()) {
+      if (productRef && productSnap && productSnap.exists()) {
         const curStock = productSnap.data().currentStock || 0;
         transaction.update(productRef, {
           currentStock: curStock + params.salesReturn.quantity,
@@ -879,7 +1254,6 @@ export async function recordSalesReturn(params: {
         });
       }
 
-      // 3. Log stock movement (+ quantity returned)
       const stockMoveRef = doc(collection(db, 'stockMovements'));
       transaction.set(stockMoveRef, {
         productId: params.salesReturn.productId,
@@ -894,37 +1268,21 @@ export async function recordSalesReturn(params: {
         updatedAt: new Date().toISOString(),
       });
 
-      // 4. Handle refund action (Deduct customer pending balance OR Wallet Cash refund)
-      if (
-        params.salesReturn.refundMethod === 'DeductPending' &&
-        params.salesReturn.customerId
-      ) {
-        const customerRef = doc(db, 'customers', params.salesReturn.customerId);
-        const customerSnap = await transaction.get(customerRef);
-        if (customerSnap.exists()) {
-          const curPending = customerSnap.data().pendingBalance || 0;
-          const newPending = Math.max(0, curPending - params.salesReturn.totalAmount);
-          transaction.update(customerRef, {
-            pendingBalance: newPending,
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      } else if (
-        params.salesReturn.refundMethod === 'WalletRefund' &&
-        params.salesReturn.walletId
-      ) {
-        const walletRef = doc(db, 'wallets', params.salesReturn.walletId);
-        const walletSnap = await transaction.get(walletRef);
-        if (walletSnap.exists()) {
-          const curBal = walletSnap.data().currentBalance || 0;
-          transaction.update(walletRef, {
-            currentBalance: curBal - params.salesReturn.totalAmount,
-            updatedAt: new Date().toISOString(),
-          });
-        }
+      if (customerRef && customerSnap && customerSnap.exists()) {
+        const curPending = customerSnap.data().pendingBalance || 0;
+        const newPending = Math.max(0, curPending - params.salesReturn.totalAmount);
+        transaction.update(customerRef, {
+          pendingBalance: newPending,
+          updatedAt: new Date().toISOString(),
+        });
+      } else if (walletRef && walletSnap && walletSnap.exists()) {
+        const curBal = walletSnap.data().currentBalance || 0;
+        transaction.update(walletRef, {
+          currentBalance: curBal - params.salesReturn.totalAmount,
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      // 5. Audit log
       const auditRef = doc(collection(db, 'auditLogs'));
       transaction.set(auditRef, {
         userEmail: params.userEmail,
@@ -970,23 +1328,31 @@ export async function createExpense(params: {
 }): Promise<string> {
   try {
     const monthKey = getMonthKey(params.expense.date);
+    const resolvedWallet = await getOrResolveWalletDoc(params.expense.walletId, params.expense.walletName);
+    const expAmount = safeNum(params.expense.amount);
     let newExpenseId = '';
 
     await runTransaction(db, async (transaction) => {
-      const walletRef = doc(db, 'wallets', params.expense.walletId);
+      const walletRef = doc(db, 'wallets', resolvedWallet.id);
       const walletSnap = await transaction.get(walletRef);
-      if (!walletSnap.exists()) throw new Error('Wallet not found');
 
-      const currentBalance = walletSnap.data().currentBalance || 0;
-      transaction.update(walletRef, {
-        currentBalance: currentBalance - params.expense.amount,
-        updatedAt: new Date().toISOString(),
-      });
+      const currentBalance = walletSnap.exists() ? safeNum(walletSnap.data().currentBalance) : 0;
+      transaction.set(
+        walletRef,
+        {
+          currentBalance: currentBalance - expAmount,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
 
       const expenseRef = doc(collection(db, 'expenses'));
       newExpenseId = expenseRef.id;
       transaction.set(expenseRef, {
         ...params.expense,
+        walletId: resolvedWallet.id,
+        walletName: resolvedWallet.name,
+        amount: expAmount,
         monthKey,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -998,7 +1364,7 @@ export async function createExpense(params: {
         action: 'CREATE_EXPENSE',
         recordType: 'expense',
         recordId: expenseRef.id,
-        newValue: JSON.stringify({ category: params.expense.category, amount: params.expense.amount, wallet: params.expense.walletName }),
+        newValue: JSON.stringify({ category: params.expense.category, amount: expAmount, wallet: resolvedWallet.name }),
         timestamp: new Date().toISOString(),
       });
     });
@@ -1036,49 +1402,61 @@ export async function createPayment(params: {
 }): Promise<string> {
   try {
     const monthKey = getMonthKey(params.payment.date);
+    const resolvedWallet = await getOrResolveWalletDoc(params.payment.walletId, params.payment.walletName);
+    const payAmount = safeNum(params.payment.amount);
     let newPaymentId = '';
 
     await runTransaction(db, async (transaction) => {
-      // 1. Update wallet balance (increase)
-      const walletRef = doc(db, 'wallets', params.payment.walletId);
+      // 1. ALL READS FIRST
+      const walletRef = doc(db, 'wallets', resolvedWallet.id);
       const walletSnap = await transaction.get(walletRef);
-      if (!walletSnap.exists()) throw new Error('Wallet not found');
+      const currentWalletBal = walletSnap.exists() ? safeNum(walletSnap.data().currentBalance) : 0;
 
-      const currentWalletBal = walletSnap.data().currentBalance || 0;
-      transaction.update(walletRef, {
-        currentBalance: currentWalletBal + params.payment.amount,
-        updatedAt: new Date().toISOString(),
-      });
+      let customerRef = params.payment.customerId && !params.payment.customerId.startsWith('init_')
+        ? doc(db, 'customers', params.payment.customerId)
+        : null;
+      let customerSnap = null;
+      if (customerRef) {
+        customerSnap = await transaction.get(customerRef);
+      }
 
-      // 2. Update Customer pending balance (decrease)
-      const customerRef = doc(db, 'customers', params.payment.customerId);
-      const custSnap = await transaction.get(customerRef);
-      if (custSnap.exists()) {
-        const currentPending = custSnap.data().pendingBalance || 0;
+      // 2. ALL WRITES SECOND
+      transaction.set(
+        walletRef,
+        {
+          currentBalance: currentWalletBal + payAmount,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      if (customerRef && customerSnap && customerSnap.exists()) {
+        const currentPending = safeNum(customerSnap.data().pendingBalance);
         transaction.update(customerRef, {
-          pendingBalance: Math.max(0, currentPending - params.payment.amount),
+          pendingBalance: Math.max(0, currentPending - payAmount),
           updatedAt: new Date().toISOString(),
         });
       }
 
-      // 3. Create Payment document
       const paymentRef = doc(collection(db, 'payments'));
       newPaymentId = paymentRef.id;
       transaction.set(paymentRef, {
         ...params.payment,
+        walletId: resolvedWallet.id,
+        walletName: resolvedWallet.name,
+        amount: payAmount,
         monthKey,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
-      // 4. Audit log
       const auditRef = doc(collection(db, 'auditLogs'));
       transaction.set(auditRef, {
         userEmail: params.userEmail,
         action: 'CREATE_PAYMENT',
         recordType: 'payment',
         recordId: paymentRef.id,
-        newValue: JSON.stringify({ customer: params.payment.customerName, amount: params.payment.amount, wallet: params.payment.walletName }),
+        newValue: JSON.stringify({ customer: params.payment.customerName, amount: payAmount, wallet: resolvedWallet.name }),
         timestamp: new Date().toISOString(),
       });
     });
@@ -1149,6 +1527,8 @@ export async function createTransfer(params: {
       transaction.set(transferRef, {
         ...params.transfer,
         monthKey,
+        createdBy: params.userEmail || 'system',
+        userEmail: params.userEmail || '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
@@ -1233,9 +1613,25 @@ export async function createPurchase(params: {
     let newPurchaseId = '';
 
     await runTransaction(db, async (transaction) => {
-      // 1. Update product currentStock & cost trend
+      // 1. ALL READS FIRST
       const productRef = doc(db, 'products', params.purchase.productId);
       const productSnap = await transaction.get(productRef);
+
+      let walletRef = null;
+      let walletSnap = null;
+      if (params.purchase.paymentStatus === 'Paid' && params.purchase.walletId) {
+        walletRef = doc(db, 'wallets', params.purchase.walletId);
+        walletSnap = await transaction.get(walletRef);
+      }
+
+      let vendorRef = null;
+      let vendorSnap = null;
+      if (params.purchase.vendorId) {
+        vendorRef = doc(db, 'vendors', params.purchase.vendorId);
+        vendorSnap = await transaction.get(vendorRef);
+      }
+
+      // 2. ALL WRITES SECOND
       if (productSnap.exists()) {
         const pData = productSnap.data();
         const curStock = pData.currentStock || 0;
@@ -1258,36 +1654,25 @@ export async function createPurchase(params: {
         });
       }
 
-      // 2. If paid and wallet provided, decrease wallet balance
-      if (params.purchase.paymentStatus === 'Paid' && params.purchase.walletId) {
-        const walletRef = doc(db, 'wallets', params.purchase.walletId);
-        const walletSnap = await transaction.get(walletRef);
-        if (walletSnap.exists()) {
-          const curBal = walletSnap.data().currentBalance || 0;
-          transaction.update(walletRef, {
-            currentBalance: curBal - params.purchase.totalCost,
-            updatedAt: new Date().toISOString(),
-          });
-        }
+      if (walletRef && walletSnap && walletSnap.exists()) {
+        const curBal = walletSnap.data().currentBalance || 0;
+        transaction.update(walletRef, {
+          currentBalance: curBal - params.purchase.totalCost,
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      // 3. If vendor exists, update vendor totalPurchases and pending
-      if (params.purchase.vendorId) {
-        const vendorRef = doc(db, 'vendors', params.purchase.vendorId);
-        const vSnap = await transaction.get(vendorRef);
-        if (vSnap.exists()) {
-          const prevPurchases = vSnap.data().totalPurchases || 0;
-          const prevPending = vSnap.data().pendingPayment || 0;
-          const pendingAdd = params.purchase.paymentStatus === 'Unpaid' ? params.purchase.totalCost : 0;
-          transaction.update(vendorRef, {
-            totalPurchases: prevPurchases + params.purchase.totalCost,
-            pendingPayment: prevPending + pendingAdd,
-            updatedAt: new Date().toISOString(),
-          });
-        }
+      if (vendorRef && vendorSnap && vendorSnap.exists()) {
+        const prevPurchases = vendorSnap.data().totalPurchases || 0;
+        const prevPending = vendorSnap.data().pendingPayment || 0;
+        const pendingAdd = params.purchase.paymentStatus === 'Unpaid' ? params.purchase.totalCost : 0;
+        transaction.update(vendorRef, {
+          totalPurchases: prevPurchases + params.purchase.totalCost,
+          pendingPayment: prevPending + pendingAdd,
+          updatedAt: new Date().toISOString(),
+        });
       }
 
-      // 4. Create purchase record
       const purchaseRef = doc(collection(db, 'purchases'));
       newPurchaseId = purchaseRef.id;
       transaction.set(purchaseRef, {
@@ -1297,7 +1682,6 @@ export async function createPurchase(params: {
         updatedAt: new Date().toISOString(),
       });
 
-      // 5. Log Stock Movement
       const stockMoveRef = doc(collection(db, 'stockMovements'));
       transaction.set(stockMoveRef, {
         productId: params.purchase.productId,
@@ -1312,7 +1696,6 @@ export async function createPurchase(params: {
         updatedAt: new Date().toISOString(),
       });
 
-      // 6. Audit log
       const auditRef = doc(collection(db, 'auditLogs'));
       transaction.set(auditRef, {
         userEmail: params.userEmail,
@@ -1387,3 +1770,752 @@ export async function updateStoreSettings(data: Partial<StoreSettings>): Promise
     throw error;
   }
 }
+
+// ----------------------------------------------------
+// SANZARI TOURISM: TOUR BATCHES (Tour Folders / Dates)
+// ----------------------------------------------------
+export function subscribeTourBatches(callback: (batches: TourBatch[]) => void) {
+  const q = query(collection(db, 'tourBatches'), orderBy('departureDate', 'asc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const batches: TourBatch[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<TourBatch, 'id'>),
+      }));
+      callback(batches);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tourBatches');
+    }
+  );
+}
+
+export async function addTourBatch(
+  batchData: Omit<TourBatch, 'id' | 'createdAt' | 'updatedAt' | 'bookedSeats'>,
+  userEmail: string
+): Promise<string> {
+  try {
+    const batchRef = doc(collection(db, 'tourBatches'));
+    const monthKey = getMonthKey(batchData.departureDate);
+    
+    await setDoc(batchRef, sanitizeForFirestore({
+      ...batchData,
+      notes: batchData.notes || '',
+      bookedSeats: 0,
+      monthKey,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    }));
+
+    // Audit log
+    await addDoc(collection(db, 'auditLogs'), sanitizeForFirestore({
+      userEmail,
+      action: 'CREATE_TOUR_BATCH',
+      recordType: 'tourBatches',
+      recordId: batchRef.id,
+      newValue: JSON.stringify({ title: batchData.title, departureDate: batchData.departureDate }),
+      timestamp: new Date().toISOString(),
+    }));
+
+    return batchRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'tourBatches');
+    throw error;
+  }
+}
+
+export async function updateTourBatch(
+  id: string,
+  batchData: Partial<TourBatch>,
+  userEmail: string
+): Promise<void> {
+  try {
+    const batchRef = doc(db, 'tourBatches', id);
+    await updateDoc(batchRef, sanitizeForFirestore({
+      ...batchData,
+      updatedAt: new Date().toISOString(),
+    }));
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'UPDATE_TOUR_BATCH',
+      recordType: 'tourBatches',
+      recordId: id,
+      newValue: JSON.stringify(batchData),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBatches/${id}`);
+    throw error;
+  }
+}
+
+export async function deleteTourBatch(id: string, userEmail: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'tourBatches', id));
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'DELETE_TOUR_BATCH',
+      recordType: 'tourBatches',
+      recordId: id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `tourBatches/${id}`);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// SANZARI TOURISM: TOUR BOOKINGS
+// ----------------------------------------------------
+export function subscribeTourBookings(callback: (bookings: TourBooking[]) => void) {
+  const q = query(collection(db, 'tourBookings'), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const bookings: TourBooking[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<TourBooking, 'id'>),
+      }));
+      callback(bookings);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tourBookings');
+    }
+  );
+}
+
+export async function addTourBooking(
+  bookingData: Omit<TourBooking, 'id' | 'bookingNumber' | 'createdAt' | 'updatedAt' | 'pendingAmount' | 'paymentStatus'>,
+  userEmail: string
+): Promise<string> {
+  try {
+    const bookingRef = doc(collection(db, 'tourBookings'));
+    const bookingNumber = `SZ-TOUR-${Date.now().toString().slice(-4)}`;
+    const pendingAmount = Math.max(0, Number(bookingData.totalAmount) - Number(bookingData.advancePaid || 0));
+    const paymentStatus =
+      pendingAmount === 0 ? 'Paid' : Number(bookingData.advancePaid) > 0 ? 'Partial' : 'Pending';
+    const monthKey = getMonthKey(bookingData.tourDate);
+
+    // Resolve target wallet ID outside transaction
+    let targetWalletId = '';
+    if (Number(bookingData.advancePaid) > 0 && bookingData.walletName) {
+      try {
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const targetWallet = walletsSnap.docs.find(
+          (w) => (w.data().name || '').toLowerCase() === (bookingData.walletName || '').toLowerCase()
+        );
+        if (targetWallet) targetWalletId = targetWallet.id;
+      } catch {
+        // Fallback
+      }
+    }
+
+    await runTransaction(db, async (transaction) => {
+      // READS FIRST
+      let batchRef = null;
+      let batchSnap = null;
+      if (bookingData.tourBatchId) {
+        batchRef = doc(db, 'tourBatches', bookingData.tourBatchId);
+        batchSnap = await transaction.get(batchRef);
+      }
+
+      let wRef = null;
+      let wSnap = null;
+      if (targetWalletId) {
+        wRef = doc(db, 'wallets', targetWalletId);
+        wSnap = await transaction.get(wRef);
+      }
+
+      // WRITES SECOND
+      if (batchRef && batchSnap && batchSnap.exists()) {
+        const currentBooked = Number(batchSnap.data().bookedSeats || 0);
+        const newBooked = currentBooked + Number(bookingData.membersCount || 1);
+        transaction.update(batchRef, {
+          bookedSeats: newBooked,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      if (wRef && wSnap && wSnap.exists()) {
+        const currentBal = Number(wSnap.data().currentBalance || 0);
+        transaction.update(wRef, {
+          currentBalance: currentBal + Number(bookingData.advancePaid),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      transaction.set(bookingRef, sanitizeForFirestore({
+        ...bookingData,
+        bookingNumber,
+        monthKey,
+        pendingAmount,
+        paymentStatus,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+    });
+
+    // Audit log
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'CREATE_TOUR_BOOKING',
+      recordType: 'tourBookings',
+      recordId: bookingRef.id,
+      newValue: JSON.stringify({ bookingNumber, customer: bookingData.customerName, total: bookingData.totalAmount }),
+      timestamp: new Date().toISOString(),
+    });
+
+    return bookingRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'tourBookings');
+    throw error;
+  }
+}
+
+export async function recordTourBookingPayment(params: {
+  bookingId: string;
+  amount: number;
+  walletName: string;
+  paymentMethod: PaymentMethod;
+  paymentMode: TourPaymentMode;
+  notes?: string;
+  userEmail: string;
+}): Promise<void> {
+  try {
+    let targetWalletId = '';
+    if (params.walletName) {
+      try {
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const targetWallet = walletsSnap.docs.find(
+          (w) => (w.data().name || '').toLowerCase() === (params.walletName || '').toLowerCase()
+        );
+        if (targetWallet) targetWalletId = targetWallet.id;
+      } catch {
+        // Fallback
+      }
+    }
+
+    await runTransaction(db, async (transaction) => {
+      // READS FIRST
+      const bookingRef = doc(db, 'tourBookings', params.bookingId);
+      const bSnap = await transaction.get(bookingRef);
+      if (!bSnap.exists()) throw new Error('Tour booking not found');
+
+      let wRef = null;
+      let wSnap = null;
+      if (targetWalletId) {
+        wRef = doc(db, 'wallets', targetWalletId);
+        wSnap = await transaction.get(wRef);
+      }
+
+      // WRITES SECOND
+      const bData = bSnap.data() as TourBooking;
+      const newAdvance = Number(bData.advancePaid || 0) + Number(params.amount);
+      const newPending = Math.max(0, Number(bData.totalAmount || 0) - newAdvance);
+      const newPaymentStatus = newPending === 0 ? 'Paid' : 'Partial';
+
+      transaction.update(bookingRef, {
+        advancePaid: newAdvance,
+        pendingAmount: newPending,
+        paymentStatus: newPaymentStatus,
+        updatedAt: new Date().toISOString(),
+      });
+
+      if (wRef && wSnap && wSnap.exists()) {
+        const currentBal = Number(wSnap.data().currentBalance || 0);
+        transaction.update(wRef, {
+          currentBalance: currentBal + Number(params.amount),
+          updatedAt: new Date().toISOString(),
+        });
+      }
+    });
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail: params.userEmail,
+      action: 'TOUR_PAYMENT_COLLECTED',
+      recordType: 'tourBookings',
+      recordId: params.bookingId,
+      newValue: JSON.stringify({ amount: params.amount, wallet: params.walletName }),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, `tourBookings/${params.bookingId}/payment`);
+    throw error;
+  }
+}
+
+export async function updateTourBooking(
+  id: string,
+  bookingData: Partial<TourBooking>,
+  userEmail: string
+): Promise<void> {
+  try {
+    const bookingRef = doc(db, 'tourBookings', id);
+    const bSnap = await getDoc(bookingRef);
+    if (!bSnap.exists()) {
+      throw new Error('Tour booking not found');
+    }
+    const existing = bSnap.data() as TourBooking;
+
+    const totalAmount =
+      bookingData.totalAmount !== undefined ? Number(bookingData.totalAmount) : Number(existing.totalAmount || 0);
+    const advancePaid =
+      bookingData.advancePaid !== undefined ? Number(bookingData.advancePaid) : Number(existing.advancePaid || 0);
+    const pendingAmount = Math.max(0, totalAmount - advancePaid);
+    const paymentStatus = pendingAmount === 0 ? 'Paid' : advancePaid > 0 ? 'Partial' : 'Pending';
+
+    const oldAdvance = Number(existing.advancePaid || 0);
+    const diffAdvance = advancePaid - oldAdvance;
+
+    let targetWalletRef = null;
+    if (diffAdvance !== 0 && (bookingData.walletName || existing.walletName)) {
+      const targetWalletName = bookingData.walletName || existing.walletName;
+      try {
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const targetWallet = walletsSnap.docs.find(
+          (w) => (w.data().name || '').toLowerCase() === (targetWalletName || '').toLowerCase()
+        );
+        if (targetWallet) {
+          targetWalletRef = doc(db, 'wallets', targetWallet.id);
+        }
+      } catch {
+        // Fallback
+      }
+    }
+
+    const oldBatchId = existing.tourBatchId;
+    const newBatchId = bookingData.tourBatchId !== undefined ? bookingData.tourBatchId : existing.tourBatchId;
+    const oldMembers = Number(existing.membersCount || 1);
+    const newMembers = bookingData.membersCount !== undefined ? Number(bookingData.membersCount) : oldMembers;
+
+    const oldBatchRef = oldBatchId ? doc(db, 'tourBatches', oldBatchId) : null;
+    const newBatchRef = newBatchId && newBatchId !== oldBatchId ? doc(db, 'tourBatches', newBatchId) : null;
+
+    await runTransaction(db, async (transaction) => {
+      let wSnap = null;
+      if (targetWalletRef) {
+        wSnap = await transaction.get(targetWalletRef);
+      }
+
+      let oldBatchSnap = null;
+      if (oldBatchRef) {
+        oldBatchSnap = await transaction.get(oldBatchRef);
+      }
+
+      let newBatchSnap = null;
+      if (newBatchRef) {
+        newBatchSnap = await transaction.get(newBatchRef);
+      }
+
+      // WRITES SECOND
+      if (targetWalletRef && wSnap && wSnap.exists()) {
+        const currentBal = Number(wSnap.data().currentBalance || 0);
+        transaction.update(targetWalletRef, {
+          currentBalance: currentBal + diffAdvance,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      if (oldBatchRef && oldBatchSnap && oldBatchSnap.exists()) {
+        if (oldBatchId === newBatchId && oldMembers !== newMembers) {
+          const diffSeats = newMembers - oldMembers;
+          const booked = Number(oldBatchSnap.data().bookedSeats || 0);
+          transaction.update(oldBatchRef, {
+            bookedSeats: Math.max(0, booked + diffSeats),
+            updatedAt: new Date().toISOString(),
+          });
+        } else if (oldBatchId !== newBatchId) {
+          const booked = Number(oldBatchSnap.data().bookedSeats || 0);
+          transaction.update(oldBatchRef, {
+            bookedSeats: Math.max(0, booked - oldMembers),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+      }
+
+      if (newBatchRef && newBatchSnap && newBatchSnap.exists() && oldBatchId !== newBatchId) {
+        const booked = Number(newBatchSnap.data().bookedSeats || 0);
+        transaction.update(newBatchRef, {
+          bookedSeats: booked + newMembers,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      const cleanPayload = sanitizeForFirestore({
+        ...bookingData,
+        pendingAmount,
+        paymentStatus,
+        updatedAt: new Date().toISOString(),
+      });
+
+      transaction.update(bookingRef, cleanPayload);
+    });
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'UPDATE_TOUR_BOOKING',
+      recordType: 'tourBookings',
+      recordId: id,
+      newValue: JSON.stringify(bookingData),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${id}`);
+    throw error;
+  }
+}
+
+export async function deleteTourBooking(id: string, userEmail: string): Promise<void> {
+  if (!id) return;
+  try {
+    const bookingRef = doc(db, 'tourBookings', id);
+    const bSnap = await getDoc(bookingRef);
+
+    if (bSnap.exists()) {
+      const existing = bSnap.data() as TourBooking;
+
+      // 1. Adjust batch seats (best effort)
+      if (existing.tourBatchId) {
+        try {
+          const batchRef = doc(db, 'tourBatches', existing.tourBatchId);
+          const batchSnap = await getDoc(batchRef);
+          if (batchSnap.exists()) {
+            const booked = Number(batchSnap.data().bookedSeats || 0);
+            await updateDoc(batchRef, {
+              bookedSeats: Math.max(0, booked - Number(existing.membersCount || 1)),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          console.warn('Batch seat adjustment error on delete:', e);
+        }
+      }
+
+      // 2. Adjust wallet balance (best effort)
+      if (Number(existing.advancePaid || 0) > 0 && existing.walletName) {
+        try {
+          const walletsSnap = await getDocs(collection(db, 'wallets'));
+          const targetWallet = walletsSnap.docs.find(
+            (w) => (w.data().name || '').toLowerCase() === (existing.walletName || '').toLowerCase()
+          );
+          if (targetWallet) {
+            const wRef = doc(db, 'wallets', targetWallet.id);
+            const wSnap = await getDoc(wRef);
+            if (wSnap.exists()) {
+              const currentBal = Number(wSnap.data().currentBalance || 0);
+              await updateDoc(wRef, {
+                currentBalance: Math.max(0, currentBal - Number(existing.advancePaid || 0)),
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+        } catch (e) {
+          console.warn('Wallet adjustment error on delete:', e);
+        }
+      }
+    }
+
+    // 3. Delete booking document directly
+    await deleteDoc(bookingRef);
+
+    // 4. Audit Log (best effort)
+    try {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail: userEmail || 'admin@sanzari.com',
+        action: 'DELETE_TOUR_BOOKING',
+        recordType: 'tourBookings',
+        recordId: id,
+        timestamp: new Date().toISOString(),
+      });
+    } catch {
+      // ignore
+    }
+  } catch (error) {
+    console.error('deleteTourBooking failed:', error);
+    handleFirestoreError(error, OperationType.DELETE, `tourBookings/${id}`);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// SANZARI TOURISM: TOUR EXPENSES
+// ----------------------------------------------------
+export function subscribeTourExpenses(callback: (expenses: TourExpense[]) => void) {
+  const q = query(collection(db, 'tourExpenses'), orderBy('date', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const expenses: TourExpense[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<TourExpense, 'id'>),
+      }));
+      callback(expenses);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tourExpenses');
+    }
+  );
+}
+
+export async function addTourExpense(
+  expenseData: Omit<TourExpense, 'id' | 'createdAt' | 'updatedAt'>,
+  userEmail: string
+): Promise<string> {
+  try {
+    const expenseRef = doc(collection(db, 'tourExpenses'));
+    const monthKey = getMonthKey(expenseData.date);
+
+    await runTransaction(db, async (transaction) => {
+      // Deduct from wallet
+      if (expenseData.walletName) {
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const targetWallet = walletsSnap.docs.find(
+          (w) => (w.data().name || '').toLowerCase() === (expenseData.walletName || '').toLowerCase()
+        );
+        if (targetWallet) {
+          const wRef = doc(db, 'wallets', targetWallet.id);
+          const wSnap = await transaction.get(wRef);
+          if (wSnap.exists()) {
+            const currentBal = Number(wSnap.data().currentBalance || 0);
+            transaction.update(wRef, {
+              currentBalance: currentBal - Number(expenseData.amount),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
+      transaction.set(expenseRef, sanitizeForFirestore({
+        ...expenseData,
+        monthKey,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }));
+    });
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'CREATE_TOUR_EXPENSE',
+      recordType: 'tourExpenses',
+      recordId: expenseRef.id,
+      newValue: JSON.stringify(expenseData),
+      timestamp: new Date().toISOString(),
+    });
+
+    return expenseRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'tourExpenses');
+    throw error;
+  }
+}
+
+export async function deleteTourExpense(id: string, userEmail: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'tourExpenses', id));
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'DELETE_TOUR_EXPENSE',
+      recordType: 'tourExpenses',
+      recordId: id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `tourExpenses/${id}`);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// GENERIC TRANSACTION EDIT & UPDATE FUNCTION
+// ----------------------------------------------------
+export async function updateTransactionRecord(params: {
+  id: string;
+  type: 'sale' | 'expense' | 'payment' | 'purchase' | 'transfer' | 'tourBooking' | 'tourExpense';
+  updates: {
+    amount?: number;
+    date?: string;
+    walletId?: string;
+    walletName?: string;
+    notes?: string;
+    description?: string;
+    category?: string;
+    customerName?: string;
+    vendorName?: string;
+    paymentMethod?: PaymentMethod;
+    paymentStatus?: PaymentStatus;
+    fromWalletId?: string;
+    fromWalletName?: string;
+    toWalletId?: string;
+    toWalletName?: string;
+  };
+  userEmail: string;
+}): Promise<void> {
+  try {
+    const { id, type, updates, userEmail } = params;
+    const updatedAt = new Date().toISOString();
+
+    if (type === 'expense') {
+      const ref = doc(db, 'expenses', id);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const oldData = snap.data();
+        const oldAmt = Number(oldData.amount || 0);
+        const newAmt = updates.amount !== undefined ? Number(updates.amount) : oldAmt;
+        const oldWalletId = oldData.walletId;
+        const newWalletId = updates.walletId || oldWalletId;
+
+        // Adjust wallet balance if amount changed on same wallet
+        if (oldWalletId && oldWalletId === newWalletId && newAmt !== oldAmt) {
+          const diff = newAmt - oldAmt;
+          const wRef = doc(db, 'wallets', oldWalletId);
+          const wSnap = await getDoc(wRef);
+          if (wSnap.exists()) {
+            const curBal = Number(wSnap.data().currentBalance || 0);
+            await updateDoc(wRef, { currentBalance: curBal - diff, updatedAt });
+          }
+        }
+
+        await updateDoc(ref, {
+          ...(updates.amount !== undefined && { amount: Number(updates.amount) }),
+          ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+          ...(updates.walletId && { walletId: updates.walletId }),
+          ...(updates.walletName && { walletName: updates.walletName }),
+          ...(updates.category && { category: updates.category as ExpenseCategory }),
+          ...(updates.notes !== undefined && { notes: updates.notes }),
+          ...(updates.description !== undefined && { description: updates.description }),
+          updatedAt,
+        });
+      }
+    } else if (type === 'payment') {
+      const ref = doc(db, 'payments', id);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const oldData = snap.data();
+        const oldAmt = Number(oldData.amount || 0);
+        const newAmt = updates.amount !== undefined ? Number(updates.amount) : oldAmt;
+        const oldWalletId = oldData.walletId;
+
+        if (oldWalletId && newAmt !== oldAmt) {
+          const diff = newAmt - oldAmt;
+          const wRef = doc(db, 'wallets', oldWalletId);
+          const wSnap = await getDoc(wRef);
+          if (wSnap.exists()) {
+            const curBal = Number(wSnap.data().currentBalance || 0);
+            await updateDoc(wRef, { currentBalance: curBal + diff, updatedAt });
+          }
+        }
+
+        await updateDoc(ref, {
+          ...(updates.amount !== undefined && { amount: Number(updates.amount) }),
+          ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+          ...(updates.walletId && { walletId: updates.walletId }),
+          ...(updates.walletName && { walletName: updates.walletName }),
+          ...(updates.customerName && { customerName: updates.customerName }),
+          ...(updates.paymentMethod && { paymentMethod: updates.paymentMethod }),
+          ...(updates.notes !== undefined && { notes: updates.notes }),
+          updatedAt,
+        });
+      }
+    } else if (type === 'transfer') {
+      const ref = doc(db, 'transfers', id);
+      const snap = await getDoc(ref);
+      if (snap.exists()) {
+        const oldData = snap.data();
+        const oldAmt = Number(oldData.amount || 0);
+        const newAmt = updates.amount !== undefined ? Number(updates.amount) : oldAmt;
+        const fromWId = oldData.fromWalletId;
+        const toWId = oldData.toWalletId;
+
+        if (newAmt !== oldAmt && fromWId && toWId) {
+          const diff = newAmt - oldAmt;
+          const fromRef = doc(db, 'wallets', fromWId);
+          const toRef = doc(db, 'wallets', toWId);
+
+          const fromSnap = await getDoc(fromRef);
+          const toSnap = await getDoc(toRef);
+
+          if (fromSnap.exists()) {
+            const curBal = Number(fromSnap.data().currentBalance || 0);
+            await updateDoc(fromRef, { currentBalance: curBal - diff, updatedAt });
+          }
+          if (toSnap.exists()) {
+            const curBal = Number(toSnap.data().currentBalance || 0);
+            await updateDoc(toRef, { currentBalance: curBal + diff, updatedAt });
+          }
+        }
+
+        await updateDoc(ref, {
+          ...(updates.amount !== undefined && { amount: Number(updates.amount) }),
+          ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+          ...(updates.notes !== undefined && { notes: updates.notes }),
+          ...(updates.fromWalletId && { fromWalletId: updates.fromWalletId }),
+          ...(updates.fromWalletName && { fromWalletName: updates.fromWalletName }),
+          ...(updates.toWalletId && { toWalletId: updates.toWalletId }),
+          ...(updates.toWalletName && { toWalletName: updates.toWalletName }),
+          updatedAt,
+        });
+      }
+    } else if (type === 'sale') {
+      const ref = doc(db, 'sales', id);
+      await updateDoc(ref, {
+        ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+        ...(updates.customerName && { customerName: updates.customerName }),
+        ...(updates.walletId && { walletId: updates.walletId }),
+        ...(updates.walletName && { walletName: updates.walletName }),
+        ...(updates.notes !== undefined && { notes: updates.notes }),
+        ...(updates.paymentMethod && { paymentMethod: updates.paymentMethod }),
+        ...(updates.paymentStatus && { paymentStatus: updates.paymentStatus }),
+        updatedAt,
+      });
+    } else if (type === 'purchase') {
+      const ref = doc(db, 'purchases', id);
+      await updateDoc(ref, {
+        ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+        ...(updates.vendorName && { vendorName: updates.vendorName }),
+        ...(updates.amount !== undefined && { totalCost: Number(updates.amount) }),
+        ...(updates.notes !== undefined && { notes: updates.notes }),
+        ...(updates.paymentStatus && { paymentStatus: updates.paymentStatus as 'Paid' | 'Unpaid' | 'Partial' }),
+        updatedAt,
+      });
+    } else if (type === 'tourBooking') {
+      const ref = doc(db, 'tourBookings', id);
+      await updateDoc(ref, {
+        ...(updates.date && { tourDate: updates.date, monthKey: getMonthKey(updates.date) }),
+        ...(updates.customerName && { customerName: updates.customerName }),
+        ...(updates.walletName && { walletName: updates.walletName }),
+        ...(updates.amount !== undefined && { advancePaid: Number(updates.amount) }),
+        ...(updates.notes !== undefined && { specialNotes: updates.notes }),
+        ...(updates.paymentStatus && { paymentStatus: updates.paymentStatus }),
+        updatedAt,
+      });
+    } else if (type === 'tourExpense') {
+      const ref = doc(db, 'tourExpenses', id);
+      await updateDoc(ref, {
+        ...(updates.amount !== undefined && { amount: Number(updates.amount) }),
+        ...(updates.date && { date: updates.date, monthKey: getMonthKey(updates.date) }),
+        ...(updates.walletName && { walletName: updates.walletName }),
+        ...(updates.category && { category: updates.category as any }),
+        ...(updates.notes !== undefined && { notes: updates.notes }),
+        ...(updates.description !== undefined && { description: updates.description }),
+        updatedAt,
+      });
+    }
+
+    // Log audit
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: `EDIT_TRANSACTION_${type.toUpperCase()}`,
+      recordType: type,
+      recordId: id,
+      newValue: JSON.stringify(updates),
+      timestamp: updatedAt,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${params.type}/${params.id}`);
+    throw error;
+  }
+}
+

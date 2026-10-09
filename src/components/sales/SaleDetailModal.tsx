@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { BottomSheet } from '../common/BottomSheet';
-import { Printer, Share2, CheckCircle2, Clock, XCircle, Store, User } from 'lucide-react';
+import { Printer, Share2, CheckCircle2, Clock, XCircle, Store, User, Trash2, AlertTriangle } from 'lucide-react';
 import { updateDoc, doc, collection, addDoc } from 'firebase/firestore';
 import { db } from '../../firebase/config';
+import { deleteSale } from '../../services/db';
 
 export const SaleDetailModal: React.FC = () => {
   const {
@@ -21,6 +22,9 @@ export const SaleDetailModal: React.FC = () => {
   const [isEditingNotes, setIsEditingNotes] = useState(false);
   const [editedNotes, setEditedNotes] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const sale = sales.find((s) => s.id === selectedSaleId);
 
@@ -28,6 +32,21 @@ export const SaleDetailModal: React.FC = () => {
 
   const handlePrintReceipt = () => {
     window.print();
+  };
+
+  const handleDeleteSale = async () => {
+    if (!sale) return;
+    try {
+      setIsDeleting(true);
+      setDeleteError(null);
+      await deleteSale(sale.id, user?.email || 'sanzaritourism@gmail.com');
+      setSelectedSaleId(null);
+      setShowConfirmDelete(false);
+    } catch (err: any) {
+      setDeleteError(err?.message || 'Failed to delete sale. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSaveNotesCorrection = async () => {
@@ -165,28 +184,78 @@ export const SaleDetailModal: React.FC = () => {
           )}
         </div>
 
-        {/* Actions (Print / View Customer) */}
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            onClick={() => {
-              if (sale.customerId) {
-                setSelectedSaleId(null);
-                setSelectedCustomerId(sale.customerId);
-              }
-            }}
-            className="py-3 px-4 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <User size={14} />
-            <span>Customer Profile</span>
-          </button>
+        {/* Actions (Print / View Customer / Delete Sale) */}
+        <div className="space-y-2.5">
+          {deleteError && (
+            <div className="p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold">
+              {deleteError}
+            </div>
+          )}
 
-          <button
-            onClick={handlePrintReceipt}
-            className="py-3 px-4 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-          >
-            <Printer size={14} />
-            <span>Print Receipt</span>
-          </button>
+          {showConfirmDelete ? (
+            <div className="p-4 rounded-2xl bg-rose-50 border border-rose-200 space-y-3 animate-in fade-in zoom-in-95 duration-150">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle size={18} className="text-rose-600 shrink-0 mt-0.5" />
+                <div>
+                  <h4 className="text-xs font-bold text-rose-950">Delete Sale Record?</h4>
+                  <p className="text-[11px] text-rose-700 mt-0.5 leading-relaxed">
+                    This will permanently remove <strong>{sale.saleNumber}</strong>, restore product inventory stock, and deduct paid amount from wallet balance.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  onClick={() => setShowConfirmDelete(false)}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-white border border-rose-200 text-zinc-700 text-xs font-bold hover:bg-zinc-50 transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDeleteSale}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Trash2 size={13} />
+                  <span>{isDeleting ? 'Deleting...' : 'Yes, Delete Sale'}</span>
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  onClick={() => {
+                    if (sale.customerId) {
+                      setSelectedSaleId(null);
+                      setSelectedCustomerId(sale.customerId);
+                    }
+                  }}
+                  className="py-3 px-4 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <User size={14} />
+                  <span>Customer Profile</span>
+                </button>
+
+                <button
+                  onClick={handlePrintReceipt}
+                  className="py-3 px-4 rounded-2xl bg-zinc-900 hover:bg-black text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Printer size={14} />
+                  <span>Print Receipt</span>
+                </button>
+              </div>
+
+              <button
+                onClick={() => setShowConfirmDelete(true)}
+                className="w-full py-2.5 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <Trash2 size={14} />
+                <span>Delete Sale Invoice</span>
+              </button>
+            </>
+          )}
         </div>
       </div>
     </BottomSheet>

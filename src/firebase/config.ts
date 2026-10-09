@@ -1,19 +1,13 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
 const databaseId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
-// Critical: instantiate Firestore with long polling enabled to prevent WebSocket iframe timeouts
-export const db = initializeFirestore(
-  app,
-  {
-    experimentalForceLongPolling: true,
-  },
-  databaseId || '(default)'
-);
+// Standard fast WebSocket / streaming Firestore connection
+export const db = getFirestore(app, databaseId || '(default)');
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();

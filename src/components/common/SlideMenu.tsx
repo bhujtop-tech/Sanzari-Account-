@@ -24,6 +24,8 @@ import {
   ChevronRight,
   FileSpreadsheet,
   FileText,
+  Plane,
+  Luggage,
 } from 'lucide-react';
 
 interface SlideMenuProps {
@@ -38,20 +40,30 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     activeMoreSection,
     setActiveMoreSection,
     settings,
+    businessMode,
     setIsAiAssistantOpen,
     setIsGoogleSheetsOpen,
     setIsPdfCustomizerOpen,
   } = useData();
   const { currentUserProfile, lockApp } = useAuth();
 
-  const mainNav: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+  const dryFruitMainNav: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'sales', label: 'Sales History', icon: ShoppingBag },
     { id: 'stock', label: 'Stock & Inventory', icon: Boxes },
     { id: 'accounts', label: 'Wallets & Accounts', icon: WalletCards },
   ];
 
-  const managementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+  const tourismMainNav: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+    { id: 'home', label: 'Tours Dashboard', icon: Plane },
+    { id: 'stock', label: 'Tour Dates & Folders', icon: CalendarDays },
+    { id: 'sales', label: 'Tour Bookings', icon: Luggage },
+    { id: 'accounts', label: 'Wallets & Khata', icon: WalletCards },
+  ];
+
+  const mainNav = businessMode === 'tourism' ? tourismMainNav : dryFruitMainNav;
+
+  const dryFruitManagementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'customers', label: 'Customers CRM', icon: Users },
     { id: 'products', label: 'Products Catalog', icon: Package },
     { id: 'expenses', label: 'Expenses', icon: Receipt },
@@ -62,6 +74,13 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     { id: 'reports', label: 'Reports & P&L', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const tourismManagementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
+    { id: 'customers', label: 'Customers & Travelers', icon: Users },
+    { id: 'settings', label: 'Settings', icon: Settings },
+  ];
+
+  const managementNav = businessMode === 'tourism' ? tourismManagementNav : dryFruitManagementNav;
 
   const handleSelectTab = (tabId: NavTab) => {
     setActiveTab(tabId);
@@ -148,73 +167,75 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                     <p className="text-[11px] text-zinc-400">{currentUserProfile.role}</p>
                     <p className="text-[10px] text-emerald-400 font-semibold mt-0.5 flex items-center gap-1">
                       <Store size={10} />
-                      {settings.businessName || 'Sanzari Store'}
+                      {businessMode === 'tourism' ? 'Sanzari Tours & Travels' : settings.businessName || 'Sanzari Store'}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* AI Assistant Quick Trigger Banner */}
-              <div className="p-3 px-4 bg-linear-to-r from-amber-50 to-indigo-50 border-b border-amber-200/50 space-y-2">
-                <button
-                  onClick={() => {
-                    onClose();
-                    setIsAiAssistantOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between text-left cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
-                      <Sparkles size={16} className="fill-amber-200" />
+              {/* Dry Fruit Store Tools (Only shown in dry fruit mode) */}
+              {businessMode === 'dryfruit' && (
+                <div className="p-3 px-4 bg-linear-to-r from-amber-50 to-indigo-50 border-b border-amber-200/50 space-y-2">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsAiAssistantOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                        <Sparkles size={16} className="fill-amber-200" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-zinc-900">Ask AI Assistant</h4>
+                        <p className="text-[10px] text-zinc-500">Sales, balances &amp; low stock</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-900">Ask AI Assistant</h4>
-                      <p className="text-[10px] text-zinc-500">Sales, balances &amp; low stock</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-zinc-400" />
-                </button>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </button>
 
-                {/* Google Sheets Trigger */}
-                <button
-                  onClick={() => {
-                    onClose();
-                    setIsGoogleSheetsOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between text-left pt-2 border-t border-emerald-200/60 cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
-                      <FileSpreadsheet size={16} />
+                  {/* Google Sheets Trigger */}
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsGoogleSheetsOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between text-left pt-2 border-t border-emerald-200/60 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                        <FileSpreadsheet size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-zinc-900">Google Sheets Auto-Sync</h4>
+                        <p className="text-[10px] text-emerald-700 font-medium">Export &amp; Live Sync Excel</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-900">Google Sheets Auto-Sync</h4>
-                      <p className="text-[10px] text-emerald-700 font-medium">Export &amp; Live Sync Excel</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-zinc-400" />
-                </button>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </button>
 
-                {/* PDF Export Customizer Trigger */}
-                <button
-                  onClick={() => {
-                    onClose();
-                    setIsPdfCustomizerOpen(true);
-                  }}
-                  className="w-full flex items-center justify-between text-left pt-2 border-t border-zinc-200/60 cursor-pointer"
-                >
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
-                      <FileText size={16} className="text-amber-400" />
+                  {/* PDF Export Customizer Trigger */}
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsPdfCustomizerOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between text-left pt-2 border-t border-zinc-200/60 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                        <FileText size={16} className="text-amber-400" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-zinc-900">Custom PDF Export</h4>
+                        <p className="text-[10px] text-zinc-500 font-medium">Invoices, Khata &amp; Valuation</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-xs font-bold text-zinc-900">Custom PDF Export</h4>
-                      <p className="text-[10px] text-zinc-500 font-medium">Invoices, Khata &amp; Valuation</p>
-                    </div>
-                  </div>
-                  <ChevronRight size={16} className="text-zinc-400" />
-                </button>
-              </div>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </button>
+                </div>
+              )}
 
               {/* Main Navigation Links */}
               <div className="p-4 space-y-1 border-b border-zinc-100">
@@ -248,7 +269,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
               {/* Management Sections */}
               <div className="p-4 space-y-1">
                 <p className="text-[10px] font-bold text-zinc-600 uppercase tracking-wider px-2 mb-1">
-                  Store Modules
+                  {businessMode === 'tourism' ? 'Tourism Modules' : 'Store Modules'}
                 </p>
                 {managementNav.map((item) => {
                   const Icon = item.icon;
@@ -285,7 +306,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                 className="w-full py-3 px-4 rounded-2xl bg-rose-50 hover:bg-rose-100 border border-rose-200/80 text-rose-700 text-xs font-bold flex items-center justify-center gap-2 transition-all cursor-pointer"
               >
                 <LogOut size={16} />
-                <span>Lock App (Sahil)</span>
+                <span>Lock &amp; Switch Portal</span>
               </button>
             </div>
           </motion.div>
