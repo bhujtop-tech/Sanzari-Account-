@@ -19,6 +19,8 @@ import {
   TourBatch,
   TourBooking,
   TourExpense,
+  TourInquiry,
+  CustomTourPackage,
 } from '../types';
 import {
   initializeStoreDataIfEmpty,
@@ -37,8 +39,12 @@ import {
   subscribeTourBatches,
   subscribeTourBookings,
   subscribeTourExpenses,
+  subscribeTourInquiries,
+  subscribeCustomTourPackages,
   deleteTourBooking,
   deleteTourBatch,
+  deleteTourInquiry,
+  deleteCustomTourPackage,
 } from '../services/db';
 import {
   INITIAL_WALLETS,
@@ -48,6 +54,8 @@ import {
   INITIAL_TOUR_BATCHES,
   INITIAL_TOUR_BOOKINGS,
   INITIAL_TOUR_EXPENSES,
+  INITIAL_TOUR_INQUIRIES,
+  INITIAL_CUSTOM_TOUR_PACKAGES,
 } from '../data/initialData';
 import { useAuth } from './AuthContext';
 
@@ -58,6 +66,8 @@ interface DataContextType {
 
   // Dry Fruit Store State
   wallets: Wallet[];
+  dryfruitWallets: Wallet[];
+  tourWallets: Wallet[];
   customers: Customer[];
   products: Product[];
   sales: Sale[];
@@ -98,6 +108,36 @@ interface DataContextType {
   setIsTourReceiptOpen: (open: boolean) => void;
   tourReceiptBooking: TourBooking | null;
   setTourReceiptBooking: (booking: TourBooking | null) => void;
+
+  // Tour Inquiries & Custom Packages
+  tourInquiries: TourInquiry[];
+  setTourInquiries: React.Dispatch<React.SetStateAction<TourInquiry[]>>;
+  customTourPackages: CustomTourPackage[];
+  setCustomTourPackages: React.Dispatch<React.SetStateAction<CustomTourPackage[]>>;
+  selectedTourInquiryId: string | null;
+  setSelectedTourInquiryId: (id: string | null) => void;
+  isAddTourInquiryOpen: boolean;
+  setIsAddTourInquiryOpen: (open: boolean) => void;
+  editingTourInquiry: TourInquiry | null;
+  setEditingTourInquiry: (inquiry: TourInquiry | null) => void;
+  openEditTourInquiryModal: (inquiry: TourInquiry) => void;
+  deleteTourInquiryById: (id: string) => Promise<void>;
+
+  isCustomPackageModalOpen: boolean;
+  setIsCustomPackageModalOpen: (open: boolean) => void;
+  editingCustomPackage: CustomTourPackage | null;
+  setEditingCustomPackage: (pkg: CustomTourPackage | null) => void;
+  openEditCustomPackageModal: (pkg: CustomTourPackage) => void;
+  deleteCustomPackageById: (id: string) => Promise<void>;
+
+  isTourPackagePdfOpen: boolean;
+  setIsTourPackagePdfOpen: (open: boolean) => void;
+  selectedPackageForPdf: CustomTourPackage | null;
+  setSelectedPackageForPdf: (pkg: CustomTourPackage | null) => void;
+  selectedInquiryForPdf: TourInquiry | null;
+  setSelectedInquiryForPdf: (inq: TourInquiry | null) => void;
+  openPackagePdf: (pkg: CustomTourPackage, inq?: TourInquiry | null) => void;
+  openInquiryPdf: (inq: TourInquiry, pkg?: CustomTourPackage | null) => void;
 
   // Selected Month for monthly view
   selectedMonth: string;
@@ -164,13 +204,18 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
 
-  // Helper to load cache with fallback
+  // Helper to load cache with fallback and strictly exclude mock data
   const getCache = <T,>(key: string, fallback: T): T => {
     try {
       const item = localStorage.getItem(key);
       if (item) {
         const parsed = JSON.parse(item);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed as T;
+        if (Array.isArray(parsed)) {
+          // Strictly filter out any mock items created with 'init_'
+          const realItems = parsed.filter((entry: any) => !entry?.id?.startsWith('init_'));
+          if (realItems.length > 0) return realItems as unknown as T;
+          return fallback;
+        }
         if (parsed && typeof parsed === 'object' && Object.keys(parsed).length > 0) return parsed as T;
       }
     } catch {
@@ -189,17 +234,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     localStorage.setItem('sz_business_mode', mode);
   };
 
-  const initialWallets: Wallet[] = INITIAL_WALLETS.map((w, idx) => ({ ...w, id: `init_w_${idx}` }));
-  const initialProducts: Product[] = INITIAL_PRODUCTS.map((p, idx) => ({ ...p, id: `init_p_${idx}` }));
-  const initialCustomers: Customer[] = INITIAL_CUSTOMERS.map((c, idx) => ({ ...c, id: `init_c_${idx}` }));
-  const initialTourBatches: TourBatch[] = INITIAL_TOUR_BATCHES.map((b, idx) => ({ ...b, id: `init_tb_${idx}` }));
-  const initialTourBookings: TourBooking[] = INITIAL_TOUR_BOOKINGS.map((b, idx) => ({ ...b, id: `init_bk_${idx}` }));
-  const initialTourExpenses: TourExpense[] = INITIAL_TOUR_EXPENSES.map((e, idx) => ({ ...e, id: `init_te_${idx}` }));
-
-  // State Declarations with instant LocalStorage caching
-  const [wallets, setWallets] = useState<Wallet[]>(() => getCache('sz_wallets', initialWallets));
-  const [customers, setCustomers] = useState<Customer[]>(() => getCache('sz_customers', initialCustomers));
-  const [products, setProducts] = useState<Product[]>(() => getCache('sz_products', initialProducts));
+  // State Declarations with REAL data only (no mock fallbacks)
+  const [wallets, setWallets] = useState<Wallet[]>(() => getCache('sz_wallets', []));
+  const [customers, setCustomers] = useState<Customer[]>(() => getCache('sz_customers', []));
+  const [products, setProducts] = useState<Product[]>(() => getCache('sz_products', []));
   const [sales, setSales] = useState<Sale[]>(() => getCache('sz_sales', []));
   const [payments, setPayments] = useState<Payment[]>(() => getCache('sz_payments', []));
   const [expenses, setExpenses] = useState<Expense[]>(() => getCache('sz_expenses', []));
@@ -210,10 +248,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [returns, setReturns] = useState<SalesReturn[]>(() => getCache('sz_returns', []));
   const [settings, setSettings] = useState<StoreSettings>(() => getCache('sz_settings', DEFAULT_SETTINGS));
 
-  // Tourism State
-  const [tourBatches, setTourBatches] = useState<TourBatch[]>(() => getCache('sz_tour_batches', initialTourBatches));
-  const [tourBookings, setTourBookings] = useState<TourBooking[]>(() => getCache('sz_tour_bookings', initialTourBookings));
-  const [tourExpenses, setTourExpenses] = useState<TourExpense[]>(() => getCache('sz_tour_expenses', initialTourExpenses));
+  // Tourism State - REAL data only
+  const [tourBatches, setTourBatches] = useState<TourBatch[]>(() => getCache('sz_tour_batches', []));
+  const [tourBookings, setTourBookings] = useState<TourBooking[]>(() => getCache('sz_tour_bookings', []));
+  const [tourExpenses, setTourExpenses] = useState<TourExpense[]>(() => getCache('sz_tour_expenses', []));
+  const [tourInquiries, setTourInquiries] = useState<TourInquiry[]>(() => getCache('sz_tour_inquiries', []));
+  const [customTourPackages, setCustomTourPackages] = useState<CustomTourPackage[]>(() => getCache('sz_custom_tour_packages', []));
+  
   const [selectedTourBatchId, setSelectedTourBatchId] = useState<string | null>(null);
   const [selectedTourBookingId, setSelectedTourBookingId] = useState<string | null>(null);
   const [isAddTourBookingOpen, setIsAddTourBookingOpen] = useState(false);
@@ -222,6 +263,18 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAddTourExpenseOpen, setIsAddTourExpenseOpen] = useState(false);
   const [isTourReceiptOpen, setIsTourReceiptOpen] = useState(false);
   const [tourReceiptBooking, setTourReceiptBooking] = useState<TourBooking | null>(null);
+
+  // Inquiries & Custom Packages Modals state
+  const [selectedTourInquiryId, setSelectedTourInquiryId] = useState<string | null>(null);
+  const [isAddTourInquiryOpen, setIsAddTourInquiryOpen] = useState(false);
+  const [editingTourInquiry, setEditingTourInquiry] = useState<TourInquiry | null>(null);
+  
+  const [isCustomPackageModalOpen, setIsCustomPackageModalOpen] = useState(false);
+  const [editingCustomPackage, setEditingCustomPackage] = useState<CustomTourPackage | null>(null);
+
+  const [isTourPackagePdfOpen, setIsTourPackagePdfOpen] = useState(false);
+  const [selectedPackageForPdf, setSelectedPackageForPdf] = useState<CustomTourPackage | null>(null);
+  const [selectedInquiryForPdf, setSelectedInquiryForPdf] = useState<TourInquiry | null>(null);
 
   const openEditTourBookingModal = (booking: TourBooking) => {
     setEditingTourBooking(booking);
@@ -256,7 +309,58 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const [loading, setLoading] = useState(false);
+  const openEditTourInquiryModal = (inquiry: TourInquiry) => {
+    setEditingTourInquiry(inquiry);
+    setIsAddTourInquiryOpen(true);
+  };
+
+  const deleteTourInquiryById = async (id: string) => {
+    if (!id) return;
+    setTourInquiries((prev) => {
+      const updated = prev.filter((inq) => inq.id !== id);
+      localStorage.setItem('sz_tour_inquiries', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await deleteTourInquiry(id, user?.email || 'admin@sanzari.com');
+    } catch (err) {
+      console.warn('Delete tour inquiry error:', err);
+    }
+  };
+
+  const openEditCustomPackageModal = (pkg: CustomTourPackage) => {
+    setEditingCustomPackage(pkg);
+    setIsCustomPackageModalOpen(true);
+  };
+
+  const deleteCustomPackageById = async (id: string) => {
+    if (!id) return;
+    setCustomTourPackages((prev) => {
+      const updated = prev.filter((p) => p.id !== id);
+      localStorage.setItem('sz_custom_tour_packages', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await deleteCustomTourPackage(id, user?.email || 'admin@sanzari.com');
+    } catch (err) {
+      console.warn('Delete custom package error:', err);
+    }
+  };
+
+  const openPackagePdf = (pkg: CustomTourPackage, inq?: TourInquiry | null) => {
+    setSelectedPackageForPdf(pkg);
+    setSelectedInquiryForPdf(inq || null);
+    setIsTourPackagePdfOpen(true);
+  };
+
+  const openInquiryPdf = (inq: TourInquiry, pkg?: CustomTourPackage | null) => {
+    setSelectedInquiryForPdf(inq);
+    const targetPkg = pkg || customTourPackages.find((p) => p.id === inq.linkedPackageId) || customTourPackages[0];
+    setSelectedPackageForPdf(targetPkg || null);
+    setIsTourPackagePdfOpen(true);
+  };
+
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<NavTab>('home');
   const [activeMoreSection, setActiveMoreSection] = useState<MoreSection>('customers');
 
@@ -286,14 +390,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Subscribe to collections with instant cache sync
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
-    // Non-blocking background seeding
-    initializeStoreDataIfEmpty().catch(console.warn);
+    // Trigger store data seeding into default database if empty
+    initializeStoreDataIfEmpty().catch(() => {});
+
+    let loadedCount = 0;
+    const markLoaded = () => {
+      loadedCount++;
+      if (loadedCount >= 2) {
+        setLoading(false);
+      }
+    };
+
+    // Fast safety timer ensures UI never hangs even if offline
+    const safetyTimer = setTimeout(() => {
+      setLoading(false);
+    }, 600);
 
     const unsubWallets = subscribeWallets((w) => {
       setWallets(w);
       localStorage.setItem('sz_wallets', JSON.stringify(w));
+      markLoaded();
     });
 
     const unsubCustomers = subscribeCustomers((c) => {
@@ -309,6 +430,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubSales = subscribeSales((s) => {
       setSales(s);
       localStorage.setItem('sz_sales', JSON.stringify(s));
+      markLoaded();
     });
 
     const unsubPayments = subscribePayments((p) => {
@@ -357,11 +479,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const unsubTourBatches = subscribeTourBatches((batches) => {
       setTourBatches(batches);
       localStorage.setItem('sz_tour_batches', JSON.stringify(batches));
+      markLoaded();
     });
 
     const unsubTourBookings = subscribeTourBookings((bookings) => {
       setTourBookings(bookings);
       localStorage.setItem('sz_tour_bookings', JSON.stringify(bookings));
+      markLoaded();
     });
 
     const unsubTourExpenses = subscribeTourExpenses((expenses) => {
@@ -369,7 +493,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('sz_tour_expenses', JSON.stringify(expenses));
     });
 
+    const unsubTourInquiries = subscribeTourInquiries((inquiries) => {
+      setTourInquiries(inquiries);
+      localStorage.setItem('sz_tour_inquiries', JSON.stringify(inquiries));
+      markLoaded();
+    });
+
+    const unsubCustomPackages = subscribeCustomTourPackages((pkgs) => {
+      setCustomTourPackages(pkgs);
+      localStorage.setItem('sz_custom_tour_packages', JSON.stringify(pkgs));
+      markLoaded();
+    });
+
     return () => {
+      clearTimeout(safetyTimer);
       unsubWallets();
       unsubCustomers();
       unsubProducts();
@@ -385,13 +522,71 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTourBatches();
       unsubTourBookings();
       unsubTourExpenses();
+      unsubTourInquiries();
+      unsubCustomPackages();
     };
   }, [user]);
 
-  // Compute Total Wallet Balance (Shared across businesses)
-  const totalBalance = useMemo(() => {
-    return wallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0);
+  // Strict Separation: Dryfruit vs Tour Wallets
+  const dryfruitWallets = useMemo(() => {
+    const list = wallets.filter((w) => {
+      const n = (w.name || '').toLowerCase().trim();
+      if (w.scope === 'dryfruit') return true;
+      if (w.scope === 'tourism') return false;
+      return !n.includes('(tour)') && !n.includes('bus');
+    });
+
+    const hasRizwan = list.some((w) => w.name.toLowerCase() === 'rizwan' || w.partnerKey === 'rizwan');
+    const hasAvesh = list.some((w) => w.name.toLowerCase() === 'avesh' || w.partnerKey === 'avesh');
+    const hasSahil = list.some((w) => w.name.toLowerCase() === 'sahil' || w.partnerKey === 'sahil');
+
+    const res = [...list];
+    if (!hasRizwan) {
+      res.push({ id: 'def-rizwan-df', name: 'Rizwan', partnerKey: 'rizwan', scope: 'dryfruit', openingBalance: 31100, currentBalance: 31100, color: '#0284c7' });
+    }
+    if (!hasAvesh) {
+      res.push({ id: 'def-avesh-df', name: 'Avesh', partnerKey: 'avesh', scope: 'dryfruit', openingBalance: 10950, currentBalance: 10950, color: '#10b981' });
+    }
+    if (!hasSahil) {
+      res.push({ id: 'def-sahil-df', name: 'Sahil', partnerKey: 'sahil', scope: 'dryfruit', openingBalance: 0, currentBalance: 0, color: '#8b5cf6' });
+    }
+
+    return res;
   }, [wallets]);
+
+  const tourWallets = useMemo(() => {
+    const list = wallets.filter((w) => {
+      const n = (w.name || '').toLowerCase().trim();
+      if (w.scope === 'tourism') return true;
+      if (w.scope === 'dryfruit') return false;
+      return n.includes('(tour)') || n.includes('bus') || n.includes('tour');
+    });
+
+    const hasRizwanTour = list.some((w) => w.name.toLowerCase().includes('rizwan'));
+    const hasSahilTour = list.some((w) => w.name.toLowerCase().includes('sahil'));
+    const hasBusTour = list.some((w) => w.name.toLowerCase().includes('bus'));
+
+    const res = [...list];
+    if (!hasRizwanTour) {
+      res.push({ id: 'def-rizwan-tour', name: 'Rizwan (Tour)', partnerKey: 'rizwan', scope: 'tourism', openingBalance: 0, currentBalance: 0, color: '#0ea5e9' });
+    }
+    if (!hasSahilTour) {
+      res.push({ id: 'def-sahil-tour', name: 'Sahil (Tour)', partnerKey: 'sahil', scope: 'tourism', openingBalance: 0, currentBalance: 0, color: '#a855f7' });
+    }
+    if (!hasBusTour) {
+      res.push({ id: 'def-bus-tour', name: 'Bus (Tour)', partnerKey: 'bus', scope: 'tourism', openingBalance: 0, currentBalance: 0, color: '#f59e0b' });
+    }
+
+    return res;
+  }, [wallets]);
+
+  // Compute Total Wallet Balance strictly based on active businessMode
+  const totalBalance = useMemo(() => {
+    if (businessMode === 'tourism') {
+      return tourWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0);
+    }
+    return dryfruitWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0);
+  }, [businessMode, tourWallets, dryfruitWallets]);
 
   // Compute This Month Dryfruit KPIs
   const thisMonthSalesTotal = useMemo(() => {
@@ -643,6 +838,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         businessMode,
         setBusinessMode,
         wallets,
+        dryfruitWallets,
+        tourWallets,
         customers,
         products,
         sales,
@@ -676,6 +873,32 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsTourReceiptOpen,
         tourReceiptBooking,
         setTourReceiptBooking,
+        tourInquiries,
+        setTourInquiries,
+        customTourPackages,
+        setCustomTourPackages,
+        selectedTourInquiryId,
+        setSelectedTourInquiryId,
+        isAddTourInquiryOpen,
+        setIsAddTourInquiryOpen,
+        editingTourInquiry,
+        setEditingTourInquiry,
+        openEditTourInquiryModal,
+        deleteTourInquiryById,
+        isCustomPackageModalOpen,
+        setIsCustomPackageModalOpen,
+        editingCustomPackage,
+        setEditingCustomPackage,
+        openEditCustomPackageModal,
+        deleteCustomPackageById,
+        isTourPackagePdfOpen,
+        setIsTourPackagePdfOpen,
+        selectedPackageForPdf,
+        setSelectedPackageForPdf,
+        selectedInquiryForPdf,
+        setSelectedInquiryForPdf,
+        openPackagePdf,
+        openInquiryPdf,
         loading,
         activeTab,
         setActiveTab,

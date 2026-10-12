@@ -48,6 +48,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     setIsPdfCustomizerOpen,
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
+    setIsAddTourInquiryOpen,
   } = useData();
   const { currentUserProfile, lockApp } = useAuth();
 
@@ -80,7 +81,10 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
   ];
 
   const tourismManagementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
-    { id: 'customers', label: 'Customers & Travelers', icon: Users },
+    { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText },
+    { id: 'packages', label: 'Tour Packages & PDF', icon: Package },
+    { id: 'customers', label: 'Passengers Manifest', icon: Users },
+    { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -183,15 +187,28 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                     Quick Actions
                   </p>
+
+                  {/* Lamba Add New Inquiry Button */}
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsAddTourInquiryOpen(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                  >
+                    <Plus size={15} className="stroke-[3]" />
+                    <span>+ Add New Inquiry</span>
+                  </button>
+
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       onClick={() => {
                         onClose();
                         setIsAddTourBookingOpen(true);
                       }}
-                      className="py-2.5 px-2.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                      className="py-2 px-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
                     >
-                      <Plus size={14} className="stroke-[3]" />
+                      <Plus size={14} />
                       <span>+ Booking</span>
                     </button>
                     <button
@@ -199,7 +216,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                         onClose();
                         setIsAddTourBatchOpen(true);
                       }}
-                      className="py-2.5 px-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                      className="py-2 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                     >
                       <FolderPlus size={14} />
                       <span>+ Tour Date</span>

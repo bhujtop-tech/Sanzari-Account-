@@ -5,12 +5,27 @@
     <script>
       (function() {
         if (typeof window !== 'undefined') {
-          // Suppress errors injected by third-party browser extensions
+          // Suppress errors injected by third-party browser extensions or benign network aborts
           window.addEventListener('error', function(event) {
             if (
               event &&
               ((event.filename && (event.filename.includes('chrome-extension://') || event.filename.includes('moz-extension://') || event.filename.includes('safari-extension://') || event.filename.includes('frame_ant'))) ||
-               (event.message && event.message.includes('Cannot set property fetch of #<Window>')))
+               (event.message && (event.message.includes('Cannot set property fetch of #<Window>') || event.message.includes('signal is aborted') || event.message.includes('aborted without reason'))))
+            ) {
+              event.preventDefault();
+              event.stopImmediatePropagation();
+              return true;
+            }
+          }, true);
+
+          window.addEventListener('unhandledrejection', function(event) {
+            var reason = event.reason;
+            var msg = typeof reason === 'string' ? reason : (reason && reason.message) ? reason.message : '';
+            if (
+              (reason && reason.name === 'AbortError') ||
+              msg.includes('signal is aborted') ||
+              msg.includes('aborted without reason') ||
+              msg.includes('The user aborted a request')
             ) {
               event.preventDefault();
               event.stopImmediatePropagation();
@@ -58,7 +73,7 @@
     <meta name="apple-mobile-web-app-title" content="Sanzari Accounts" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Hind:wght@400;500;600;700&family=Poppins:wght@500;600;700;800&family=Noto+Sans+Gujarati:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;500;600;700&display=swap" rel="stylesheet">
   </head>
   <body class="h-full bg-[#f8f9fa] text-zinc-900 selection:bg-emerald-100 selection:text-emerald-900 font-sans">
     <div id="root" class="h-full"></div>

@@ -22,6 +22,7 @@ import {
   Plane,
   Store,
   X,
+  FileText,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -67,7 +68,10 @@ export const BottomNav: React.FC = () => {
   ];
 
   const tourismMoreItems: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
-    { id: 'customers', label: 'Customers & Travelers', icon: Users, desc: 'Passenger directory & contacts' },
+    { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText, desc: 'Instagram, WhatsApp & Call leads' },
+    { id: 'packages', label: 'Tour Packages & PDF', icon: Package, desc: 'Custom packages & Gujarati PDF' },
+    { id: 'customers', label: 'Passengers Manifest', icon: Users, desc: 'Traveler list & contacts' },
+    { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3, desc: 'Profit & revenue analytics' },
     { id: 'settings', label: 'Settings', icon: Settings, desc: 'App & Data Controls' },
   ];
 
@@ -103,18 +107,14 @@ export const BottomNav: React.FC = () => {
                 onClick={() => handleTabClick(tab.id)}
                 className={`flex flex-col items-center justify-center w-16 py-1 rounded-2xl transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? businessMode === 'tourism'
-                      ? 'text-blue-600 font-bold'
-                      : 'text-zinc-950 font-semibold'
-                    : 'text-zinc-600 hover:text-zinc-900 font-medium'
+                    ? 'text-zinc-950 font-black'
+                    : 'text-zinc-500 hover:text-zinc-900 font-medium'
                 }`}
               >
                 <div
                   className={`relative p-1 rounded-xl transition-all ${
                     isActive
-                      ? businessMode === 'tourism'
-                        ? 'bg-blue-50 text-blue-600 scale-105'
-                        : 'bg-zinc-100 text-zinc-950 scale-105'
+                      ? 'bg-zinc-100 text-zinc-950 scale-105'
                       : ''
                   }`}
                 >

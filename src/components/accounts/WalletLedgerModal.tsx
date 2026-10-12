@@ -16,6 +16,8 @@ export const WalletLedgerModal: React.FC = () => {
     selectedWalletId,
     setSelectedWalletId,
     wallets,
+    dryfruitWallets,
+    tourWallets,
     sales,
     payments,
     expenses,
@@ -29,6 +31,14 @@ export const WalletLedgerModal: React.FC = () => {
   } = useData();
 
   const wallet = wallets.find((w) => w.id === selectedWalletId);
+
+  const isTourWallet = useMemo(() => {
+    if (!wallet) return false;
+    if (wallet.scope === 'tourism') return true;
+    if (wallet.scope === 'dryfruit') return false;
+    const n = (wallet.name || '').toLowerCase();
+    return n.includes('(tour)') || n.includes('bus') || tourWallets.some((tw) => tw.id === wallet.id);
+  }, [wallet, tourWallets]);
 
   // Compile full ledger for this wallet
   const ledgerItems = useMemo(() => {
@@ -52,86 +62,105 @@ export const WalletLedgerModal: React.FC = () => {
       return false;
     };
 
-    // Sales paid into this wallet
-    sales.forEach((s) => {
-      if (matchesWallet(s.walletId, s.walletName) && s.paidAmount > 0) {
-        list.push({
-          id: `sale-${s.id}`,
-          date: formatDate(s.date),
-          rawDate: s.date || s.createdAt || '',
-          type: 'sale',
-          title: `Sale • ${s.saleNumber}`,
-          subtitle: s.customerName || 'Customer',
-          amount: s.paidAmount,
-          isPositive: true,
-          refId: s.id,
-        });
-      }
-    });
+    if (isTourWallet) {
+      // Tour Bookings advance paid into this wallet
+      tourBookings.forEach((tb) => {
+        if (matchesWallet(tb.walletId, tb.walletName) && tb.advancePaid > 0) {
+          list.push({
+            id: `tb-${tb.id}`,
+            date: formatDate(tb.tourDate),
+            rawDate: tb.tourDate || tb.createdAt || '',
+            type: 'tour_booking',
+            title: `Tour Advance • ${tb.tourTitle}`,
+            subtitle: `${tb.customerName} (${tb.membersCount} Pax)`,
+            amount: tb.advancePaid,
+            isPositive: true,
+          });
+        }
+      });
 
-    // Tour Bookings advance paid into this wallet
-    tourBookings.forEach((tb) => {
-      if (matchesWallet(tb.walletId, tb.walletName) && tb.advancePaid > 0) {
-        list.push({
-          id: `tb-${tb.id}`,
-          date: formatDate(tb.tourDate),
-          rawDate: tb.tourDate || tb.createdAt || '',
-          type: 'tour_booking',
-          title: `Tour Advance • ${tb.tourTitle}`,
-          subtitle: `${tb.customerName} (${tb.membersCount} Pax)`,
-          amount: tb.advancePaid,
-          isPositive: true,
-        });
-      }
-    });
+      // Tour Expenses paid from this wallet
+      tourExpenses.forEach((te) => {
+        if (matchesWallet(te.walletId, te.walletName) && te.amount > 0) {
+          list.push({
+            id: `te-${te.id}`,
+            date: formatDate(te.date),
+            rawDate: te.date || te.createdAt || '',
+            type: 'tour_expense',
+            title: `Tour Exp • ${te.category}`,
+            subtitle: te.description || te.tourTitle || 'Tour Expense',
+            amount: te.amount,
+            isPositive: false,
+          });
+        }
+      });
+    } else {
+      // Dry Fruit Store Ledger
+      // Sales paid into this wallet
+      sales.forEach((s) => {
+        if (matchesWallet(s.walletId, s.walletName) && s.paidAmount > 0) {
+          list.push({
+            id: `sale-${s.id}`,
+            date: formatDate(s.date),
+            rawDate: s.date || s.createdAt || '',
+            type: 'sale',
+            title: `Sale • ${s.saleNumber}`,
+            subtitle: s.customerName || 'Customer',
+            amount: s.paidAmount,
+            isPositive: true,
+            refId: s.id,
+          });
+        }
+      });
 
-    // Tour Expenses paid from this wallet
-    tourExpenses.forEach((te) => {
-      if (matchesWallet(te.walletId, te.walletName) && te.amount > 0) {
-        list.push({
-          id: `te-${te.id}`,
-          date: formatDate(te.date),
-          rawDate: te.date || te.createdAt || '',
-          type: 'tour_expense',
-          title: `Tour Exp • ${te.category}`,
-          subtitle: te.description || te.tourTitle || 'Tour Expense',
-          amount: te.amount,
-          isPositive: false,
-        });
-      }
-    });
+      // Payments received in this wallet
+      payments.forEach((p) => {
+        if (p.walletId === selectedWalletId && !p.notes?.includes('Payment for SALE-')) {
+          list.push({
+            id: `pay-${p.id}`,
+            date: formatDate(p.date),
+            rawDate: p.date || p.createdAt || '',
+            type: 'payment',
+            title: 'Payment Received',
+            subtitle: p.customerName || 'Customer',
+            amount: p.amount,
+            isPositive: true,
+          });
+        }
+      });
 
-    // Payments received in this wallet (excluding sale direct payments if logged separately)
-    payments.forEach((p) => {
-      if (p.walletId === selectedWalletId && !p.notes?.includes('Payment for SALE-')) {
-        list.push({
-          id: `pay-${p.id}`,
-          date: formatDate(p.date),
-          rawDate: p.date || p.createdAt || '',
-          type: 'payment',
-          title: 'Payment Received',
-          subtitle: p.customerName || 'Customer',
-          amount: p.amount,
-          isPositive: true,
-        });
-      }
-    });
+      // Expenses paid from this wallet
+      expenses.forEach((e) => {
+        if (e.walletId === selectedWalletId) {
+          list.push({
+            id: `exp-${e.id}`,
+            date: formatDate(e.date),
+            rawDate: e.date || e.createdAt || '',
+            type: 'expense',
+            title: `Expense • ${e.category}`,
+            subtitle: e.description || e.category,
+            amount: e.amount,
+            isPositive: false,
+          });
+        }
+      });
 
-    // Expenses paid from this wallet
-    expenses.forEach((e) => {
-      if (e.walletId === selectedWalletId) {
-        list.push({
-          id: `exp-${e.id}`,
-          date: formatDate(e.date),
-          rawDate: e.date || e.createdAt || '',
-          type: 'expense',
-          title: `Expense • ${e.category}`,
-          subtitle: e.description || e.category,
-          amount: e.amount,
-          isPositive: false,
-        });
-      }
-    });
+      // Purchases
+      purchases.forEach((p) => {
+        if (p.walletId === selectedWalletId) {
+          list.push({
+            id: `pur-${p.id}`,
+            date: formatDate(p.date),
+            rawDate: p.date || p.createdAt || '',
+            type: 'purchase',
+            title: `Purchase • ${p.productName}`,
+            subtitle: p.vendorName || 'Vendor',
+            amount: p.totalCost,
+            isPositive: false,
+          });
+        }
+      });
+    }
 
     // Transfers In
     transfers.forEach((t) => {

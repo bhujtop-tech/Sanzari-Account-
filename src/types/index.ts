@@ -123,6 +123,77 @@ export interface TourExpense {
   updatedAt?: string;
 }
 
+// ==========================================
+// INQUIRY & CUSTOM TOUR PACKAGE MANAGEMENT
+// ==========================================
+export type InquirySource = 'Instagram' | 'WhatsApp' | 'Phone Call' | 'Walk-in' | 'Reference' | 'Other';
+export type InquiryStatus = 'New' | 'In Discussion' | 'Package Sent' | 'Follow-up' | 'Converted' | 'Lost';
+
+export interface TourInquiry {
+  id: string;
+  inquiryNumber: string; // e.g. "INQ-101"
+  customerName: string;
+  customerPhone: string;
+  source: InquirySource;
+  destination: string; // e.g. "Kashmir", "Shimla Manali", "Goa", "Dubai"
+  fromCity?: string; // e.g. "Vadodara", "Ahmedabad", "Surat"
+  discussionSummary: string; // "kya baat hui"
+  paxAdults: number;
+  paxChildren: number;
+  totalPax: number;
+  travelMode?: 'Train' | 'Flight' | 'Bus' | 'Self Drive' | 'Any';
+  travelClass?: TravelClass | string;
+  preferredDate?: string; // approximate date or month e.g. "2026-11-15" or "Diwali Vacation"
+  budget?: string | number;
+  packageCategory?: 'Standard' | 'Deluxe' | 'Super Deluxe' | 'Luxury';
+  notes?: string; // extra notes
+  status: InquiryStatus;
+  followUpDate?: string;
+  assignedTo?: string; // employee / staff name
+  linkedPackageId?: string; // selected custom tour package
+  linkedPackageTitle?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PackageItineraryDay {
+  day: number;
+  title: string; // e.g. "શ્રીનગર આગમન & દાલ લેક શિકારા રાઇડ"
+  description: string;
+}
+
+export interface CustomTourPackage {
+  id: string;
+  packageCode: string; // e.g. "SZ-PKG-KASHMIR"
+  packageName: string; // e.g. "Kashmir Autumn Deluxe Tour"
+  packageNameGujarati: string; // e.g. "શ્રી કાશ્મીર હેવન સ્પેશિયલ ફેમિલી ટૂર"
+  destination: string; // e.g. "કાશ્મીર (શ્રીનગર, ગુલમર્ગ, પહેલગામ, સોનમર્ગ)"
+  durationNights: number; // 6
+  durationDays: number; // 7
+  durationTextGujarati: string; // "૬ રાત / ૭ દિવસ"
+  
+  // Pricing per person
+  priceNonAcTrain?: number;
+  priceAcTrain?: number;
+  priceFlight?: number;
+  priceChildHalf?: number;
+  
+  // Details in Gujarati (Vadodara Tour Style)
+  overviewGujarati: string;
+  inclusionsGujarati: string[];
+  exclusionsGujarati: string[];
+  itinerary: PackageItineraryDay[];
+  
+  hotelCategory: string; // e.g. "3 સ્ટાર & 4 સ્ટાર પ્રીમિયમ હોટેલ / લક્ઝરી હાઉસબોટ"
+  foodPlan: string; // e.g. "શુદ્ધ શાકાહારી ભોજન (સવારનો નાસ્તો, બપોરે & રાત્રે ગરમાગરમ જમવાનું)"
+  transportDetails: string; // e.g. "પ્રાઇવેટ એસી ઇનોવા / ટેમ્પો ટ્રાવેલર સાઇટસીઇંગ માટે"
+  pickupCity: string; // e.g. "વડોદરા / અમદાવાદ / સુરત"
+  specialNotesGujarati?: string;
+  
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 export interface Customer {
   id: string;
   name: string;
@@ -373,7 +444,7 @@ export interface AppUser {
 }
 
 export type NavTab = 'home' | 'sales' | 'stock' | 'accounts' | 'more';
-export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 'vendors' | 'users' | 'reports' | 'monthly' | 'settings' | 'ai';
+export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 'vendors' | 'users' | 'reports' | 'monthly' | 'settings' | 'ai' | 'inquiries' | 'packages';
 
 export interface ActivityItem {
   id: string;

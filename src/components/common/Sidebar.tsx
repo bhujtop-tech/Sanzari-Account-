@@ -24,6 +24,7 @@ import {
   Plane,
   Store,
   LogOut,
+  FileText,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -38,6 +39,7 @@ export const Sidebar: React.FC = () => {
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
     setIsAddTourExpenseOpen,
+    setIsAddTourInquiryOpen,
     setIsAiAssistantOpen,
     businessMode,
   } = useData();
@@ -71,7 +73,10 @@ export const Sidebar: React.FC = () => {
   ];
 
   const tourismManagementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
-    { id: 'customers', label: 'Customers & Travelers', icon: Users },
+    { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText },
+    { id: 'packages', label: 'Tour Packages & PDF', icon: Package },
+    { id: 'customers', label: 'Passengers Manifest', icon: Users },
+    { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -95,26 +100,37 @@ export const Sidebar: React.FC = () => {
       </div>
 
       {/* Quick Action Buttons */}
-      <div className="grid grid-cols-2 gap-2 mb-4">
+      <div className="space-y-2 mb-4">
         {businessMode === 'tourism' ? (
           <>
+            {/* Lamba Add New Inquiry Button */}
             <button
-              onClick={() => setIsAddTourBookingOpen(true)}
-              className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-semibold shadow-xs transition-transform active:scale-95 cursor-pointer"
+              onClick={() => setIsAddTourInquiryOpen(true)}
+              className="w-full flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black shadow-xs transition-transform active:scale-95 cursor-pointer border border-zinc-900"
             >
-              <Plus size={14} />
-              <span>+ Booking</span>
+              <Plus size={15} className="stroke-[3]" />
+              <span>+ Add New Inquiry</span>
             </button>
-            <button
-              onClick={() => setIsAddTourBatchOpen(true)}
-              className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-semibold transition-transform active:scale-95 cursor-pointer border border-zinc-200"
-            >
-              <FolderPlus size={14} />
-              <span>+ Tour Date</span>
-            </button>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                onClick={() => setIsAddTourBookingOpen(true)}
+                className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 text-xs font-bold border border-zinc-300 shadow-2xs transition-transform active:scale-95 cursor-pointer"
+              >
+                <Plus size={14} />
+                <span>+ Booking</span>
+              </button>
+              <button
+                onClick={() => setIsAddTourBatchOpen(true)}
+                className="flex items-center justify-center gap-1 py-2 px-2.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-xs font-bold transition-transform active:scale-95 cursor-pointer border border-zinc-200"
+              >
+                <FolderPlus size={14} />
+                <span>+ Tour Date</span>
+              </button>
+            </div>
           </>
         ) : (
-          <>
+          <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => setIsAddSaleOpen(true)}
               className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-semibold shadow-xs transition-transform active:scale-95 cursor-pointer"
@@ -129,7 +145,7 @@ export const Sidebar: React.FC = () => {
               <Plus size={14} />
               <span>Expense</span>
             </button>
-          </>
+          </div>
         )}
       </div>
 

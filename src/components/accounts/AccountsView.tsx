@@ -9,14 +9,19 @@ import {
   ShieldCheck,
   Calendar,
   User,
+  Plus,
+  X,
+  Wallet as WalletIcon,
 } from 'lucide-react';
 import { motion } from 'motion/react';
+import { addWallet } from '../../services/db';
 
 export const AccountsView: React.FC = () => {
   const {
     businessMode,
     wallets,
-    totalBalance,
+    dryfruitWallets,
+    tourWallets,
     formatCurrency,
     formatDate,
     setSelectedWalletId,
@@ -26,286 +31,216 @@ export const AccountsView: React.FC = () => {
     transfers,
   } = useData();
 
-  // Active category filter initialized and synced with businessMode
-  const [categoryFilter, setCategoryFilter] = useState<'tourism' | 'dryfruit' | 'all'>(() =>
-    businessMode === 'tourism' ? 'tourism' : 'dryfruit'
-  );
-
-  // Sync categoryFilter whenever businessMode changes
-  React.useEffect(() => {
-    setCategoryFilter(businessMode === 'tourism' ? 'tourism' : 'dryfruit');
-  }, [businessMode]);
+  const isTourism = businessMode === 'tourism';
 
   const [filterWalletId, setFilterWalletId] = useState<string>('all');
+  const [isAddWalletOpen, setIsAddWalletOpen] = useState(false);
+  const [newWalletName, setNewWalletName] = useState('');
+  const [newWalletOpening, setNewWalletOpening] = useState('');
+  const [newWalletScope, setNewWalletScope] = useState<'tourism' | 'dryfruit'>(isTourism ? 'tourism' : 'dryfruit');
+  const [newWalletColor, setNewWalletColor] = useState(isTourism ? '#f59e0b' : '#0ea5e9');
+  const [isSavingWallet, setIsSavingWallet] = useState(false);
 
   const currentMonthKey = new Date().toISOString().substring(0, 7);
 
-  const tourWallets = wallets.filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'));
-  const dryfruitWallets = wallets.filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')));
+  // Active wallets strictly based on current mode
+  const currentWallets = isTourism ? tourWallets : dryfruitWallets;
+  const currentTotal = currentWallets.reduce((s, w) => s + (w.currentBalance || 0), 0);
 
-  const tourTotal = tourWallets.reduce((s, w) => s + (w.currentBalance || 0), 0);
-  const dryfruitTotal = dryfruitWallets.reduce((s, w) => s + (w.currentBalance || 0), 0);
+  const handleCreateWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newWalletName.trim()) return;
+    setIsSavingWallet(true);
+    try {
+      const openBal = Number(newWalletOpening) || 0;
+      const lower = newWalletName.toLowerCase();
+      const partnerKey = lower.includes('sahil')
+        ? 'sahil'
+        : lower.includes('bus')
+        ? 'bus'
+        : lower.includes('rizwan')
+        ? 'rizwan'
+        : lower.includes('avesh')
+        ? 'avesh'
+        : 'other';
 
-  // Filter transfers by selected wallet or show all
+      await addWallet({
+        name: newWalletName.trim(),
+        partnerKey,
+        scope: isTourism ? 'tourism' : 'dryfruit',
+        openingBalance: openBal,
+        currentBalance: openBal,
+        color: newWalletColor,
+      });
+      setNewWalletName('');
+      setNewWalletOpening('');
+      setIsAddWalletOpen(false);
+    } catch (err) {
+      console.error('Failed to add wallet:', err);
+    } finally {
+      setIsSavingWallet(false);
+    }
+  };
+
+  // Filter transfers strictly for current mode's wallets
+  const currentWalletIds = new Set(currentWallets.map((w) => w.id));
   const filteredTransfers = transfers.filter((t) => {
+    const isModeTransfer = currentWalletIds.has(t.fromWalletId) || currentWalletIds.has(t.toWalletId);
+    if (!isModeTransfer) return false;
     if (filterWalletId === 'all') return true;
     return t.fromWalletId === filterWalletId || t.toWalletId === filterWalletId;
   });
 
   return (
     <div className="space-y-6 pb-36 md:pb-12 max-w-5xl mx-auto">
-      {/* Header & Total Business Balance */}
+      {/* Header */}
       <div className="flex items-center justify-between pt-1">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-zinc-950">Accounts</h2>
-          <p className="text-xs text-zinc-600 font-medium">Partner wallets &amp; internal balances</p>
+          <h2 className="text-2xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
+            <span>{isTourism ? '🚌 Tour Accounts & Wallets' : '🛒 Dry Fruit Store Accounts'}</span>
+          </h2>
+          <p className="text-xs text-zinc-600 font-medium">
+            {isTourism
+              ? 'Tour advance, passenger bookings & bus expenses (Rizwan, Sahil, Bus)'
+              : 'Store partner wallets: Rizwan, Avesh, Sahil (Dry fruits & spices)'}
+          </p>
         </div>
 
-        <button
-          onClick={() => setIsTransferOpen(true)}
-          className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
-        >
-          <ArrowRightLeft size={14} />
-          <span>Transfer</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsAddWalletOpen(true)}
+            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 border-2 border-zinc-900 text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus size={14} className="stroke-[3]" />
+            <span>+ Add Account</span>
+          </button>
+
+          <button
+            onClick={() => setIsTransferOpen(true)}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
+          >
+            <ArrowRightLeft size={14} />
+            <span>Transfer</span>
+          </button>
+        </div>
       </div>
 
-      {/* Hero Overview Card */}
-      <div className="p-6 rounded-[28px] bg-linear-to-br from-zinc-950 to-zinc-900 text-white shadow-xl">
+      {/* Hero Overview Card - Strictly Mode Specific Cash */}
+      <div
+        className={`p-6 rounded-[28px] text-white shadow-xl ${
+          isTourism
+            ? 'bg-gradient-to-br from-amber-950 via-zinc-950 to-zinc-900 border border-amber-900/40'
+            : 'bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-800'
+        }`}
+      >
         <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-wider">
-            {categoryFilter === 'tourism'
-              ? 'Sanzari Tours Total Cash'
-              : categoryFilter === 'dryfruit'
-              ? 'Dry Fruit Store Total Cash'
-              : 'Total Combined Business Balance'}
+          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+            {isTourism ? 'Sanzari Tours Total Cash' : 'Dry Fruit Store Total Cash'}
           </span>
-          <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-950/80 border border-emerald-800/50 px-2 py-0.5 rounded-full flex items-center gap-1">
+          <span
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+              isTourism
+                ? 'text-amber-300 bg-amber-950/80 border border-amber-800/50'
+                : 'text-emerald-400 bg-emerald-950/80 border border-emerald-800/50'
+            }`}
+          >
             <ShieldCheck size={11} />
-            Balanced
+            {isTourism ? 'Tour Accounts Only' : 'Dry Fruit Accounts Only'}
           </span>
         </div>
-        <div className="text-3xl font-black tracking-tight text-white mt-1">
-          {formatCurrency(
-            categoryFilter === 'tourism'
-              ? tourTotal
-              : categoryFilter === 'dryfruit'
-              ? dryfruitTotal
-              : totalBalance
-          )}
+        <div className="text-3xl font-black tracking-tight text-white mt-1 font-mono">
+          {formatCurrency(currentTotal)}
         </div>
-
-        {/* Business Subtotals Breakdown */}
-        <div className="grid grid-cols-2 gap-2 mt-4 pt-3 border-t border-zinc-800/80 text-xs">
-          <div
-            onClick={() => setCategoryFilter('dryfruit')}
-            className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-              categoryFilter === 'dryfruit'
-                ? 'bg-zinc-800 border-zinc-600 ring-1 ring-white/20'
-                : 'bg-zinc-900/90 border-zinc-800 opacity-70 hover:opacity-100'
-            }`}
-          >
-            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-wider flex items-center gap-1">
-              <span>🛒</span> Dry Fruits Cash
-            </span>
-            <span className="text-sm font-black text-white font-mono mt-0.5 block">
-              {formatCurrency(dryfruitTotal)}
-            </span>
-          </div>
-
-          <div
-            onClick={() => setCategoryFilter('tourism')}
-            className={`p-2.5 rounded-2xl border transition-all cursor-pointer ${
-              categoryFilter === 'tourism'
-                ? 'bg-amber-950/60 border-amber-500/60 ring-1 ring-amber-400/30'
-                : 'bg-zinc-900/90 border-zinc-800 opacity-70 hover:opacity-100'
-            }`}
-          >
-            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-              <span>🚌</span> Sanzari Tours Cash
-            </span>
-            <span className="text-sm font-black text-amber-300 font-mono mt-0.5 block">
-              {formatCurrency(tourTotal)}
-            </span>
-          </div>
-        </div>
+        <p className="text-xs text-zinc-400 mt-2">
+          {isTourism
+            ? `Sum across ${currentWallets.length} Tour Wallets (Rizwan, Sahil & Bus)`
+            : `Sum across ${currentWallets.length} Store Wallets (Rizwan, Avesh & Sahil)`}
+        </p>
       </div>
 
-      {/* Category Filter Pills Bar */}
-      <div className="flex items-center gap-1.5 p-1 bg-zinc-100/80 rounded-2xl border border-zinc-200/90 w-fit">
-        <button
-          type="button"
-          onClick={() => setCategoryFilter('tourism')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            categoryFilter === 'tourism'
-              ? 'bg-amber-500 text-white shadow-xs'
-              : 'text-zinc-600 hover:text-zinc-950'
-          }`}
-        >
-          <span>🚌</span>
-          <span>Tour Wallets ({tourWallets.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCategoryFilter('dryfruit')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            categoryFilter === 'dryfruit'
-              ? 'bg-zinc-950 text-white shadow-xs'
-              : 'text-zinc-600 hover:text-zinc-950'
-          }`}
-        >
-          <span>🛒</span>
-          <span>Dry Fruit Wallets ({dryfruitWallets.length})</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setCategoryFilter('all')}
-          className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
-            categoryFilter === 'all'
-              ? 'bg-zinc-800 text-white shadow-xs'
-              : 'text-zinc-600 hover:text-zinc-950'
-          }`}
-        >
-          <span>🌐</span>
-          <span>All Accounts</span>
-        </button>
-      </div>
-
-      {/* 1. Sanzari Tours & Travel Wallets */}
-      {(categoryFilter === 'tourism' || categoryFilter === 'all') && (
-        <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🚌</span> Sanzari Tours &amp; Travel Accounts
-            </h3>
-            <span className="text-[10px] font-bold text-amber-800 bg-amber-50 border border-amber-200/80 px-2 py-0.5 rounded-full">
-              Tour Advance &amp; Bus Expenses
-            </span>
-          </div>
-
-          <div className="space-y-3">
-            {tourWallets.map((wallet, idx) => {
-              return (
-                <motion.div
-                  key={wallet.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  onClick={() => setSelectedWalletId(wallet.id)}
-                  className="p-5 rounded-3xl bg-amber-50/40 border border-amber-200/90 shadow-2xs hover:border-amber-400 hover:shadow-xs transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs"
-                        style={{ backgroundColor: wallet.color || '#f59e0b' }}
-                      >
-                        {wallet.name.startsWith('Bus') ? '🚌' : wallet.name.slice(0, 1).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-extrabold text-zinc-950">{wallet.name}</h4>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-200">
-                            Tour Dedicated
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-600">
-                          Opening Balance: {formatCurrency(wallet.openingBalance)}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <span className="text-base font-black text-zinc-950 tracking-tight font-mono">
-                          {formatCurrency(wallet.currentBalance)}
-                        </span>
-                        <p className="text-[10px] text-zinc-600 font-semibold">Live Balance</p>
-                      </div>
-                      <ChevronRight size={16} className="text-zinc-400" />
-                    </div>
-                  </div>
-                </motion.div>
-              );
-            })}
-          </div>
+      {/* Wallets List Section */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between px-1">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-800 flex items-center gap-1.5">
+            <span>{isTourism ? '🚌' : '🛒'}</span>
+            <span>{isTourism ? 'Tour Dedicated Accounts' : 'Dry Fruit Store Wallets'} ({currentWallets.length})</span>
+          </h3>
+          <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2.5 py-0.5 rounded-full">
+            {isTourism ? 'Tour Advance & Expenses' : 'Sales, Expenses & Purchases'}
+          </span>
         </div>
-      )}
 
-      {/* 2. Dry Fruit Store Wallets */}
-      {(categoryFilter === 'dryfruit' || categoryFilter === 'all') && (
         <div className="space-y-3">
-          <div className="flex items-center justify-between px-1">
-            <h3 className="text-xs font-bold text-zinc-700 uppercase tracking-wider flex items-center gap-1.5">
-              <span>🛒</span> Dry Fruit Store Accounts
-            </h3>
-            <span className="text-[10px] font-bold text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-full">
-              Store Sales &amp; Vendors
-            </span>
-          </div>
+          {currentWallets.map((wallet, idx) => {
+            const walletMonthSales = sales
+              .filter(
+                (s) =>
+                  s.walletId === wallet.id &&
+                  (s.monthKey === currentMonthKey || s.date?.startsWith(currentMonthKey))
+              )
+              .reduce((sum, s) => sum + (s.paidAmount || 0), 0);
 
-          <div className="space-y-3">
-            {dryfruitWallets.map((wallet, idx) => {
-              const walletMonthSales = sales
-                .filter(
-                  (s) =>
-                    s.walletId === wallet.id &&
-                    (s.monthKey === currentMonthKey || s.date?.startsWith(currentMonthKey))
-                )
-                .reduce((sum, s) => sum + (s.paidAmount || 0), 0);
+            const walletMonthExpenses = expenses
+              .filter(
+                (e) =>
+                  e.walletId === wallet.id &&
+                  (e.monthKey === currentMonthKey || e.date?.startsWith(currentMonthKey))
+              )
+              .reduce((sum, e) => sum + (e.amount || 0), 0);
 
-              const walletMonthExpenses = expenses
-                .filter(
-                  (e) =>
-                    e.walletId === wallet.id &&
-                    (e.monthKey === currentMonthKey || e.date?.startsWith(currentMonthKey))
-                )
-                .reduce((sum, e) => sum + (e.amount || 0), 0);
-
-              return (
-                <motion.div
-                  key={wallet.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
-                  onClick={() => setSelectedWalletId(wallet.id)}
-                  className="p-5 rounded-3xl bg-white border border-zinc-200/80 shadow-2xs hover:border-zinc-300 hover:shadow-xs transition-all cursor-pointer"
-                >
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs"
-                        style={{ backgroundColor: wallet.color || '#18181b' }}
-                      >
-                        {wallet.name.slice(0, 1).toUpperCase()}
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h4 className="text-sm font-extrabold text-zinc-950">{wallet.name}</h4>
-                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-600 border border-zinc-200">
-                            Dry Fruits
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-600">
-                          Opening Balance: {formatCurrency(wallet.openingBalance)}
-                        </p>
-                      </div>
+            return (
+              <motion.div
+                key={wallet.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.05 }}
+                onClick={() => setSelectedWalletId(wallet.id)}
+                className={`p-5 rounded-3xl border shadow-2xs hover:shadow-xs transition-all cursor-pointer ${
+                  isTourism
+                    ? 'bg-amber-50/40 border-amber-200/90 hover:border-amber-400'
+                    : 'bg-white border-zinc-200/80 hover:border-zinc-300'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs"
+                      style={{ backgroundColor: wallet.color || (isTourism ? '#f59e0b' : '#18181b') }}
+                    >
+                      {wallet.name.startsWith('Bus') ? '🚌' : wallet.name.slice(0, 1).toUpperCase()}
                     </div>
-
-                    <div className="flex items-center gap-2">
-                      <div className="text-right">
-                        <span className="text-base font-black text-zinc-950 tracking-tight font-mono">
-                          {formatCurrency(wallet.currentBalance)}
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-sm font-extrabold text-zinc-950">{wallet.name}</h4>
+                        <span
+                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                            isTourism
+                              ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                              : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
+                          }`}
+                        >
+                          {isTourism ? 'Tour Account' : 'Dry Fruit Account'}
                         </span>
-                        <p className="text-[10px] text-zinc-600 font-semibold">Live Balance</p>
                       </div>
-                      <ChevronRight size={16} className="text-zinc-400" />
+                      <p className="text-[11px] text-zinc-600">
+                        Opening Balance: {formatCurrency(wallet.openingBalance)}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 pt-3 border-t border-zinc-100 text-xs">
+                  <div className="flex items-center gap-2">
+                    <div className="text-right">
+                      <span className="text-base font-black text-zinc-950 tracking-tight font-mono">
+                        {formatCurrency(wallet.currentBalance)}
+                      </span>
+                      <p className="text-[10px] text-zinc-600 font-semibold">Live Balance</p>
+                    </div>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </div>
+                </div>
+
+                {!isTourism && (walletMonthSales > 0 || walletMonthExpenses > 0) && (
+                  <div className="grid grid-cols-2 gap-2 pt-3 mt-3 border-t border-zinc-100 text-xs">
                     <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center justify-between">
                       <span className="text-[11px] text-emerald-800 font-medium">Month Sales</span>
                       <span className="font-bold text-emerald-700">+{formatCurrency(walletMonthSales)}</span>
@@ -315,12 +250,12 @@ export const AccountsView: React.FC = () => {
                       <span className="font-bold text-rose-700">-{formatCurrency(walletMonthExpenses)}</span>
                     </div>
                   </div>
-                </motion.div>
-              );
-            })}
-          </div>
+                )}
+              </motion.div>
+            );
+          })}
         </div>
-      )}
+      </div>
 
       {/* Account-to-Account Transfer History & Logs */}
       <div className="space-y-3 pt-2">
@@ -348,8 +283,8 @@ export const AccountsView: React.FC = () => {
             >
               All ({transfers.length})
             </button>
-            {wallets.map((w) => {
-              const count = transfers.filter(
+            {currentWallets.map((w) => {
+              const count = filteredTransfers.filter(
                 (t) => t.fromWalletId === w.id || t.toWalletId === w.id
               ).length;
               return (
@@ -453,6 +388,111 @@ export const AccountsView: React.FC = () => {
 
       {/* Modals */}
       <WalletLedgerModal />
+
+      {/* Add New Wallet / Account Modal */}
+      {isAddWalletOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
+          <div className="bg-white rounded-3xl border-2 border-zinc-900 shadow-2xl max-w-sm w-full p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center">
+                  <WalletIcon size={16} />
+                </div>
+                <div>
+                  <h3 className="text-sm font-black text-zinc-950">Add New Account</h3>
+                  <p className="text-[11px] text-zinc-500 font-medium">Create partner or business wallet</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsAddWalletOpen(false)}
+                className="w-7 h-7 rounded-lg bg-zinc-100 hover:bg-zinc-200 flex items-center justify-center text-zinc-600"
+              >
+                <X size={14} />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateWallet} className="space-y-3">
+              <div>
+                <label className="text-[11px] font-black uppercase tracking-wider text-zinc-900 block mb-1">
+                  Account / Person Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. Sahil (Tour), Bus (Tour), Rizwan..."
+                  value={newWalletName}
+                  onChange={(e) => setNewWalletName(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 bg-zinc-50 border-2 border-zinc-900 rounded-xl focus:outline-none focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black uppercase tracking-wider text-zinc-900 block mb-1">
+                  Business Scope
+                </label>
+                <select
+                  value={newWalletScope}
+                  onChange={(e) => setNewWalletScope(e.target.value as any)}
+                  className="w-full text-xs font-bold p-2.5 bg-zinc-50 border-2 border-zinc-900 rounded-xl focus:outline-none focus:bg-white"
+                >
+                  <option value="tourism">🚌 Sanzari Tours (Tour Wallet)</option>
+                  <option value="dryfruit">🛒 Dry Fruit Store</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black uppercase tracking-wider text-zinc-900 block mb-1">
+                  Opening Balance (₹)
+                </label>
+                <input
+                  type="number"
+                  placeholder="0"
+                  value={newWalletOpening}
+                  onChange={(e) => setNewWalletOpening(e.target.value)}
+                  className="w-full text-xs font-bold p-2.5 bg-zinc-50 border-2 border-zinc-900 rounded-xl focus:outline-none focus:bg-white"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-black uppercase tracking-wider text-zinc-900 block mb-1">
+                  Tag Color
+                </label>
+                <div className="flex items-center gap-2">
+                  {['#0ea5e9', '#a855f7', '#f59e0b', '#10b981', '#ef4444', '#18181b'].map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      onClick={() => setNewWalletColor(c)}
+                      className={`w-7 h-7 rounded-lg transition-transform ${
+                        newWalletColor === c ? 'scale-110 ring-2 ring-zinc-950' : 'opacity-70'
+                      }`}
+                      style={{ backgroundColor: c }}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddWalletOpen(false)}
+                  className="px-3 py-2 rounded-xl border border-zinc-300 text-xs font-bold text-zinc-700 hover:bg-zinc-100"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSavingWallet}
+                  className="px-4 py-2 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {isSavingWallet ? 'Adding...' : 'Create Account'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

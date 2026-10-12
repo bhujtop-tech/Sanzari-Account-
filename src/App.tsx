@@ -44,6 +44,11 @@ import { AddTourBatchModal } from './components/tourism/AddTourBatchModal';
 import { AddTourExpenseModal } from './components/tourism/AddTourExpenseModal';
 import { TourReceiptModal } from './components/tourism/TourReceiptModal';
 import { TourBatchDetailModal } from './components/tourism/TourBatchDetailModal';
+import { TourInquiriesView } from './components/tourism/TourInquiriesView';
+import { CustomTourPackagesView } from './components/tourism/CustomTourPackagesView';
+import { AddTourInquiryModal } from './components/tourism/AddTourInquiryModal';
+import { AddCustomPackageModal } from './components/tourism/AddCustomPackageModal';
+import { TourPackagePdfModal } from './components/tourism/TourPackagePdfModal';
 
 import { PublicStorePortal } from './components/public/PublicStorePortal';
 import { GoogleSheetsSyncModal } from './components/sheets/GoogleSheetsSyncModal';
@@ -73,6 +78,14 @@ const MainAppContent: React.FC = () => {
     tourReceiptBooking,
     selectedTourBatchId,
     setSelectedTourBatchId,
+    isAddTourInquiryOpen,
+    setIsAddTourInquiryOpen,
+    isCustomPackageModalOpen,
+    setIsCustomPackageModalOpen,
+    isTourPackagePdfOpen,
+    setIsTourPackagePdfOpen,
+    selectedPackageForPdf,
+    selectedInquiryForPdf,
   } = useData();
 
   const [selectedBatchForBooking, setSelectedBatchForBooking] = useState<string>('');
@@ -143,6 +156,8 @@ const MainAppContent: React.FC = () => {
               {activeTab === 'more' && (
                 <>
                   {activeMoreSection === 'customers' && <TourPassengersView />}
+                  {activeMoreSection === 'inquiries' && <TourInquiriesView />}
+                  {activeMoreSection === 'packages' && <CustomTourPackagesView />}
                   {activeMoreSection === 'reports' && <TourReportsView />}
                   {activeMoreSection === 'expenses' && <ExpensesList />}
                   {activeMoreSection === 'users' && <UsersView />}
@@ -238,6 +253,20 @@ const MainAppContent: React.FC = () => {
           setSelectedBatchForBooking(batchId);
           setIsAddTourBookingOpen(true);
         }}
+      />
+      <AddTourInquiryModal
+        isOpen={isAddTourInquiryOpen}
+        onClose={() => setIsAddTourInquiryOpen(false)}
+      />
+      <AddCustomPackageModal
+        isOpen={isCustomPackageModalOpen}
+        onClose={() => setIsCustomPackageModalOpen(false)}
+      />
+      <TourPackagePdfModal
+        isOpen={isTourPackagePdfOpen}
+        onClose={() => setIsTourPackagePdfOpen(false)}
+        pkg={selectedPackageForPdf}
+        inquiry={selectedInquiryForPdf}
       />
     </div>
   );

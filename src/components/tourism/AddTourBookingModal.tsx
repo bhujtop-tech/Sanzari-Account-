@@ -20,6 +20,7 @@ import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { addTourBooking, updateTourBooking, deleteTourBooking } from '../../services/db';
 import { TourMember, TourType, TravelClass, TourPaymentMode, PaymentMethod } from '../../types';
+import { GoogleContactsAutofill } from './GoogleContactsAutofill';
 
 interface AddTourBookingModalProps {
   isOpen: boolean;
@@ -33,7 +34,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   preselectedBatchId,
 }) => {
   const {
-    wallets,
+    tourWallets,
     tourBatches,
     formatCurrency,
     setTourReceiptBooking,
@@ -67,12 +68,10 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   const [totalAmount, setTotalAmount] = useState<number | string>('');
   const [advancePaid, setAdvancePaid] = useState<number | string>('');
   const [paymentMode, setPaymentMode] = useState<TourPaymentMode>('Online');
-  const tourWallets = wallets.filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'));
-  const dryfruitWallets = wallets.filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')));
 
   const [walletName, setWalletName] = useState<string>(() => {
-    const defaultTour = wallets.find((w) => w.name.toLowerCase().includes('rizwan (tour)')) || tourWallets[0];
-    return defaultTour?.name || wallets[0]?.name || 'Rizwan (Tour)';
+    const defaultTour = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan')) || tourWallets[0];
+    return defaultTour?.name || 'Rizwan (Tour)';
   });
   const [specialNotes, setSpecialNotes] = useState('');
 
@@ -119,8 +118,8 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
       setTotalAmount('');
       setAdvancePaid('');
       setPaymentMode('Online');
-      const defaultTour = wallets.find((w) => w.name.toLowerCase().includes('rizwan (tour)')) || tourWallets[0];
-      setWalletName(defaultTour?.name || wallets[0]?.name || 'Rizwan (Tour)');
+      const defaultTour = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan')) || tourWallets[0];
+      setWalletName(defaultTour?.name || 'Rizwan (Tour)');
       setSpecialNotes('');
     }
   }, [isOpen, editingTourBooking, preselectedBatchId]);
@@ -267,7 +266,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
         advancePaid: numAdvance,
         paymentMode,
         paymentMethod: (paymentMode === 'Online' ? 'UPI' : 'Cash') as PaymentMethod,
-        walletName: walletName || wallets[0]?.name || 'Rizwan (Tour)',
+        walletName: walletName || tourWallets[0]?.name || 'Rizwan (Tour)',
         specialNotes: specialNotes.trim(),
       };
 
@@ -443,6 +442,17 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               <User className="w-3.5 h-3.5 text-emerald-400" />
               2. Customer Details
             </span>
+
+            {/* Quick Auto-fill from Google Contacts (sanzaritourism@gmail.com) */}
+            <GoogleContactsAutofill
+              selectedName={customerName}
+              selectedPhone={customerPhone}
+              onSelectContact={({ name, phoneNumber }) => {
+                if (name) setCustomerName(name);
+                if (phoneNumber) setCustomerPhone(phoneNumber);
+              }}
+            />
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
               <div>
                 <label className="block text-[11px] text-zinc-400 mb-1 font-medium">

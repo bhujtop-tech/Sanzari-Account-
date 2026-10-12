@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBooking } from '../../types';
+import { BookingsSkeleton } from '../common/Skeleton';
 
 interface TourBookingsViewProps {
   onOpenBookingDetail?: (booking: TourBooking) => void;
@@ -19,6 +20,7 @@ interface TourBookingsViewProps {
 
 export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   const {
+    loading,
     tourBookings,
     formatCurrency,
     setTourReceiptBooking,
@@ -29,6 +31,10 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Partial' | 'Pending'>('ALL');
+
+  if (loading) {
+    return <BookingsSkeleton />;
+  }
 
   const filteredBookings = useMemo(() => {
     return tourBookings.filter((b) => {
@@ -141,21 +147,21 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
             return (
               <div
                 key={b.id}
-                className="bg-zinc-950 text-white rounded-2xl border border-zinc-800 shadow-md p-3 sm:p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group"
+                className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-3 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group"
               >
                 <div>
-                  {/* Top Header / Booking No & Status - Clean Black (No Orange) */}
-                  <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 mb-2">
-                    <span className="font-mono text-[9px] sm:text-[10px] font-black text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[90px]">
+                  {/* Top Header / Booking No & Status - Crisp White Card & Black Border */}
+                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2">
+                    <span className="text-[10px] font-black text-zinc-950 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300 truncate max-w-[90px]">
                       {b.bookingNumber}
                     </span>
                     <span
-                      className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded ${
+                      className={`text-[9px] font-black px-2 py-0.5 rounded border ${
                         b.paymentStatus === 'Paid'
-                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
                           : b.paymentStatus === 'Partial'
-                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                          : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                          ? 'bg-amber-50 text-amber-900 border-amber-400'
+                          : 'bg-rose-50 text-rose-800 border-rose-400'
                       }`}
                     >
                       {b.paymentStatus === 'Partial' ? 'Advance' : b.paymentStatus}
@@ -163,50 +169,50 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                   </div>
 
                   {/* Big Date Highlight & Customer Info */}
-                  <div className="flex items-center gap-2 mb-2">
-                    {/* Big Date Badge - Zero Orange */}
-                    <div className="px-2 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-center shrink-0 min-w-[42px]">
-                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-400 block leading-tight">
+                  <div className="flex items-center gap-2.5 mb-2.5">
+                    {/* Big Date Badge - White background, Black border */}
+                    <div className="px-2 py-1 rounded-xl bg-zinc-50 border-2 border-zinc-900 text-center shrink-0 min-w-[44px]">
+                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-600 block leading-tight">
                         {monthShort}
                       </span>
-                      <span className="text-lg sm:text-2xl font-black font-mono tracking-tight text-white block leading-none my-0.5">
+                      <span className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 block leading-none my-0.5">
                         {dayNum}
                       </span>
-                      <span className="text-[7px] font-bold text-zinc-500 block leading-tight">
+                      <span className="text-[8px] font-bold text-zinc-500 block leading-tight">
                         {yearNum}
                       </span>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-xs sm:text-sm font-black text-white truncate tracking-tight">
+                      <h3 className="text-sm font-black text-zinc-950 truncate tracking-tight">
                         {b.customerName}
                       </h3>
                       <a
                         href={`tel:${b.customerPhone}`}
-                        className="text-[10px] font-medium text-zinc-400 hover:text-white flex items-center gap-1 truncate"
+                        className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-950 flex items-center gap-1 truncate mt-0.5"
                       >
-                        <Phone size={10} className="text-blue-400 shrink-0" />
+                        <Phone size={11} className="text-zinc-900 shrink-0" />
                         <span className="truncate">{b.customerPhone}</span>
                       </a>
                     </div>
                   </div>
 
                   {/* Destination & Members Details */}
-                  <div className="bg-zinc-900/90 rounded-xl p-2 border border-zinc-800/80 space-y-1 mb-2">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-blue-400 font-bold flex items-center gap-1 truncate max-w-[110px]">
-                        <MapPin size={10} className="shrink-0" />
+                  <div className="bg-zinc-50 rounded-xl p-2.5 border border-zinc-200 space-y-1.5 mb-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="text-zinc-950 font-black flex items-center gap-1 truncate max-w-[120px]">
+                        <MapPin size={12} className="text-zinc-900 shrink-0" />
                         <span className="truncate">{b.destination}</span>
                       </span>
-                      <span className="text-zinc-300 font-bold text-[9px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[80px]">
+                      <span className="text-zinc-800 font-bold text-[9px] bg-white px-1.5 py-0.5 rounded border border-zinc-300 truncate max-w-[80px]">
                         {b.travelClass}
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-zinc-300 flex items-center gap-1">
-                      <Users size={11} className="text-zinc-500 shrink-0" />
-                      <span className="font-bold">{b.membersCount} Pax</span>
-                      <span className="text-zinc-500 text-[9px] truncate">
+                    <div className="text-[10px] text-zinc-700 flex items-center gap-1.5">
+                      <Users size={12} className="text-zinc-900 shrink-0" />
+                      <span className="font-extrabold text-zinc-900">{b.membersCount} Pax</span>
+                      <span className="text-zinc-500 text-[10px] truncate">
                         ({b.members.map((m) => m.name).slice(0, 2).join(', ')}
                         {b.members.length > 2 ? '...' : ''})
                       </span>
@@ -214,44 +220,44 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                   </div>
 
                   {/* Money Summary */}
-                  <div className="grid grid-cols-2 gap-1 bg-zinc-900/60 rounded-xl p-1.5 text-center text-[9px] font-medium border border-zinc-850">
+                  <div className="grid grid-cols-2 gap-1.5 bg-zinc-50 rounded-xl p-2 text-center text-[10px] font-medium border border-zinc-200">
                     <div>
-                      <span className="text-zinc-500 block">Total</span>
-                      <strong className="text-white font-mono text-xs">{formatCurrency(b.totalAmount)}</strong>
+                      <span className="text-zinc-500 block text-[9px] font-bold uppercase">Total</span>
+                      <strong className="text-zinc-950 font-black text-xs">{formatCurrency(b.totalAmount)}</strong>
                     </div>
                     <div>
-                      <span className="text-emerald-400 block">Advance</span>
-                      <strong className="text-emerald-400 font-mono text-xs">{formatCurrency(b.advancePaid)}</strong>
+                      <span className="text-emerald-700 block text-[9px] font-bold uppercase">Advance</span>
+                      <strong className="text-emerald-700 font-black text-xs">{formatCurrency(b.advancePaid)}</strong>
                     </div>
                   </div>
                 </div>
 
                 {/* Actions Footer */}
-                <div className="pt-2 mt-2 border-t border-zinc-850 flex items-center justify-between gap-1">
-                  <div className="flex items-center gap-1">
+                <div className="pt-2 mt-2 border-t border-zinc-200 flex items-center justify-between gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       type="button"
                       onClick={() => openEditTourBookingModal(b)}
                       title="Edit Booking"
-                      className="p-1.5 rounded-lg bg-zinc-900 hover:bg-blue-600/30 text-blue-400 border border-zinc-800 transition-all cursor-pointer"
+                      className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 transition-all cursor-pointer"
                     >
-                      <Edit2 size={12} />
+                      <Edit2 size={13} />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleWhatsAppSend(b)}
                       title="Send WhatsApp"
-                      className="p-1.5 rounded-lg bg-emerald-600/20 hover:bg-emerald-600 text-emerald-400 hover:text-white border border-emerald-500/30 transition-all cursor-pointer"
+                      className="p-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 transition-all cursor-pointer"
                     >
-                      <MessageCircle size={12} />
+                      <MessageCircle size={13} />
                     </button>
                     <button
                       type="button"
                       onClick={() => handleShareReceipt(b)}
                       title="Voucher Slip"
-                      className="p-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 transition-all cursor-pointer"
+                      className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 transition-all cursor-pointer"
                     >
-                      <FileText size={12} />
+                      <FileText size={13} />
                     </button>
                   </div>
 
@@ -259,9 +265,9 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     type="button"
                     onClick={() => handleDelete(b.id, b.customerName)}
                     title="Delete Booking"
-                    className="p-1.5 rounded-lg bg-zinc-900 hover:bg-rose-600/30 text-rose-400 border border-zinc-800 hover:border-rose-500/40 transition-all cursor-pointer"
+                    className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 transition-all cursor-pointer"
                   >
-                    <Trash2 size={12} />
+                    <Trash2 size={13} />
                   </button>
                 </div>
               </div>

@@ -86,21 +86,21 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
-        {/* Header - Signature Black Theme (Zero Blue) */}
-        <div className="bg-zinc-950 p-5 sm:p-6 text-white shrink-0 border-b border-zinc-800">
+        {/* Header - Crisp White Background, Black Text & Black Borders (Zero Blue) */}
+        <div className="bg-white p-5 sm:p-6 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-zinc-300 bg-zinc-900 border border-zinc-800 px-2.5 py-0.5 rounded-full font-mono">
+                <span className="text-[11px] font-bold text-zinc-900 bg-zinc-100 border border-zinc-300 px-2.5 py-0.5 rounded-full">
                   🗓️ Departure: {formatDate(batch.departureDate)}
                 </span>
-                <span className="text-[11px] bg-zinc-900 border border-zinc-800 text-zinc-300 font-bold px-2 py-0.5 rounded-md">
+                <span className="text-[11px] bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold px-2 py-0.5 rounded-md">
                   {batch.tourType}
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black mt-1.5 text-white tracking-tight">{batch.title}</h2>
-              <p className="text-xs text-zinc-400 flex items-center gap-1 mt-0.5 font-medium">
-                <MapPin className="w-3.5 h-3.5 text-blue-400" /> {batch.destination} • {batch.durationDays} Days ({batch.travelMode})
+              <h2 className="text-xl sm:text-2xl font-black mt-1.5 text-zinc-950 tracking-tight">{batch.title}</h2>
+              <p className="text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
+                <MapPin className="w-3.5 h-3.5 text-zinc-900" /> {batch.destination} • {batch.durationDays} Days ({batch.travelMode})
               </p>
             </div>
 
@@ -110,7 +110,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                 type="button"
                 onClick={handleDeleteBatch}
                 title="Delete Tour Folder"
-                className="px-3 py-1.5 rounded-xl bg-rose-500/15 hover:bg-rose-600 text-rose-300 hover:text-white border border-rose-500/30 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                className="px-3 py-1.5 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
               >
                 <Trash2 size={13} />
                 <span>Delete Folder</span>
@@ -118,39 +118,39 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-xl bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* Seat Progress & PnL Bar - Pure Black Style */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-5 pt-4 border-t border-zinc-850 text-xs">
-            <div className="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
-              <span className="text-zinc-400 block text-[11px] font-medium">Seat Capacity</span>
-              <span className="text-sm sm:text-base font-bold font-mono text-white">
+          {/* Seat Progress & PnL Bar - Crisp White & Black Style */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-5 pt-4 border-t border-zinc-200 text-xs">
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
+              <span className="text-zinc-500 block text-[11px] font-medium">Seat Capacity</span>
+              <span className="text-sm sm:text-base font-black text-zinc-950">
                 {totalPassengers} / {totalSeats} Booked ({percentage}%)
               </span>
             </div>
 
-            <div className="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
-              <span className="text-zinc-400 block text-[11px] font-medium">Total Revenue</span>
-              <span className="text-sm sm:text-base font-bold font-mono text-white">{formatCurrency(totalRevenue)}</span>
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
+              <span className="text-zinc-500 block text-[11px] font-medium">Total Revenue</span>
+              <span className="text-sm sm:text-base font-black text-zinc-950">{formatCurrency(totalRevenue)}</span>
             </div>
 
-            <div className="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
-              <span className="text-zinc-400 block text-[11px] font-medium">Hotel & Transport Cost</span>
-              <span className="text-sm sm:text-base font-bold font-mono text-rose-400">
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
+              <span className="text-zinc-500 block text-[11px] font-medium">Hotel & Transport Cost</span>
+              <span className="text-sm sm:text-base font-black text-rose-700">
                 {formatCurrency(totalTourExpenses)}
               </span>
             </div>
 
-            <div className="bg-zinc-900/90 border border-zinc-800 p-2.5 rounded-xl">
-              <span className="text-zinc-400 block text-[11px] font-medium">Estimated Tour Profit</span>
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
+              <span className="text-zinc-500 block text-[11px] font-medium">Estimated Tour Profit</span>
               <span
-                className={`text-sm sm:text-base font-bold font-mono ${
-                  netTourProfit >= 0 ? 'text-emerald-400' : 'text-rose-400'
+                className={`text-sm sm:text-base font-black ${
+                  netTourProfit >= 0 ? 'text-emerald-700' : 'text-rose-700'
                 }`}
               >
                 {formatCurrency(netTourProfit)}
@@ -204,7 +204,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                         className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg ${
                           b.paymentStatus === 'Paid'
                             ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                            : 'bg-blue-50 text-blue-700 border border-blue-200'
+                            : 'bg-amber-50 text-amber-900 border border-amber-300'
                         }`}
                       >
                         {b.paymentStatus === 'Paid' ? 'Paid' : `Advance: ₹${b.advancePaid}`}

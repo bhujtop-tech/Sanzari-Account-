@@ -35,6 +35,8 @@ import {
   TourBatch,
   TourBooking,
   TourExpense,
+  TourInquiry,
+  CustomTourPackage,
   PaymentMethod,
   PaymentStatus,
   ExpenseCategory,
@@ -211,25 +213,74 @@ export async function cleanDuplicateCustomersInFirestore(): Promise<void> {
   }
 }
 
+export async function syncCacheToDefaultDatabase(): Promise<void> {
+  try {
+    const cacheKeys = [
+      { key: 'sz_sales', col: 'sales' },
+      { key: 'sz_expenses', col: 'expenses' },
+      { key: 'sz_tour_bookings', col: 'tourBookings' },
+      { key: 'sz_tour_expenses', col: 'tourExpenses' },
+      { key: 'sz_tour_inquiries', col: 'tourInquiries' },
+      { key: 'sz_custom_tour_packages', col: 'customTourPackages' },
+      { key: 'sz_customers', col: 'customers' },
+      { key: 'sz_products', col: 'products' },
+      { key: 'sz_wallets', col: 'wallets' },
+      { key: 'sz_transfers', col: 'transfers' },
+      { key: 'sz_payments', col: 'payments' },
+      { key: 'sz_purchases', col: 'purchases' },
+    ];
+
+    for (const { key, col } of cacheKeys) {
+      try {
+        const itemStr = localStorage.getItem(key);
+        if (itemStr) {
+          const items = JSON.parse(itemStr);
+          if (Array.isArray(items)) {
+            for (const entry of items) {
+              if (entry && entry.id && !entry.id.startsWith('init_') && !entry.id.startsWith('def-') && !entry.id.startsWith('fallback-')) {
+                const targetRef = doc(db, col, entry.id);
+                const existsSnap = await getDoc(targetRef);
+                if (!existsSnap.exists()) {
+                  await setDoc(targetRef, sanitizeForFirestore(entry));
+                }
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.warn(`Cache sync ${key} warning:`, err);
+      }
+    }
+  } catch (err) {
+    console.warn('syncCacheToDefaultDatabase warning:', err);
+  }
+}
+
 export async function initializeStoreDataIfEmpty(): Promise<boolean> {
   try {
+    // 1. Sync any local cache items to Firestore (default)
+    await syncCacheToDefaultDatabase();
+
     const currentDate = getCurrentDateString();
     const currentMonth = getMonthKey(currentDate);
 
     // Fetch snapshot checks in parallel for ultra-fast response
-    const [walletsSnap, productsSnap, customersSnap, salesSnap, expensesSnap] = await Promise.all([
+    const [walletsSnap, productsSnap, customersSnap, salesSnap, expensesSnap, tourBatchesSnap, tourBookingsSnap, tourInquiriesSnap] = await Promise.all([
       getDocs(collection(db, 'wallets')),
       getDocs(collection(db, 'products')),
       getDocs(collection(db, 'customers')),
       getDocs(collection(db, 'sales')),
       getDocs(collection(db, 'expenses')),
+      getDocs(collection(db, 'tourBatches')),
+      getDocs(collection(db, 'tourBookings')),
+      getDocs(collection(db, 'tourInquiries')),
     ]);
 
     let seeded = false;
 
     // 1. Wallets
     if (walletsSnap.empty) {
-      console.log('Seeding initial wallets into Firebase Firestore...');
+      console.log('Seeding initial wallets into Firebase Firestore (default)...');
       const batch = writeBatch(db);
       for (const w of INITIAL_WALLETS) {
         const wRef = doc(collection(db, 'wallets'));
@@ -245,7 +296,7 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
 
     // 2. Products
     if (productsSnap.empty) {
-      console.log('Seeding initial products...');
+      console.log('Seeding initial products into Firestore (default)...');
       const batch = writeBatch(db);
       for (const p of INITIAL_PRODUCTS) {
         const pRef = doc(collection(db, 'products'));
@@ -254,27 +305,14 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
-
-        // Stock movement
-        const mRef = doc(collection(db, 'stockMovements'));
-        batch.set(mRef, {
-          productId: pRef.id,
-          productName: p.name,
-          type: 'OPENING',
-          quantity: p.currentStock,
-          unit: p.unit,
-          date: currentDate,
-          notes: 'Opening physical stock setup',
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        });
       }
       await batch.commit();
+      seeded = true;
     }
 
     // 3. Customers
     if (customersSnap.empty) {
-      console.log('Seeding initial customers...');
+      console.log('Seeding initial customers into Firestore (default)...');
       const batch = writeBatch(db);
       for (const c of INITIAL_CUSTOMERS) {
         const cRef = doc(collection(db, 'customers'));
@@ -285,109 +323,40 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
         });
       }
       await batch.commit();
+      seeded = true;
     }
 
-    // 4. Sales
-    if (salesSnap.empty) {
-      console.log('Seeding initial sales...');
+    // 4. Tour Batches
+    if (tourBatchesSnap.empty && INITIAL_TOUR_BATCHES?.length > 0) {
+      console.log('Seeding initial tour batches...');
       const batch = writeBatch(db);
-
-      const sale1Ref = doc(collection(db, 'sales'));
-      batch.set(sale1Ref, {
-        saleNumber: 'SALE-1001',
-        customerName: 'Aslam Bhai',
-        items: [
-          {
-            productName: 'Keser (Pure Kashmiri Saffron)',
-            quantity: 2,
-            unit: '1g',
-            sellingPrice: 500,
-            purchaseCost: 350,
-            lineTotal: 1000,
-          },
-          {
-            productName: 'Mamra Badam',
-            quantity: 2,
-            unit: 'kg',
-            sellingPrice: 2400,
-            purchaseCost: 1800,
-            lineTotal: 4800,
-          },
-        ],
-        subtotal: 5800,
-        discount: 0,
-        total: 5800,
-        paidAmount: 3300,
-        pendingAmount: 2500,
-        paymentStatus: 'Partial',
-        paymentMethod: 'UPI',
-        walletName: 'Rizwan',
-        date: currentDate,
-        monthKey: currentMonth,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
-      const sale2Ref = doc(collection(db, 'sales'));
-      batch.set(sale2Ref, {
-        saleNumber: 'SALE-1002',
-        customerName: 'Ahmed Khan',
-        items: [
-          {
-            productName: 'Akhrot (Kashmiri Walnuts)',
-            quantity: 3,
-            unit: 'kg',
-            sellingPrice: 800,
-            purchaseCost: 550,
-            lineTotal: 2400,
-          },
-          {
-            productName: 'Crane bery (Cranberry)',
-            quantity: 2,
-            unit: 'kg',
-            sellingPrice: 750,
-            purchaseCost: 500,
-            lineTotal: 1500,
-          },
-        ],
-        subtotal: 3900,
-        discount: 0,
-        total: 3900,
-        paidAmount: 3900,
-        pendingAmount: 0,
-        paymentStatus: 'Paid',
-        paymentMethod: 'Cash',
-        walletName: 'Avesh',
-        date: currentDate,
-        monthKey: currentMonth,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
+      for (const tb of INITIAL_TOUR_BATCHES) {
+        const tbRef = doc(collection(db, 'tourBatches'));
+        batch.set(tbRef, sanitizeForFirestore({
+          ...tb,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+      }
       await batch.commit();
     }
 
-    // 5. Expenses
-    if (expensesSnap.empty) {
-      console.log('Seeding initial expenses...');
+    // 5. Tour Bookings
+    if (tourBookingsSnap.empty && INITIAL_TOUR_BOOKINGS?.length > 0) {
+      console.log('Seeding initial tour bookings...');
       const batch = writeBatch(db);
-
-      const exp1Ref = doc(collection(db, 'expenses'));
-      batch.set(exp1Ref, {
-        category: 'Transport & Logistics',
-        amount: 450,
-        description: 'Dryfruit Parcel Transport to Surat',
-        walletName: 'Rizwan',
-        date: currentDate,
-        monthKey: currentMonth,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      });
-
+      for (const tb of INITIAL_TOUR_BOOKINGS) {
+        const tbRef = doc(collection(db, 'tourBookings'));
+        batch.set(tbRef, sanitizeForFirestore({
+          ...tb,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }));
+      }
       await batch.commit();
     }
 
-    // Mark store initialized locally so subsequent app loads skip network checks
+    // Mark store initialized locally
     localStorage.setItem('sanzari_store_initialized_v2', 'true');
     return true;
   } catch (error) {
@@ -451,12 +420,40 @@ export async function deleteAppUser(uid: string): Promise<void> {
     throw error;
   }
 }
-export async function ensureTourWalletsExist(): Promise<void> {
+export async function ensureAllDefaultWalletsExist(): Promise<void> {
   try {
     const snap = await getDocs(collection(db, 'wallets'));
-    const existingNames = snap.docs.map((d) => (d.data().name || '').toLowerCase().trim());
+    const existing = snap.docs.map((d) => ({
+      id: d.id,
+      name: (d.data().name || '').toLowerCase().trim(),
+      scope: d.data().scope,
+    }));
 
-    const tourWalletsToAdd = [
+    const defaultsToAdd = [
+      {
+        name: 'Rizwan',
+        partnerKey: 'rizwan' as const,
+        scope: 'dryfruit' as const,
+        openingBalance: 31100,
+        currentBalance: 31100,
+        color: '#0284c7',
+      },
+      {
+        name: 'Avesh',
+        partnerKey: 'avesh' as const,
+        scope: 'dryfruit' as const,
+        openingBalance: 10950,
+        currentBalance: 10950,
+        color: '#10b981',
+      },
+      {
+        name: 'Sahil',
+        partnerKey: 'sahil' as const,
+        scope: 'dryfruit' as const,
+        openingBalance: 0,
+        currentBalance: 0,
+        color: '#8b5cf6',
+      },
       {
         name: 'Rizwan (Tour)',
         partnerKey: 'rizwan' as const,
@@ -483,13 +480,17 @@ export async function ensureTourWalletsExist(): Promise<void> {
       },
     ];
 
-    for (const tw of tourWalletsToAdd) {
-      if (!existingNames.includes(tw.name.toLowerCase().trim())) {
+    for (const dw of defaultsToAdd) {
+      const targetName = dw.name.toLowerCase().trim();
+      const alreadyExists = existing.some(
+        (w) => w.name === targetName || (dw.scope === 'tourism' && dw.partnerKey === 'bus' && w.name.includes('bus'))
+      );
+      if (!alreadyExists) {
         const wRef = doc(collection(db, 'wallets'));
         await setDoc(
           wRef,
           sanitizeForFirestore({
-            ...tw,
+            ...dw,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
           })
@@ -497,13 +498,13 @@ export async function ensureTourWalletsExist(): Promise<void> {
       }
     }
   } catch (err) {
-    console.warn('ensureTourWalletsExist warning:', err);
+    console.warn('ensureAllDefaultWalletsExist warning:', err);
   }
 }
 
 export function subscribeWallets(callback: (wallets: Wallet[]) => void) {
-  // Ensure tour wallets exist in the background
-  ensureTourWalletsExist().catch(() => {});
+  // Ensure all default wallets exist in the background
+  ensureAllDefaultWalletsExist().catch(() => {});
 
   const q = query(collection(db, 'wallets'));
   return onSnapshot(
@@ -514,10 +515,10 @@ export function subscribeWallets(callback: (wallets: Wallet[]) => void) {
         ...(d.data() as Omit<Wallet, 'id'>),
       }));
 
-      // Deduplicate by normalized wallet name
+      // Deduplicate by normalized name + scope key
       const uniqueMap = new Map<string, Wallet>();
       rawWallets.forEach((w) => {
-        const key = (w.name || '').toLowerCase().trim();
+        const key = `${(w.name || '').toLowerCase().trim()}__${w.scope || 'dryfruit'}`;
         if (!uniqueMap.has(key)) {
           uniqueMap.set(key, w);
         } else {
@@ -2515,6 +2516,197 @@ export async function updateTransactionRecord(params: {
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.UPDATE, `${params.type}/${params.id}`);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// SANZARI TOURISM: TOUR INQUIRIES
+// ----------------------------------------------------
+export function subscribeTourInquiries(callback: (inquiries: TourInquiry[]) => void) {
+  const q = query(collection(db, 'tourInquiries'), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const inquiries: TourInquiry[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<TourInquiry, 'id'>),
+      }));
+      callback(inquiries);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'tourInquiries');
+    }
+  );
+}
+
+export async function addTourInquiry(
+  inquiryData: Omit<TourInquiry, 'id' | 'inquiryNumber' | 'createdAt' | 'updatedAt'>,
+  userEmail: string
+): Promise<string> {
+  try {
+    const inquiryRef = doc(collection(db, 'tourInquiries'));
+    const inquiryNumber = `INQ-${Date.now().toString().slice(-4)}`;
+    const now = new Date().toISOString();
+
+    const record: Omit<TourInquiry, 'id'> = {
+      ...inquiryData,
+      inquiryNumber,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(inquiryRef, sanitizeForFirestore(record));
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'ADD_TOUR_INQUIRY',
+      recordType: 'tourInquiries',
+      recordId: inquiryRef.id,
+      newValue: JSON.stringify(record),
+      timestamp: now,
+    });
+
+    return inquiryRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'tourInquiries');
+    throw error;
+  }
+}
+
+export async function updateTourInquiry(
+  id: string,
+  updates: Partial<TourInquiry>,
+  userEmail: string
+): Promise<void> {
+  try {
+    const ref = doc(db, 'tourInquiries', id);
+    const now = new Date().toISOString();
+    await updateDoc(ref, sanitizeForFirestore({
+      ...updates,
+      updatedAt: now,
+    }));
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'UPDATE_TOUR_INQUIRY',
+      recordType: 'tourInquiries',
+      recordId: id,
+      newValue: JSON.stringify(updates),
+      timestamp: now,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourInquiries/${id}`);
+    throw error;
+  }
+}
+
+export async function deleteTourInquiry(id: string, userEmail: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'tourInquiries', id));
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'DELETE_TOUR_INQUIRY',
+      recordType: 'tourInquiries',
+      recordId: id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `tourInquiries/${id}`);
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// SANZARI TOURISM: CUSTOM TOUR PACKAGES
+// ----------------------------------------------------
+export function subscribeCustomTourPackages(callback: (packages: CustomTourPackage[]) => void) {
+  const q = query(collection(db, 'customTourPackages'), orderBy('createdAt', 'desc'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const pkgs: CustomTourPackage[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<CustomTourPackage, 'id'>),
+      }));
+      callback(pkgs);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'customTourPackages');
+    }
+  );
+}
+
+export async function addCustomTourPackage(
+  pkgData: Omit<CustomTourPackage, 'id' | 'createdAt' | 'updatedAt'>,
+  userEmail: string
+): Promise<string> {
+  try {
+    const pkgRef = doc(collection(db, 'customTourPackages'));
+    const now = new Date().toISOString();
+    const record: Omit<CustomTourPackage, 'id'> = {
+      ...pkgData,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    await setDoc(pkgRef, sanitizeForFirestore(record));
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'ADD_CUSTOM_TOUR_PACKAGE',
+      recordType: 'customTourPackages',
+      recordId: pkgRef.id,
+      newValue: JSON.stringify(record),
+      timestamp: now,
+    });
+
+    return pkgRef.id;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.CREATE, 'customTourPackages');
+    throw error;
+  }
+}
+
+export async function updateCustomTourPackage(
+  id: string,
+  updates: Partial<CustomTourPackage>,
+  userEmail: string
+): Promise<void> {
+  try {
+    const ref = doc(db, 'customTourPackages', id);
+    const now = new Date().toISOString();
+    await updateDoc(ref, sanitizeForFirestore({
+      ...updates,
+      updatedAt: now,
+    }));
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'UPDATE_CUSTOM_TOUR_PACKAGE',
+      recordType: 'customTourPackages',
+      recordId: id,
+      newValue: JSON.stringify(updates),
+      timestamp: now,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `customTourPackages/${id}`);
+    throw error;
+  }
+}
+
+export async function deleteCustomTourPackage(id: string, userEmail: string): Promise<void> {
+  try {
+    await deleteDoc(doc(db, 'customTourPackages', id));
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'DELETE_CUSTOM_TOUR_PACKAGE',
+      recordType: 'customTourPackages',
+      recordId: id,
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `customTourPackages/${id}`);
     throw error;
   }
 }

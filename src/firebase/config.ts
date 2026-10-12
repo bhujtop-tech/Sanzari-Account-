@@ -1,18 +1,24 @@
 import { initializeApp } from 'firebase/app';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
-import { getFirestore, doc, getDocFromServer } from 'firebase/firestore';
+import { initializeFirestore, doc, getDocFromServer } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-const databaseId = (firebaseConfig as { firestoreDatabaseId?: string }).firestoreDatabaseId;
-// Standard fast WebSocket / streaming Firestore connection
-export const db = getFirestore(app, databaseId || '(default)');
+export const databaseId = '(default)';
+// Robust connection with auto-detected long-polling to prevent proxy/iframe connection aborts
+export const db = initializeFirestore(
+  app,
+  {
+    experimentalAutoDetectLongPolling: true,
+  }
+);
 
 export const auth = getAuth(app);
 export const googleProvider = new GoogleAuthProvider();
 googleProvider.addScope('https://www.googleapis.com/auth/spreadsheets');
 googleProvider.addScope('https://www.googleapis.com/auth/drive.file');
+googleProvider.addScope('https://www.googleapis.com/auth/contacts.readonly');
 
 export enum OperationType {
   CREATE = 'create',

@@ -10,7 +10,7 @@ interface AddTourExpenseModalProps {
 }
 
 export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen, onClose }) => {
-  const { wallets, tourBatches, formatCurrency } = useData();
+  const { tourWallets, tourBatches, formatCurrency } = useData();
   const { currentUserProfile } = useAuth();
 
   const [selectedBatchId, setSelectedBatchId] = useState('');
@@ -18,12 +18,10 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
     'Hotel & Stay' | 'Train & Transport' | 'Food & Meals' | 'Sightseeing & Entry' | 'Guide & Staff' | 'Other'
   >('Hotel & Stay');
   const [amount, setAmount] = useState<number | string>('');
-  const tourWallets = wallets.filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'));
-  const dryfruitWallets = wallets.filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')));
 
   const [walletName, setWalletName] = useState<string>(() => {
-    const defaultTour = wallets.find((w) => w.name.toLowerCase().includes('bus (tour)')) || tourWallets[0];
-    return defaultTour?.name || wallets[0]?.name || 'Bus (Tour)';
+    const defaultTour = tourWallets.find((w) => w.name.toLowerCase().includes('bus')) || tourWallets[0];
+    return defaultTour?.name || 'Bus (Tour)';
   });
   const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [description, setDescription] = useState('');

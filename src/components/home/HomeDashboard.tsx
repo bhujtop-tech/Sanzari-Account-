@@ -20,7 +20,7 @@ import { motion } from 'motion/react';
 export const HomeDashboard: React.FC = () => {
   const { userPermissions } = useAuth();
   const {
-    wallets,
+    dryfruitWallets,
     totalBalance,
     thisMonthSalesTotal,
     thisMonthCollectedTotal,
@@ -40,10 +40,16 @@ export const HomeDashboard: React.FC = () => {
     setIsViewAllActivityOpen,
   } = useData();
 
-  // Find partner wallets
-  const rizwanWallet = wallets.find((w) => w.partnerKey === 'rizwan' || w.name.toLowerCase().includes('rizwan'));
-  const aveshWallet = wallets.find((w) => w.partnerKey === 'avesh' || w.name.toLowerCase().includes('avesh'));
-  const sahilWallet = wallets.find((w) => w.partnerKey === 'sahil' || w.name.toLowerCase().includes('sahil'));
+  // Find partner wallets strictly for Dry Fruit store
+  const rizwanWallet = dryfruitWallets.find(
+    (w) => w.name.toLowerCase() === 'rizwan' || (w.partnerKey === 'rizwan' && !w.name.includes('(Tour)'))
+  );
+  const aveshWallet = dryfruitWallets.find(
+    (w) => w.name.toLowerCase() === 'avesh' || (w.partnerKey === 'avesh' && !w.name.includes('(Tour)'))
+  );
+  const sahilWallet = dryfruitWallets.find(
+    (w) => w.name.toLowerCase() === 'sahil' || (w.partnerKey === 'sahil' && !w.name.includes('(Tour)'))
+  );
 
   const lowStockCount = products.filter((p) => p.currentStock <= p.lowStockThreshold).length;
 

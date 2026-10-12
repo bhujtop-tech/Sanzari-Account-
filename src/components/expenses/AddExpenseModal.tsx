@@ -19,7 +19,7 @@ const EXPENSE_CATEGORIES: ExpenseCategory[] = [
 ];
 
 export const AddExpenseModal: React.FC = () => {
-  const { isAddExpenseOpen, setIsAddExpenseOpen, wallets, formatCurrency } = useData();
+  const { isAddExpenseOpen, setIsAddExpenseOpen, dryfruitWallets, formatCurrency } = useData();
   const { user } = useAuth();
 
   const [amount, setAmount] = useState<number | ''>('');
@@ -41,11 +41,11 @@ export const AddExpenseModal: React.FC = () => {
       setNotes('');
       setDate(getCurrentDateString());
       setFormError(null);
-      if (wallets.length > 0) {
-        setSelectedWalletId(wallets[0].id);
+      if (dryfruitWallets.length > 0) {
+        setSelectedWalletId(dryfruitWallets[0].id);
       }
     }
-  }, [isAddExpenseOpen, wallets]);
+  }, [isAddExpenseOpen, dryfruitWallets]);
 
   const handleSaveExpense = async () => {
     try {
@@ -56,7 +56,7 @@ export const AddExpenseModal: React.FC = () => {
         return;
       }
 
-      const activeWallet = wallets.find((w) => w.id === selectedWalletId) || wallets[0];
+      const activeWallet = dryfruitWallets.find((w) => w.id === selectedWalletId) || dryfruitWallets[0];
       if (!activeWallet) {
         setFormError('Please select a wallet');
         return;
@@ -128,7 +128,7 @@ export const AddExpenseModal: React.FC = () => {
               Deduct From Wallet *
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {wallets.map((w) => (
+              {dryfruitWallets.map((w) => (
                 <button
                   key={w.id}
                   type="button"

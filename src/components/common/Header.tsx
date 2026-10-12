@@ -17,6 +17,7 @@ export const Header: React.FC = () => {
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
     setIsAddTourExpenseOpen,
+    setIsAddTourInquiryOpen,
   } = useData();
   const { currentUserProfile, userPermissions } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -76,18 +77,25 @@ export const Header: React.FC = () => {
             {businessMode === 'tourism' ? (
               <>
                 <button
-                  onClick={() => setIsAddTourBookingOpen(true)}
+                  onClick={() => setIsAddTourInquiryOpen(true)}
                   className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <Plus size={14} className="stroke-[3]" />
+                  <span>+ Inquiry</span>
+                </button>
+                <button
+                  onClick={() => setIsAddTourBookingOpen(true)}
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                >
+                  <Plus size={14} />
                   <span>+ Booking</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourBatchOpen(true)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="hidden xs:flex px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <FolderPlus size={14} />
-                  <span>+ Tour Date</span>
+                  <span>+ Date Folder</span>
                 </button>
               </>
             ) : (

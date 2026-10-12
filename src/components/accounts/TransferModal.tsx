@@ -7,8 +7,11 @@ import { createTransfer, getCurrentDateString } from '../../services/db';
 import { ArrowRightLeft } from 'lucide-react';
 
 export const TransferModal: React.FC = () => {
-  const { isTransferOpen, setIsTransferOpen, wallets, formatCurrency } = useData();
+  const { isTransferOpen, setIsTransferOpen, businessMode, dryfruitWallets, tourWallets, formatCurrency } = useData();
   const { user } = useAuth();
+
+  const isTourism = businessMode === 'tourism';
+  const activeWallets = isTourism ? tourWallets : dryfruitWallets;
 
   const [fromWalletId, setFromWalletId] = useState('');
   const [toWalletId, setToWalletId] = useState('');
@@ -27,15 +30,18 @@ export const TransferModal: React.FC = () => {
       setDate(getCurrentDateString());
       setFormError(null);
 
-      if (wallets.length >= 2) {
-        setFromWalletId(wallets[0].id);
-        setToWalletId(wallets[1].id);
+      if (activeWallets.length >= 2) {
+        setFromWalletId(activeWallets[0].id);
+        setToWalletId(activeWallets[1].id);
+      } else if (activeWallets.length === 1) {
+        setFromWalletId(activeWallets[0].id);
+        setToWalletId('');
       }
     }
-  }, [isTransferOpen, wallets]);
+  }, [isTransferOpen, activeWallets]);
 
-  const fromWallet = wallets.find((w) => w.id === fromWalletId);
-  const toWallet = wallets.find((w) => w.id === toWalletId);
+  const fromWallet = activeWallets.find((w) => w.id === fromWalletId);
+  const toWallet = activeWallets.find((w) => w.id === toWalletId);
 
   const handleSaveTransfer = async () => {
     try {
@@ -112,23 +118,12 @@ export const TransferModal: React.FC = () => {
                 onChange={(e) => setFromWalletId(e.target.value)}
                 className="w-full p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-900 focus:bg-white focus:ring-1 focus:ring-zinc-900 outline-hidden"
               >
-                <optgroup label="🛒 Dry Fruit Wallets">
-                  {wallets
-                    .filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')))
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({formatCurrency(w.currentBalance)})
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="🚌 Sanzari Tour Wallets">
-                  {wallets
-                    .filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'))
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({formatCurrency(w.currentBalance)})
-                      </option>
-                    ))}
+                <optgroup label={isTourism ? '🚌 Sanzari Tour Wallets' : '🛒 Dry Fruit Wallets'}>
+                  {activeWallets.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({formatCurrency(w.currentBalance)})
+                    </option>
+                  ))}
                 </optgroup>
               </select>
             </div>
@@ -143,23 +138,12 @@ export const TransferModal: React.FC = () => {
                 onChange={(e) => setToWalletId(e.target.value)}
                 className="w-full p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-xs font-bold text-zinc-900 focus:bg-white focus:ring-1 focus:ring-zinc-900 outline-hidden"
               >
-                <optgroup label="🚌 Sanzari Tour Wallets">
-                  {wallets
-                    .filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'))
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({formatCurrency(w.currentBalance)})
-                      </option>
-                    ))}
-                </optgroup>
-                <optgroup label="🛒 Dry Fruit Wallets">
-                  {wallets
-                    .filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')))
-                    .map((w) => (
-                      <option key={w.id} value={w.id}>
-                        {w.name} ({formatCurrency(w.currentBalance)})
-                      </option>
-                    ))}
+                <optgroup label={isTourism ? '🚌 Sanzari Tour Wallets' : '🛒 Dry Fruit Wallets'}>
+                  {activeWallets.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} ({formatCurrency(w.currentBalance)})
+                    </option>
+                  ))}
                 </optgroup>
               </select>
             </div>
