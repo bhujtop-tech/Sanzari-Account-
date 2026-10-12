@@ -69,29 +69,29 @@ export const Header: React.FC = () => {
           </div>
         </div>
 
-        {/* Right: Desktop Quick Actions & AI Trigger & Compact Profile Avatar */}
+        {/* Right: Quick Actions & Profile Avatar */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
-          {/* Desktop Quick Actions (Contextual for mode) */}
-          <div className="hidden md:flex items-center gap-2 mr-1">
+          {/* Header Quick Actions */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {businessMode === 'tourism' ? (
               <>
                 <button
                   onClick={() => setIsAddTourBookingOpen(true)}
-                  className="px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <Plus size={14} className="stroke-[3]" />
                   <span>+ Booking</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourBatchOpen(true)}
-                  className="px-3 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200/80 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <FolderPlus size={14} />
                   <span>+ Tour Date</span>
                 </button>
               </>
             ) : (
-              <>
+              <div className="hidden md:flex items-center gap-2">
                 {userPermissions?.canAddSale && (
                   <button
                     onClick={() => setIsAddSaleOpen(true)}
@@ -119,7 +119,7 @@ export const Header: React.FC = () => {
                   <ArrowDownLeft size={14} className="text-emerald-600" />
                   <span>+ Payment</span>
                 </button>
-              </>
+              </div>
             )}
           </div>
 

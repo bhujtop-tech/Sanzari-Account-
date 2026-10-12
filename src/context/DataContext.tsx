@@ -38,6 +38,7 @@ import {
   subscribeTourBookings,
   subscribeTourExpenses,
   deleteTourBooking,
+  deleteTourBatch,
 } from '../services/db';
 import {
   INITIAL_WALLETS,
@@ -90,6 +91,7 @@ interface DataContextType {
   deleteTourBookingById: (id: string) => Promise<void>;
   isAddTourBatchOpen: boolean;
   setIsAddTourBatchOpen: (open: boolean) => void;
+  deleteTourBatchById: (id: string) => Promise<void>;
   isAddTourExpenseOpen: boolean;
   setIsAddTourExpenseOpen: (open: boolean) => void;
   isTourReceiptOpen: boolean;
@@ -237,6 +239,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await deleteTourBooking(id, user?.email || 'admin@sanzari.com');
     } catch (err) {
       console.warn('Delete tour booking error:', err);
+    }
+  };
+
+  const deleteTourBatchById = async (id: string) => {
+    if (!id) return;
+    setTourBatches((prev) => {
+      const updated = prev.filter((b) => b.id !== id);
+      localStorage.setItem('sz_tour_batches', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await deleteTourBatch(id, user?.email || 'admin@sanzari.com');
+    } catch (err) {
+      console.warn('Delete tour batch error:', err);
     }
   };
 
@@ -653,6 +669,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteTourBookingById,
         isAddTourBatchOpen,
         setIsAddTourBatchOpen,
+        deleteTourBatchById,
         isAddTourExpenseOpen,
         setIsAddTourExpenseOpen,
         isTourReceiptOpen,

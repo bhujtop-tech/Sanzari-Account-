@@ -26,6 +26,8 @@ import {
   FileText,
   Plane,
   Luggage,
+  Plus,
+  FolderPlus,
 } from 'lucide-react';
 
 interface SlideMenuProps {
@@ -44,6 +46,8 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     setIsAiAssistantOpen,
     setIsGoogleSheetsOpen,
     setIsPdfCustomizerOpen,
+    setIsAddTourBookingOpen,
+    setIsAddTourBatchOpen,
   } = useData();
   const { currentUserProfile, lockApp } = useAuth();
 
@@ -172,6 +176,37 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                   </div>
                 </div>
               </div>
+
+              {/* Tourism Quick Actions */}
+              {businessMode === 'tourism' && (
+                <div className="p-3.5 px-4 bg-zinc-50 border-b border-zinc-200/70 space-y-2">
+                  <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
+                    Quick Actions
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => {
+                        onClose();
+                        setIsAddTourBookingOpen(true);
+                      }}
+                      className="py-2.5 px-2.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer"
+                    >
+                      <Plus size={14} className="stroke-[3]" />
+                      <span>+ Booking</span>
+                    </button>
+                    <button
+                      onClick={() => {
+                        onClose();
+                        setIsAddTourBatchOpen(true);
+                      }}
+                      className="py-2.5 px-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                    >
+                      <FolderPlus size={14} />
+                      <span>+ Tour Date</span>
+                    </button>
+                  </div>
+                </div>
+              )}
 
               {/* Dry Fruit Store Tools (Only shown in dry fruit mode) */}
               {businessMode === 'dryfruit' && (

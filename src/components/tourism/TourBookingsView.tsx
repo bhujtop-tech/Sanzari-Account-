@@ -2,39 +2,30 @@ import React, { useState, useMemo } from 'react';
 import {
   Luggage,
   Search,
-  Plus,
-  Calendar,
   MapPin,
   Users,
-  Train,
-  CheckCircle2,
   Phone,
   MessageCircle,
   FileText,
   Trash2,
   Edit2,
-  Share2,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { useAuth } from '../../context/AuthContext';
 import { TourBooking } from '../../types';
 
 interface TourBookingsViewProps {
   onOpenBookingDetail?: (booking: TourBooking) => void;
 }
 
-export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookingDetail }) => {
+export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   const {
     tourBookings,
     formatCurrency,
-    formatDate,
-    setIsAddTourBookingOpen,
     setTourReceiptBooking,
     setIsTourReceiptOpen,
     openEditTourBookingModal,
     deleteTourBookingById,
   } = useData();
-  const { currentUserProfile } = useAuth();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Partial' | 'Pending'>('ALL');
@@ -94,31 +85,6 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
 
   return (
     <div className="space-y-5 pb-48 sm:pb-24">
-      {/* Top Banner - Signature Black Theme */}
-      <div className="bg-zinc-950 rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-zinc-850 relative overflow-hidden">
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider">
-              <Luggage className="w-3.5 h-3.5 text-blue-400" />
-              Customer Bookings
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Tour Bookings & Passengers
-            </h2>
-            <p className="text-xs text-zinc-400 max-w-xl">
-              Track customer bookings, passenger ages, train/flight class, advance payments, and send instant WhatsApp receipts.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsAddTourBookingOpen(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all active:scale-95 shrink-0 cursor-pointer"
-          >
-            <Plus className="w-4 h-4 stroke-[3]" /> + New Tour Booking
-          </button>
-        </div>
-      </div>
-
       {/* Filter Bar */}
       <div className="bg-white p-3 rounded-2xl border border-zinc-200/90 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
         <div className="relative flex-1">
@@ -137,7 +103,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
             <button
               key={st}
               onClick={() => setStatusFilter(st)}
-              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 ${
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer ${
                 statusFilter === st
                   ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
                   : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
@@ -149,7 +115,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
         </div>
       </div>
 
-      {/* Bookings List (2 Cards Per Row on Mobile) */}
+      {/* Bookings List (2 Cards Per Row on Mobile, Pure Black Style - Zero Orange) */}
       {filteredBookings.length === 0 ? (
         <div className="bg-white rounded-3xl border border-zinc-200 p-12 text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-zinc-100 text-zinc-700 flex items-center justify-center mx-auto">
@@ -157,14 +123,8 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
           </div>
           <h3 className="text-base font-bold text-zinc-900">No Bookings Found</h3>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            No tour bookings match your search. Create a new booking with customer name, members, and advance payment!
+            No tour bookings match your search. Use the header "+ Booking" button to create a new booking!
           </p>
-          <button
-            onClick={() => setIsAddTourBookingOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 shadow-md inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <Plus className="w-4 h-4" /> Add Tour Booking
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
@@ -184,9 +144,9 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
                 className="bg-zinc-950 text-white rounded-2xl border border-zinc-800 shadow-md p-3 sm:p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group"
               >
                 <div>
-                  {/* Top Header / Booking No & Status */}
+                  {/* Top Header / Booking No & Status - Clean Black (No Orange) */}
                   <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 mb-2">
-                    <span className="font-mono text-[9px] sm:text-[10px] font-black text-amber-400 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[90px]">
+                    <span className="font-mono text-[9px] sm:text-[10px] font-black text-zinc-300 bg-zinc-900 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[90px]">
                       {b.bookingNumber}
                     </span>
                     <span
@@ -194,7 +154,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
                         b.paymentStatus === 'Paid'
                           ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                           : b.paymentStatus === 'Partial'
-                          ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
+                          ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
                           : 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
                       }`}
                     >
@@ -204,15 +164,15 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
 
                   {/* Big Date Highlight & Customer Info */}
                   <div className="flex items-center gap-2 mb-2">
-                    {/* Big Date Badge */}
+                    {/* Big Date Badge - Zero Orange */}
                     <div className="px-2 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-center shrink-0 min-w-[42px]">
-                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-amber-400 block leading-tight">
+                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-400 block leading-tight">
                         {monthShort}
                       </span>
                       <span className="text-lg sm:text-2xl font-black font-mono tracking-tight text-white block leading-none my-0.5">
                         {dayNum}
                       </span>
-                      <span className="text-[7px] font-bold text-zinc-400 block leading-tight">
+                      <span className="text-[7px] font-bold text-zinc-500 block leading-tight">
                         {yearNum}
                       </span>
                     </div>
@@ -238,7 +198,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = ({ onOpenBookin
                         <MapPin size={10} className="shrink-0" />
                         <span className="truncate">{b.destination}</span>
                       </span>
-                      <span className="text-amber-300 font-bold text-[9px] bg-zinc-950 px-1 rounded border border-zinc-800 truncate max-w-[70px]">
+                      <span className="text-zinc-300 font-bold text-[9px] bg-zinc-950 px-1.5 py-0.5 rounded border border-zinc-800 truncate max-w-[80px]">
                         {b.travelClass}
                       </span>
                     </div>

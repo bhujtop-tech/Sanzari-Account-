@@ -1,16 +1,11 @@
 import React, { useState, useMemo } from 'react';
 import {
   Folder,
-  FolderPlus,
   Calendar,
   MapPin,
   Users,
-  Train,
-  Plus,
   Search,
-  IndianRupee,
   ChevronRight,
-  Luggage,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBatch } from '../../types';
@@ -22,15 +17,12 @@ interface TourBatchesViewProps {
 
 export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
   onSelectBatch,
-  onBookTour,
 }) => {
   const {
     tourBatches,
     tourBookings,
     formatCurrency,
-    formatDate,
     setIsAddTourBatchOpen,
-    setIsAddTourBookingOpen,
   } = useData();
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,31 +51,6 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
 
   return (
     <div className="space-y-5 pb-48 sm:pb-24">
-      {/* Top Banner - Signature Black Theme */}
-      <div className="bg-zinc-950 rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-zinc-850 relative overflow-hidden">
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider">
-              <Folder className="w-3.5 h-3.5 text-blue-400" />
-              Monthly Tour Folders
-            </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
-              Tour Dates & Folders
-            </h2>
-            <p className="text-xs text-zinc-400 max-w-xl">
-              Manage your 3 monthly tour dates (e.g. 10 Oct Kashmir, 24 Oct Manali). Add bookings directly into each tour date folder.
-            </p>
-          </div>
-
-          <button
-            onClick={() => setIsAddTourBatchOpen(true)}
-            className="px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs font-black flex items-center gap-2 shadow-lg shadow-blue-600/30 transition-all active:scale-95 shrink-0 cursor-pointer"
-          >
-            <FolderPlus className="w-4 h-4" /> + New Tour Date Folder
-          </button>
-        </div>
-      </div>
-
       {/* Search Bar */}
       <div className="bg-white p-3 rounded-2xl border border-zinc-200/90 shadow-sm flex items-center gap-3">
         <Search className="w-4 h-4 text-zinc-400 ml-2" />
@@ -96,7 +63,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
         />
       </div>
 
-      {/* Folders List (2 cards per row on mobile) */}
+      {/* Folders List (2 cards per row on mobile, Pure Black Style - No Orange) */}
       {filteredBatches.length === 0 ? (
         <div className="bg-white rounded-3xl border border-zinc-200 p-12 text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-zinc-100 text-zinc-700 flex items-center justify-center mx-auto">
@@ -104,14 +71,8 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
           </div>
           <h3 className="text-base font-bold text-zinc-900">No Tour Folders Yet</h3>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            Create your first tour date folder (e.g. 10 October Kashmir Tour) to start taking bookings!
+            No tour date folders match your search. Create tour date folders using the header button!
           </p>
-          <button
-            onClick={() => setIsAddTourBatchOpen(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 inline-flex items-center gap-1.5 cursor-pointer"
-          >
-            <FolderPlus className="w-4 h-4" /> Create Tour Folder
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
@@ -130,12 +91,13 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
             return (
               <div
                 key={b.id}
-                className="bg-zinc-950 text-white rounded-2xl border border-zinc-800 shadow-lg p-3 sm:p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group"
+                onClick={() => onSelectBatch && onSelectBatch(b.id)}
+                className="bg-zinc-950 text-white rounded-2xl border border-zinc-800 shadow-lg p-3 sm:p-4 flex flex-col justify-between hover:border-zinc-700 transition-all group cursor-pointer"
               >
                 <div>
-                  {/* Folder Top Header */}
+                  {/* Folder Top Header - Pure Black & Zinc (Zero Orange) */}
                   <div className="flex items-center justify-between border-b border-zinc-800/80 pb-2 mb-2.5">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-amber-400 flex items-center gap-1">
+                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
                       <span>📂</span> Folder
                     </span>
                     <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-900 text-zinc-300 border border-zinc-800 truncate max-w-[80px]">
@@ -145,15 +107,15 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
 
                   {/* Highlighted Date & Destination */}
                   <div className="flex items-center gap-2 mb-2.5">
-                    {/* Big Date Badge */}
+                    {/* Big Date Badge - Zero Orange */}
                     <div className="px-2 py-1 rounded-xl bg-zinc-900 border border-zinc-800 text-center shrink-0 min-w-[42px]">
-                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-amber-400 block leading-tight">
+                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-400 block leading-tight">
                         {monthShort}
                       </span>
                       <span className="text-lg sm:text-2xl font-black font-mono tracking-tight text-white block leading-none my-0.5">
                         {dayNum}
                       </span>
-                      <span className="text-[7px] font-bold text-zinc-400 block leading-tight">
+                      <span className="text-[7px] font-bold text-zinc-500 block leading-tight">
                         {yearNum}
                       </span>
                     </div>
@@ -169,9 +131,9 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                     </div>
                   </div>
 
-                  {/* Compact Rates Grid */}
+                  {/* Compact Rates Grid - Clean Black & Zinc */}
                   <div className="bg-zinc-900/90 rounded-xl p-2 border border-zinc-800/80 my-2 space-y-1">
-                    <div className="text-[9px] font-bold uppercase tracking-wider text-amber-400/90 flex justify-between items-center">
+                    <div className="text-[9px] font-bold uppercase tracking-wider text-zinc-400 flex justify-between items-center">
                       <span>Rates / Person</span>
                     </div>
                     <div className="grid grid-cols-2 gap-1 text-[10px] font-mono font-bold">
@@ -184,7 +146,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                       <div className="bg-zinc-950 px-1.5 py-0.5 rounded text-sky-400 border border-zinc-800/60 truncate">
                         ✈️ Flight: {b.priceFlight ? formatCurrency(b.priceFlight) : '₹22k'}
                       </div>
-                      <div className="bg-zinc-950 px-1.5 py-0.5 rounded text-amber-300 border border-zinc-800/60 truncate">
+                      <div className="bg-zinc-950 px-1.5 py-0.5 rounded text-zinc-300 border border-zinc-800/60 truncate">
                         👶 Child: {b.priceChildHalf ? formatCurrency(b.priceChildHalf) : '₹7k'}
                       </div>
                     </div>
@@ -208,29 +170,14 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                 </div>
 
                 {/* Actions Footer */}
-                <div className="pt-2.5 mt-2.5 border-t border-zinc-850 flex items-center justify-between gap-1">
-                  <button
-                    type="button"
-                    onClick={() => onSelectBatch && onSelectBatch(b.id)}
-                    className="text-[10px] font-bold text-zinc-400 hover:text-white flex items-center gap-0.5 cursor-pointer"
-                  >
-                    <span>View</span>
-                    <ChevronRight size={12} className="text-amber-400" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (onBookTour) {
-                        onBookTour(b.id);
-                      } else {
-                        setIsAddTourBookingOpen(true);
-                      }
-                    }}
-                    className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-lg text-[10px] flex items-center gap-1 shadow-sm active:scale-95 cursor-pointer"
-                  >
-                    <Plus size={12} className="stroke-[3]" /> + Book
-                  </button>
+                <div className="pt-2.5 mt-2.5 border-t border-zinc-850 flex items-center justify-between">
+                  <span className="text-[10px] text-zinc-400 font-medium">
+                    {stats.totalPassengers} Passengers
+                  </span>
+                  <div className="text-[10px] font-bold text-zinc-300 group-hover:text-white flex items-center gap-0.5 transition-colors">
+                    <span>View Folder</span>
+                    <ChevronRight size={12} className="text-zinc-400" />
+                  </div>
                 </div>
               </div>
             );
