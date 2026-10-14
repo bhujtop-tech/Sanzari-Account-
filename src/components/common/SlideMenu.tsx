@@ -49,6 +49,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
     setIsAddTourInquiryOpen,
+    setIsPackageExplainerOpen,
   } = useData();
   const { currentUserProfile, lockApp } = useAuth();
 
@@ -187,6 +188,17 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                   <p className="text-[10px] font-bold text-zinc-500 uppercase tracking-wider">
                     Quick Actions
                   </p>
+
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsPackageExplainerOpen(true);
+                    }}
+                    className="w-full py-2.5 px-3 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-xs active:scale-95 transition-all cursor-pointer border border-amber-500"
+                  >
+                    <span>🎙️</span>
+                    <span>Package Explainer &amp; Pitch</span>
+                  </button>
 
                   {/* Lamba Add New Inquiry Button */}
                   <button

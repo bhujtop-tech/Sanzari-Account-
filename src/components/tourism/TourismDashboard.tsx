@@ -42,6 +42,7 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
     customTourPackages,
     setActiveMoreSection,
     setIsAddTourInquiryOpen,
+    setIsPackageExplainerOpen,
     openInquiryPdf,
   } = useData();
 
@@ -68,6 +69,14 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
     <div className="space-y-6 pb-48 sm:pb-24">
       {/* Quick Navigation Action Strip for Tourism */}
       <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+        <button
+          onClick={() => setIsPackageExplainerOpen(true)}
+          className="px-3.5 py-2 rounded-xl bg-amber-400 text-zinc-950 font-black text-xs border-2 border-zinc-900 shadow-xs hover:bg-amber-300 shrink-0 flex items-center gap-1.5 transition-all cursor-pointer"
+        >
+          <span>🎙️</span>
+          <span>Package Explainer &amp; Pitch</span>
+        </button>
+
         <button
           onClick={() => onNavigateTab('stock')}
           className="px-3.5 py-2 rounded-xl bg-white text-zinc-950 font-black text-xs border-2 border-zinc-900 shadow-xs hover:bg-zinc-50 shrink-0 flex items-center gap-1.5 transition-all cursor-pointer"

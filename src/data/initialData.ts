@@ -291,6 +291,85 @@ export const INITIAL_TOUR_EXPENSES: Omit<TourExpense, 'id'>[] = [];
 // ==========================================
 export const INITIAL_CUSTOM_TOUR_PACKAGES: Omit<CustomTourPackage, 'id'>[] = [
   {
+    packageCode: 'SZ-PKG-KASHMIR-SEASON-SPECIAL',
+    packageName: 'KASHMIR SEASON SPECIAL ❄️🏔️',
+    packageNameGujarati: 'Sanzari Tours Presents — Chalo Kashmir... Chalo Kashmir...! 🥳 (Gadhsisa Se)',
+    destination: 'Kashmir (Srinagar, Sonamarg, Gulmarg, Pahalgam, Dal Lake)',
+    durationNights: 8,
+    durationDays: 9,
+    durationTextGujarati: '9 Days / 8 Nights Tour (11 November 2025 Departure)',
+    priceNonAcTrain: 13999, // Sleeper Train ₹13,999
+    priceAcTrain: 15999, // 3AC Train ₹15,999
+    priceChildHalf: 8500,
+    overviewGujarati:
+      '🔊 KASHMIR SEASON SPECIAL ❄️🏔️\n😍 ✨Sanzari Tours & Travels Presents✨\n🥳 Gadhsisa Se — Chalo Kashmir... Chalo Kashmir...! 🥳\n\n📆 Departure Date : 11 November 2025\n🚆 Tour Duration : 9 Days / 8 Nights',
+    inclusionsGujarati: [
+      'Bhuj se Jammu tak AC Sleeper Bus aur Sleeper Train',
+      'Jammu se 6 Days ke liye Private Car (Innova / Swift)',
+      'Kashmir me 5 Nights Stay (Deluxe Hotels)',
+      '2 Star Hotel me 4-Bed Deluxe Room',
+      'Daily Breakfast + Dinner Included (100% Pure Veg) 🍽️',
+      '35 Years ke Experience ke sath Best Management 💯',
+    ],
+    exclusionsGujarati: [
+      'Shikara, Gondola Cable Car, Horse Ride, Union Cab, Garden Entry & Shopping extra paid by customer.',
+      'Emergency situations like natural calamity, traffic jam, extra stay, train miss company is not responsible.',
+      'Private Couple Room : ₹3,000/- Extra Per Couple',
+    ],
+    itinerary: [
+      {
+        day: 1,
+        title: 'Bhuj / Vadodara se Jammu ke liye Departure',
+        description: 'AC Sleeper Bus & Sleeper/3AC Train se Gadhsisa / Bhuj / Vadodara se Jammu departure.',
+      },
+      {
+        day: 2,
+        title: 'Jammu Arrival & Scenic Drive to Srinagar',
+        description: 'Jammu arrival ke baad Private Car se Srinagar journey, hotel check-in & night stay.',
+      },
+      {
+        day: 3,
+        title: 'Srinagar City, Mughal Gardens, Nishat Bagh & Hazratbal',
+        description: 'Srinagar city tour, Shalimar Garden, Mughal Garden, Nishat Bagh, Hazratbal visit.',
+      },
+      {
+        day: 4,
+        title: 'Dal Lake Shikara, Shankaracharya Temple & Local Market',
+        description: 'World famous Dal Lake, Shankaracharya Hilltop Temple visit aur local dry fruit shopping.',
+      },
+      {
+        day: 5,
+        title: 'Sonamarg Glacier & Ganderbal (Sindh River)',
+        description: 'Ganderbal Sindh River drive, Sonamarg glacier snow points aur adventure activities.',
+      },
+      {
+        day: 6,
+        title: 'Gulmarg Hill Station, Apple Valley & Kesar Valley',
+        description: 'Gulmarg mountain visit, Gondola ride point, Apple Valley 🍎 & Kesar Valley 🌸 tour.',
+      },
+      {
+        day: 7,
+        title: 'Pahalgam Valley, Aishmuqam & Bat Factory',
+        description: 'Pahalgam greenery, Aishmuqam visit aur Kashmir bat factory shopping.',
+      },
+      {
+        day: 8,
+        title: 'Srinagar se Jammu Return Drive',
+        description: 'Kashmir memories ke sath Jammu return drive. Jammu se train/bus me departure.',
+      },
+      {
+        day: 9,
+        title: 'Home Arrival - Safe Journey Complete',
+        description: 'Gadhsisa / Bhuj / Vadodara safe arrival. Sanzari Tours ke sath memorable tour complete.',
+      },
+    ],
+    hotelCategory: '2 Star Hotel me 4-Bed Deluxe Room (Private Couple Room Extra ₹3,000)',
+    foodPlan: 'Daily Garma-Garam Breakfast + Dinner (100% Pure Veg Shuddh Shakahari Khana)',
+    transportDetails: 'AC Sleeper Bus + Train (Bhuj-Jammu) & 6 Days Private Car (Kashmir)',
+    pickupCity: 'Gadhsisa / Bhuj / Vadodara / Ahmedabad / Jammu',
+    specialNotesGujarati: '📞 Booking & Inquiry Call : Rizvan Khalifa (📱 7874635992) - Sanzari Tourism',
+  },
+  {
     packageCode: 'SZ-PKG-KASHMIR-01',
     packageName: 'Kashmir Autumn & Snow Deluxe Special',
     packageNameGujarati: 'શ્રી કાશ્મીર હેવન સ્પેશિયલ ફેમિલી ટૂર',

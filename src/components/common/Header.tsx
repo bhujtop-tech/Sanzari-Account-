@@ -18,6 +18,7 @@ export const Header: React.FC = () => {
     setIsAddTourBatchOpen,
     setIsAddTourExpenseOpen,
     setIsAddTourInquiryOpen,
+    setIsPackageExplainerOpen,
   } = useData();
   const { currentUserProfile, userPermissions } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -76,6 +77,13 @@ export const Header: React.FC = () => {
           <div className="flex items-center gap-1.5 sm:gap-2">
             {businessMode === 'tourism' ? (
               <>
+                <button
+                  onClick={() => setIsPackageExplainerOpen(true)}
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer border border-amber-500"
+                >
+                  <Sparkles size={14} className="fill-zinc-950" />
+                  <span>🎙️ Package Explainer</span>
+                </button>
                 <button
                   onClick={() => setIsAddTourInquiryOpen(true)}
                   className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"

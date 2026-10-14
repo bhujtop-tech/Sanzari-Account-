@@ -162,6 +162,8 @@ interface DataContextType {
   setIsGoogleSheetsOpen: (open: boolean) => void;
   isPdfCustomizerOpen: boolean;
   setIsPdfCustomizerOpen: (open: boolean) => void;
+  isPackageExplainerOpen: boolean;
+  setIsPackageExplainerOpen: (open: boolean) => void;
 
   // Selected items for modal view
   selectedWalletId: string | null;
@@ -378,6 +380,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAiAssistantOpen, setIsAiAssistantOpen] = useState(false);
   const [isGoogleSheetsOpen, setIsGoogleSheetsOpen] = useState(false);
   const [isPdfCustomizerOpen, setIsPdfCustomizerOpen] = useState(false);
+  const [isPackageExplainerOpen, setIsPackageExplainerOpen] = useState(false);
 
   // Selections
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -924,6 +927,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsGoogleSheetsOpen,
         isPdfCustomizerOpen,
         setIsPdfCustomizerOpen,
+        isPackageExplainerOpen,
+        setIsPackageExplainerOpen,
         selectedWalletId,
         setSelectedWalletId,
         selectedCustomerId,

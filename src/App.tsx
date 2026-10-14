@@ -49,6 +49,7 @@ import { CustomTourPackagesView } from './components/tourism/CustomTourPackagesV
 import { AddTourInquiryModal } from './components/tourism/AddTourInquiryModal';
 import { AddCustomPackageModal } from './components/tourism/AddCustomPackageModal';
 import { TourPackagePdfModal } from './components/tourism/TourPackagePdfModal';
+import { PackageExplainerModal } from './components/tourism/PackageExplainerModal';
 
 import { PublicStorePortal } from './components/public/PublicStorePortal';
 import { GoogleSheetsSyncModal } from './components/sheets/GoogleSheetsSyncModal';
@@ -268,6 +269,7 @@ const MainAppContent: React.FC = () => {
         pkg={selectedPackageForPdf}
         inquiry={selectedInquiryForPdf}
       />
+      <PackageExplainerModal />
     </div>
   );
 };
