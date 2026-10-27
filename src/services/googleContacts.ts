@@ -62,13 +62,25 @@ export const fetchGoogleContacts = async (
 ): Promise<GoogleContactItem[]> => {
   try {
     const url = `https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses,photos,metadata&pageSize=${pageSize}&sortOrder=LAST_MODIFIED_DESCENDING`;
-    const response = await fetch(url, {
-      method: 'GET',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        Accept: 'application/json',
-      },
-    });
+    
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          Accept: 'application/json',
+        },
+      });
+    } catch (netErr) {
+      console.warn('Network error during Google Contacts fetch:', netErr);
+      // Fallback to local storage contacts if network request failed
+      try {
+        const saved = localStorage.getItem('sz_cached_contacts');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return [];
+    }
 
     if (response.status === 401) {
       cachedAccessToken = null;
@@ -77,7 +89,12 @@ export const fetchGoogleContacts = async (
 
     if (!response.ok) {
       const err = await response.text();
-      throw new Error(`Google Contacts API error: ${err}`);
+      console.warn(`Google Contacts API error: ${err}`);
+      try {
+        const saved = localStorage.getItem('sz_cached_contacts');
+        if (saved) return JSON.parse(saved);
+      } catch {}
+      return [];
     }
 
     const data = await response.json();
@@ -128,7 +145,11 @@ export const fetchGoogleContacts = async (
     return contacts;
   } catch (err: any) {
     console.error('Failed to fetch Google Contacts:', err);
-    throw err;
+    try {
+      const saved = localStorage.getItem('sz_cached_contacts');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return [];
   }
 };
 

@@ -1,6 +1,7 @@
 import React, { useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { BottomSheet } from '../common/BottomSheet';
+import { Wallet } from '../../types';
 import {
   TrendingUp,
   TrendingDown,
@@ -8,7 +9,6 @@ import {
   ArrowUpRight,
   ArrowRightLeft,
   Calendar,
-  Wallet,
 } from 'lucide-react';
 
 export const WalletLedgerModal: React.FC = () => {
@@ -30,7 +30,15 @@ export const WalletLedgerModal: React.FC = () => {
     setSelectedSaleId,
   } = useData();
 
-  const wallet = wallets.find((w) => w.id === selectedWalletId);
+  const allWallets = useMemo(() => {
+    const map = new Map<string, Wallet>();
+    wallets.forEach((w) => map.set(w.id, w));
+    dryfruitWallets.forEach((w) => map.set(w.id, w));
+    tourWallets.forEach((w) => map.set(w.id, w));
+    return Array.from(map.values());
+  }, [wallets, dryfruitWallets, tourWallets]);
+
+  const wallet = allWallets.find((w) => w.id === selectedWalletId);
 
   const isTourWallet = useMemo(() => {
     if (!wallet) return false;
@@ -56,9 +64,11 @@ export const WalletLedgerModal: React.FC = () => {
       refId?: string;
     }> = [];
 
-    const matchesWallet = (wId?: string, wName?: string) => {
-      if (wId && wId === selectedWalletId) return true;
-      if (wName && wallet.name && wName.toLowerCase().trim() === wallet.name.toLowerCase().trim()) return true;
+    const matchesWallet = (wId?: string, wName?: string, salesPerson?: string) => {
+      if (wId && (wId === selectedWalletId || (wallet && wId === wallet.id))) return true;
+      if (wName && wallet?.name && wName.toLowerCase().trim() === wallet.name.toLowerCase().trim()) return true;
+      if (salesPerson && wallet?.partnerKey && salesPerson.toLowerCase().trim() === wallet.partnerKey.toLowerCase().trim()) return true;
+      if (salesPerson && wallet?.name && salesPerson.toLowerCase().trim() === wallet.name.toLowerCase().trim()) return true;
       return false;
     };
 
@@ -98,7 +108,7 @@ export const WalletLedgerModal: React.FC = () => {
       // Dry Fruit Store Ledger
       // Sales paid into this wallet
       sales.forEach((s) => {
-        if (matchesWallet(s.walletId, s.walletName) && s.paidAmount > 0) {
+        if (matchesWallet(s.walletId, s.walletName, s.salesPerson) && s.paidAmount > 0) {
           list.push({
             id: `sale-${s.id}`,
             date: formatDate(s.date),
@@ -115,7 +125,7 @@ export const WalletLedgerModal: React.FC = () => {
 
       // Payments received in this wallet
       payments.forEach((p) => {
-        if (p.walletId === selectedWalletId && !p.notes?.includes('Payment for SALE-')) {
+        if (matchesWallet(p.walletId) && !p.notes?.includes('Payment for SALE-')) {
           list.push({
             id: `pay-${p.id}`,
             date: formatDate(p.date),
@@ -131,7 +141,7 @@ export const WalletLedgerModal: React.FC = () => {
 
       // Expenses paid from this wallet
       expenses.forEach((e) => {
-        if (e.walletId === selectedWalletId) {
+        if (matchesWallet(e.walletId, e.walletName)) {
           list.push({
             id: `exp-${e.id}`,
             date: formatDate(e.date),
@@ -147,7 +157,7 @@ export const WalletLedgerModal: React.FC = () => {
 
       // Purchases
       purchases.forEach((p) => {
-        if (p.walletId === selectedWalletId) {
+        if (matchesWallet(p.walletId, p.walletName)) {
           list.push({
             id: `pur-${p.id}`,
             date: formatDate(p.date),
@@ -164,7 +174,7 @@ export const WalletLedgerModal: React.FC = () => {
 
     // Transfers In
     transfers.forEach((t) => {
-      if (t.toWalletId === selectedWalletId) {
+      if (matchesWallet(t.toWalletId, t.toWalletName)) {
         const reasonStr = t.notes ? `Reason: ${t.notes}` : 'Reason: Internal Transfer';
         const byStr = t.createdBy || t.userEmail ? ` • By: ${t.createdBy || t.userEmail}` : '';
         list.push({
@@ -178,7 +188,7 @@ export const WalletLedgerModal: React.FC = () => {
           isPositive: true,
         });
       }
-      if (t.fromWalletId === selectedWalletId) {
+      if (matchesWallet(t.fromWalletId, t.fromWalletName)) {
         const reasonStr = t.notes ? `Reason: ${t.notes}` : 'Reason: Internal Transfer';
         const byStr = t.createdBy || t.userEmail ? ` • By: ${t.createdBy || t.userEmail}` : '';
         list.push({

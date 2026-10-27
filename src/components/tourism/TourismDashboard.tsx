@@ -33,6 +33,9 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
     thisMonthTourRevenue,
     thisMonthTourAdvance,
     thisMonthTourPending,
+    totalTourRevenue,
+    totalTourAdvance,
+    totalTourPending,
     totalTourPassengers,
     formatCurrency,
     formatDate,
@@ -121,47 +124,52 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Total Booked Revenue */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Tour Bookings (Month)</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">Total Booked Value</span>
             <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold">
               <Luggage className="w-4 h-4" />
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-zinc-950 font-mono">
-            {formatCurrency(thisMonthTourRevenue)}
+            {formatCurrency(totalTourRevenue)}
           </div>
-          <div className="text-[11px] text-zinc-500 font-medium mt-1 flex items-center gap-1">
-            <span className="font-bold text-zinc-900">{tourBookings.length}</span> Total Bookings
+          <div className="text-[11px] text-zinc-600 font-medium mt-1 flex items-center justify-between">
+            <span><strong className="text-zinc-950">{tourBookings.length}</strong> Bookings Confirmed</span>
+            {thisMonthTourRevenue > 0 && (
+              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">
+                +{formatCurrency(thisMonthTourRevenue)} this mo
+              </span>
+            )}
           </div>
         </div>
 
         {/* Advance Collected */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-emerald-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Advance Collected</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Advance Collected</span>
             <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
               <ArrowDownLeft className="w-4 h-4" />
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono">
-            {formatCurrency(thisMonthTourAdvance)}
+            {formatCurrency(totalTourAdvance)}
           </div>
           <div className="text-[11px] text-emerald-700 font-semibold mt-1">
-            Received in Wallets
+            Cash Received in Wallets
           </div>
         </div>
 
         {/* Pending Customer Dues */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-rose-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Remaining Dues</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">Remaining Dues</span>
             <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
               <AlertCircle className="w-4 h-4" />
             </div>
           </div>
           <div className="text-xl sm:text-2xl font-black text-rose-600 font-mono">
-            {formatCurrency(thisMonthTourPending)}
+            {formatCurrency(totalTourPending)}
           </div>
           <div className="text-[11px] text-rose-600 font-semibold mt-1">
             Pending from Travelers
@@ -169,9 +177,9 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         {/* Total Passengers */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-zinc-200/90 shadow-sm relative overflow-hidden">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
           <div className="flex items-center justify-between text-zinc-900 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-500">Total Travelers</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">Total Travelers</span>
             <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold">
               <Users className="w-4 h-4" />
             </div>
@@ -179,8 +187,8 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
           <div className="text-xl sm:text-2xl font-black text-zinc-950 font-mono">
             {totalTourPassengers} Pax
           </div>
-          <div className="text-[11px] text-zinc-500 font-medium mt-1">
-            Across confirmed tours
+          <div className="text-[11px] text-zinc-600 font-medium mt-1">
+            Across {tourBookings.length} confirmed bookings
           </div>
         </div>
       </div>

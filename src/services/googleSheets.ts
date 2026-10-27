@@ -31,24 +31,30 @@ export const createGoogleSheet = async (
   accessToken: string,
   title: string = 'Sanzari Store - Live Accounts & Stock'
 ): Promise<{ spreadsheetId: string; spreadsheetUrl: string }> => {
-  const response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      properties: {
-        title: `${title} (${new Date().toLocaleDateString('en-IN')})`,
+  let response: Response;
+  try {
+    response = await fetch('https://sheets.googleapis.com/v4/spreadsheets', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': 'application/json',
       },
-      sheets: [
-        { properties: { title: 'Stock Inventory' } },
-        { properties: { title: 'Sales Orders' } },
-        { properties: { title: 'Wallet Balances' } },
-        { properties: { title: 'Expenses' } },
-      ],
-    }),
-  });
+      body: JSON.stringify({
+        properties: {
+          title: `${title} (${new Date().toLocaleDateString('en-IN')})`,
+        },
+        sheets: [
+          { properties: { title: 'Stock Inventory' } },
+          { properties: { title: 'Sales Orders' } },
+          { properties: { title: 'Wallet Balances' } },
+          { properties: { title: 'Expenses' } },
+        ],
+      }),
+    });
+  } catch (netErr) {
+    console.warn('Network error creating Google Sheet:', netErr);
+    throw new Error('Network error connecting to Google Sheets. Please check your internet connection.');
+  }
 
   if (!response.ok) {
     const errText = await response.text();
@@ -133,19 +139,24 @@ export const syncStoreDataToGoogleSheet = async ({
     const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${encodeURIComponent(
       sheetName
     )}!A1?valueInputOption=USER_ENTERED`;
-    const res = await fetch(url, {
-      method: 'PUT',
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        range: `${sheetName}!A1`,
-        majorDimension: 'ROWS',
-        values,
-      }),
-    });
-    return res.ok;
+    try {
+      const res = await fetch(url, {
+        method: 'PUT',
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          range: `${sheetName}!A1`,
+          majorDimension: 'ROWS',
+          values,
+        }),
+      });
+      return res.ok;
+    } catch (netErr) {
+      console.warn(`Network error updating sheet range ${sheetName}:`, netErr);
+      return false;
+    }
   };
 
   try {

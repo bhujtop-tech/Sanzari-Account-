@@ -16,12 +16,20 @@ import {
   Sparkles,
   ArrowRight,
   Luggage,
+  Clock,
+  XCircle,
+  AlertTriangle,
+  RotateCcw,
+  ChevronDown,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
+import { useAuth } from '../../context/AuthContext';
+import { updateTourInquiry } from '../../services/db';
 import { InquirySource, InquiryStatus, TourInquiry } from '../../types';
 import { InquiriesSkeleton } from '../common/Skeleton';
 
 export const TourInquiriesView: React.FC = () => {
+  const { user } = useAuth();
   const {
     loading,
     tourInquiries,
@@ -38,6 +46,19 @@ export const TourInquiriesView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSource, setSelectedSource] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Today date string (YYYY-MM-DD)
+  const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
+
+  // Today's follow-ups: pending leads scheduled for today or overdue
+  const todayFollowUps = useMemo(() => {
+    return tourInquiries.filter((inq) => {
+      if (inq.status === 'Converted' || inq.status === 'Lost') return false;
+      if (!inq.followUpDate) return false;
+      return inq.followUpDate <= todayStr;
+    });
+  }, [tourInquiries, todayStr]);
 
   // Filtered Inquiries
   const filteredInquiries = useMemo(() => {
@@ -51,11 +72,24 @@ export const TourInquiriesView: React.FC = () => {
         (inq.discussionSummary && inq.discussionSummary.toLowerCase().includes(q));
 
       const matchSource = selectedSource === 'ALL' || inq.source === selectedSource;
-      const matchStatus = selectedStatus === 'ALL' || inq.status === selectedStatus;
+
+      let matchStatus = true;
+      if (selectedStatus === 'ALL') {
+        matchStatus = true;
+      } else if (selectedStatus === 'Today Follow-up') {
+        matchStatus = Boolean(
+          inq.followUpDate &&
+          inq.followUpDate <= todayStr &&
+          inq.status !== 'Converted' &&
+          inq.status !== 'Lost'
+        );
+      } else {
+        matchStatus = inq.status === selectedStatus;
+      }
 
       return matchSearch && matchSource && matchStatus;
     });
-  }, [tourInquiries, searchQuery, selectedSource, selectedStatus]);
+  }, [tourInquiries, searchQuery, selectedSource, selectedStatus, todayStr]);
 
   if (loading) {
     return <InquiriesSkeleton />;
@@ -66,6 +100,40 @@ export const TourInquiriesView: React.FC = () => {
   const newCount = tourInquiries.filter((i) => i.status === 'New').length;
   const followUpCount = tourInquiries.filter((i) => i.status === 'Follow-up' || i.status === 'In Discussion').length;
   const convertedCount = tourInquiries.filter((i) => i.status === 'Converted').length;
+  const lostCount = tourInquiries.filter((i) => i.status === 'Lost').length;
+
+  const handleUpdateStatus = async (inqId: string, newStatus: InquiryStatus) => {
+    setUpdatingId(inqId);
+    try {
+      await updateTourInquiry(
+        inqId,
+        { status: newStatus },
+        user?.email || 'admin@sanzari.com'
+      );
+    } catch (err) {
+      console.error('Failed to update status:', err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleUpdateFollowUpDate = async (inqId: string, newDate: string) => {
+    setUpdatingId(inqId);
+    try {
+      await updateTourInquiry(
+        inqId,
+        {
+          followUpDate: newDate,
+          status: 'Follow-up',
+        },
+        user?.email || 'admin@sanzari.com'
+      );
+    } catch (err) {
+      console.error('Failed to update follow-up date:', err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
 
   const handleDelete = async (inq: TourInquiry) => {
     if (window.confirm(`Are you sure you want to delete inquiry for ${inq.customerName}?`)) {
@@ -78,7 +146,6 @@ export const TourInquiriesView: React.FC = () => {
   };
 
   const handleConvertToBooking = (inq: TourInquiry) => {
-    // Open AddTourBookingModal with prefilled customer data
     setEditingTourBooking({
       id: '',
       bookingNumber: '',
@@ -110,32 +177,40 @@ export const TourInquiriesView: React.FC = () => {
     setIsAddTourBookingOpen(true);
   };
 
-  const handleWhatsAppSend = (inq: TourInquiry) => {
+  const handleWhatsAppSend = (inq: TourInquiry, isFollowUpMsg = false) => {
     const linkedPkg = customTourPackages.find((p) => p.id === inq.linkedPackageId) || customTourPackages[0];
     const customerName = inq.customerName;
     const cleanPhone = inq.customerPhone.replace(/[^0-9]/g, '');
 
-    let text = `नमस्ते ${customerName} जी 🙏\n`;
-    text += `*संजरी टूरिज्म - वडोदरा (SANZARI TOURS)* की तरफ से आपकी *${inq.destination}* टूर पूछताछ के लिए हार्दिक आभार।\n\n`;
-    if (linkedPkg) {
-      text += `📍 *टूर पैकेज:* ${linkedPkg.packageName} (${linkedPkg.destination})\n`;
-      text += `⏱️ *अवधि:* ${linkedPkg.durationDays} Days / ${linkedPkg.durationNights} Nights\n`;
-      text += `👥 *सवारी / यात्री:* ${inq.totalPax} व्यक्ति (${inq.paxAdults} Adults, ${inq.paxChildren} Children)\n\n`;
-      if (linkedPkg.priceAcTrain) text += `• 3AC ट्रेन किराया: ₹${linkedPkg.priceAcTrain.toLocaleString('en-IN')} / व्यक्ति\n`;
-      if (linkedPkg.priceFlight) text += `• फ्लाइट / विमान पैकेज: ₹${linkedPkg.priceFlight.toLocaleString('en-IN')} / व्यक्ति\n`;
-      text += `\n✅ 100% शुद्ध शाकाहारी / स्वादिष्ट भोजन और डीलक्स होटल स्टे शामिल है।\n`;
+    let text = '';
+    if (isFollowUpMsg) {
+      text = `नमस्ते ${customerName} जी 🙏\n` +
+        `*संजरी टूरिज्म - वडोदरा (SANZARI TOURS)*\n\n` +
+        `हम आपके *${inq.destination}* टूर के सिलसिले में फॉलो-अप कर रहे थे।\n` +
+        `क्या आपने अपने टूर प्लान के बारे में कोई फैसला लिया है? हमारी सीट्स तेजी से भर रही हैं।\n\n` +
+        (linkedPkg ? `📍 *पैकेज:* ${linkedPkg.packageName}\n⏱️ *अवधि:* ${linkedPkg.durationDays} Days / ${linkedPkg.durationNights} Nights\n\n` : '') +
+        `यदि आपके कोई प्रश्न हैं या बुकिंग कन्फर्म करना चाहते हैं, तो कृपया हमें बताएं!\n\n` +
+        `📞 *संपर्क:* 7874635992 (Rizwan Khalifa)\nसंजरी टूरिज्म - गुजरात`;
+    } else {
+      text = `नमस्ते ${customerName} जी 🙏\n`;
+      text += `*संजरी टूरिज्म - वडोदरा (SANZARI TOURS)* की तरफ से आपकी *${inq.destination}* टूर पूछताछ के लिए हार्दिक आभार।\n\n`;
+
+      if (linkedPkg) {
+        text += `📍 *टूर पैकेज:* ${linkedPkg.packageName} (${linkedPkg.destination})\n`;
+        text += `⏱️ *अवधि:* ${linkedPkg.durationDays} Days / ${linkedPkg.durationNights} Nights\n`;
+        text += `👥 *सवारी / यात्री:* ${inq.totalPax} व्यक्ति (${inq.paxAdults} Adults, ${inq.paxChildren} Children)\n\n`;
+        if (linkedPkg.priceAcTrain) text += `• 3AC ट्रेन किराया: ₹${linkedPkg.priceAcTrain.toLocaleString('en-IN')} / व्यक्ति\n`;
+        if (linkedPkg.priceFlight) text += `• फ्लाइट / विमान पैकेज: ₹${linkedPkg.priceFlight.toLocaleString('en-IN')} / व्यक्ति\n`;
+        text += `\n✅ 100% शुद्ध शाकाहारी / स्वादिष्ट भोजन और डीलक्स होटल स्टे शामिल है।\n`;
+      }
+      text += `\n📞 *संपर्क & बुकिंग (वडोदरा ऑफिस):*\nफोन: +91 7874635992 (Rizwan Khalifa)\nपता: वडोदरा (गुजरात)।`;
     }
-    text += `\n📞 *संपर्क & बुकिंग (वडोदरा ऑफिस):*\nफोन: +91 98250 14522 / +91 94280 99881\nपता: वडोदरा (गुजरात)।`;
 
     const encoded = encodeURIComponent(text);
     const url = cleanPhone
       ? `https://wa.me/${cleanPhone.startsWith('91') ? cleanPhone : '91' + cleanPhone}?text=${encoded}`
       : `https://wa.me/?text=${encoded}`;
-    const a = document.createElement('a');
-    a.href = url;
-    a.target = '_blank';
-    a.rel = 'noopener noreferrer';
-    a.click();
+    window.open(url, '_blank');
   };
 
   const getSourceBadge = (source: InquirySource) => {
@@ -176,43 +251,72 @@ export const TourInquiriesView: React.FC = () => {
   const getStatusBadge = (status: InquiryStatus) => {
     switch (status) {
       case 'New':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300">New</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-300">🟡 New</span>;
       case 'In Discussion':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-zinc-100 text-zinc-900 border border-zinc-400">Discussion</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-blue-50 text-blue-900 border border-blue-300">🔵 Discussion</span>;
       case 'Package Sent':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-300">PDF Sent</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-purple-50 text-purple-900 border border-purple-300">🟣 PDF Sent</span>;
       case 'Follow-up':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-orange-50 text-orange-900 border border-orange-300">Follow-up</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-orange-50 text-orange-900 border border-orange-300">🟠 Follow-up</span>;
       case 'Converted':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-400">✓ Booked</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-emerald-50 text-emerald-800 border border-emerald-400">🟢 ✓ Booked</span>;
       case 'Lost':
-        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">Lost</span>;
+        return <span className="text-[9px] font-black px-2 py-0.5 rounded bg-rose-50 text-rose-800 border border-rose-300">🔴 Lost</span>;
       default:
         return null;
     }
   };
 
+  // Helper date offset
+  const getDateOffset = (days: number) => {
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    return d.toISOString().split('T')[0];
+  };
+
   return (
-    <div className="space-y-4 pb-48 sm:pb-24">
-      {/* Top Stats Chips */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-        <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center justify-between">
+    <div className="space-y-5 pb-48 sm:pb-24">
+      {/* Top Stats Chips Grid (5 Metric Cards) */}
+      <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <div
+          onClick={() => setSelectedStatus('ALL')}
+          className={`bg-white p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            selectedStatus === 'ALL' ? 'border-zinc-950 bg-zinc-50' : 'border-zinc-900 hover:border-zinc-950'
+          }`}
+        >
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-zinc-500 block">Total Inquiries</span>
+            <span className="text-[10px] font-extrabold uppercase text-zinc-500 block">Total Leads</span>
             <span className="text-xl font-black text-zinc-950">{totalCount}</span>
           </div>
           <span className="text-xl">📋</span>
         </div>
 
-        <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => setSelectedStatus('Today Follow-up')}
+          className={`p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            selectedStatus === 'Today Follow-up'
+              ? 'bg-amber-100 border-amber-600 ring-2 ring-amber-400'
+              : todayFollowUps.length > 0
+              ? 'bg-amber-50 border-amber-400 hover:bg-amber-100'
+              : 'bg-white border-zinc-900'
+          }`}
+        >
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-amber-700 block">New Leads</span>
-            <span className="text-xl font-black text-amber-900">{newCount}</span>
+            <span className="text-[10px] font-extrabold uppercase text-amber-900 block flex items-center gap-1">
+              <span>Today Follow-up</span>
+              {todayFollowUps.length > 0 && <span className="w-2 h-2 rounded-full bg-amber-600 animate-ping" />}
+            </span>
+            <span className="text-xl font-black text-amber-950">{todayFollowUps.length}</span>
           </div>
-          <span className="text-xl">🟡</span>
+          <span className="text-xl">🔔</span>
         </div>
 
-        <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => setSelectedStatus('Follow-up')}
+          className={`bg-white p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            selectedStatus === 'Follow-up' ? 'border-zinc-950 bg-zinc-50' : 'border-zinc-900 hover:border-zinc-950'
+          }`}
+        >
           <div>
             <span className="text-[10px] font-extrabold uppercase text-zinc-600 block">In Follow-up</span>
             <span className="text-xl font-black text-zinc-900">{followUpCount}</span>
@@ -220,14 +324,147 @@ export const TourInquiriesView: React.FC = () => {
           <span className="text-xl">⏳</span>
         </div>
 
-        <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center justify-between">
+        <div
+          onClick={() => setSelectedStatus('Converted')}
+          className={`bg-white p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm flex items-center justify-between ${
+            selectedStatus === 'Converted' ? 'border-emerald-700 bg-emerald-50' : 'border-zinc-900 hover:border-zinc-950'
+          }`}
+        >
           <div>
-            <span className="text-[10px] font-extrabold uppercase text-emerald-700 block">Converted (Booked)</span>
+            <span className="text-[10px] font-extrabold uppercase text-emerald-700 block">Converted</span>
             <span className="text-xl font-black text-emerald-800">{convertedCount}</span>
           </div>
           <span className="text-xl">🎉</span>
         </div>
+
+        <div
+          onClick={() => setSelectedStatus('Lost')}
+          className={`bg-white p-3 rounded-2xl border-2 transition-all cursor-pointer shadow-sm flex items-center justify-between col-span-2 sm:col-span-1 ${
+            selectedStatus === 'Lost' ? 'border-rose-600 bg-rose-50' : 'border-zinc-900 hover:border-zinc-950'
+          }`}
+        >
+          <div>
+            <span className="text-[10px] font-extrabold uppercase text-rose-700 block">Lost Leads</span>
+            <span className="text-xl font-black text-rose-900">{lostCount}</span>
+          </div>
+          <span className="text-xl">🔴</span>
+        </div>
       </div>
+
+      {/* PINNED SECTION: Today's Follow-up Calls & Priority Leads */}
+      {todayFollowUps.length > 0 && selectedStatus !== 'Lost' && (
+        <div className="bg-amber-50/80 rounded-3xl border-2 border-amber-400 p-4 sm:p-5 shadow-sm space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl bg-amber-400 text-zinc-950 flex items-center justify-center font-black text-base shadow-xs">
+                🔔
+              </div>
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-zinc-950 flex items-center gap-1.5">
+                  <span>Today's Follow-up Calls</span>
+                  <span className="px-2 py-0.5 rounded-full bg-amber-200 text-amber-900 text-[10px] font-extrabold">
+                    {todayFollowUps.length} Pending Today
+                  </span>
+                </h3>
+                <p className="text-xs text-amber-900 font-medium">
+                  Aaj in customers ko call / WhatsApp karna hai taki booking confirm ho sake
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {todayFollowUps.map((inq) => (
+              <div
+                key={`today-${inq.id}`}
+                className="bg-white rounded-2xl border-2 border-amber-300 p-3.5 shadow-xs flex flex-col justify-between space-y-2.5"
+              >
+                <div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-bold text-amber-900 bg-amber-100 px-2 py-0.5 rounded font-mono">
+                      {inq.inquiryNumber} • 🗓️ Due: {inq.followUpDate}
+                    </span>
+                    {getStatusBadge(inq.status)}
+                  </div>
+
+                  <h4 className="text-sm font-black text-zinc-950 mt-1.5">{inq.customerName}</h4>
+                  <p className="text-xs text-zinc-600 font-bold flex items-center gap-1">
+                    <MapPin size={11} className="text-zinc-900" />
+                    <span>{inq.destination} ({inq.totalPax || 2} Pax)</span>
+                    {inq.fromCity && <span>• {inq.fromCity}</span>}
+                  </p>
+
+                  {inq.discussionSummary && (
+                    <p className="text-[11px] text-zinc-700 bg-zinc-50 p-2 rounded-lg border border-zinc-200 mt-1 line-clamp-2">
+                      💬 <strong>Kya baat hui:</strong> {inq.discussionSummary}
+                    </p>
+                  )}
+                </div>
+
+                {/* Quick 1-Click Priority Follow-up Actions */}
+                <div className="pt-2 border-t border-zinc-100 flex flex-wrap items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1">
+                    {/* Call Direct */}
+                    <a
+                      href={`tel:${inq.customerPhone}`}
+                      className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-black flex items-center gap-1 cursor-pointer"
+                    >
+                      <Phone size={12} />
+                      <span>Call</span>
+                    </a>
+                    {/* WhatsApp Direct */}
+                    <button
+                      type="button"
+                      onClick={() => handleWhatsAppSend(inq, true)}
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 cursor-pointer"
+                    >
+                      <MessageCircle size={12} />
+                      <span>WhatsApp</span>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {/* Next Follow-up Quick Reschedule */}
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(1))}
+                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300"
+                      title="Follow up tomorrow"
+                    >
+                      +1 Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(3))}
+                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300"
+                      title="Follow up in 3 days"
+                    >
+                      +3 Days
+                    </button>
+                    {/* 1-Click Lost */}
+                    <button
+                      type="button"
+                      onClick={() => handleUpdateStatus(inq.id, 'Lost')}
+                      className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300 cursor-pointer"
+                      title="Customer said no / cancelled"
+                    >
+                      🔴 Lost
+                    </button>
+                    {/* Convert */}
+                    <button
+                      type="button"
+                      onClick={() => handleConvertToBooking(inq)}
+                      className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-black border border-emerald-300 cursor-pointer"
+                    >
+                      ✓ Book
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Action Bar & Search */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
@@ -254,42 +491,53 @@ export const TourInquiriesView: React.FC = () => {
         </button>
       </div>
 
-      {/* Filter Tabs: Source & Status */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
-        <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">Source:</span>
-        {['ALL', 'Phone Call', 'WhatsApp', 'Instagram', 'Walk-in', 'Reference'].map((src) => (
-          <button
-            key={src}
-            onClick={() => setSelectedSource(src)}
-            className={`text-[11px] font-bold px-3 py-1 rounded-xl shrink-0 transition-all cursor-pointer ${
-              selectedSource === src
-                ? 'bg-zinc-950 text-white border-2 border-zinc-900'
-                : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
-            }`}
-          >
-            {src === 'ALL' ? 'All Sources' : src}
-          </button>
-        ))}
+      {/* Filter Tabs: Source & Status (including Lost & Today's Follow-up) */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">Status:</span>
+          {[
+            { id: 'ALL', label: 'All Leads' },
+            { id: 'Today Follow-up', label: `🔔 Today's Follow-up (${todayFollowUps.length})` },
+            { id: 'New', label: 'New Lead' },
+            { id: 'In Discussion', label: 'In Discussion' },
+            { id: 'Package Sent', label: 'PDF Sent' },
+            { id: 'Follow-up', label: 'Follow-up' },
+            { id: 'Converted', label: '✓ Booked' },
+            { id: 'Lost', label: '🔴 Lost Leads' },
+          ].map((st) => (
+            <button
+              key={st.id}
+              onClick={() => setSelectedStatus(st.id)}
+              className={`text-[11px] font-bold px-3 py-1 rounded-xl shrink-0 transition-all cursor-pointer ${
+                selectedStatus === st.id
+                  ? 'bg-zinc-950 text-white border-2 border-zinc-900 shadow-xs'
+                  : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+              }`}
+            >
+              {st.label}
+            </button>
+          ))}
+        </div>
 
-        <div className="w-[1px] h-4 bg-zinc-300 shrink-0 mx-1" />
-
-        <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">Status:</span>
-        {['ALL', 'New', 'In Discussion', 'Package Sent', 'Follow-up', 'Converted'].map((st) => (
-          <button
-            key={st}
-            onClick={() => setSelectedStatus(st)}
-            className={`text-[11px] font-bold px-3 py-1 rounded-xl shrink-0 transition-all cursor-pointer ${
-              selectedStatus === st
-                ? 'bg-zinc-950 text-white border-2 border-zinc-900'
-                : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
-            }`}
-          >
-            {st === 'ALL' ? 'All Status' : st}
-          </button>
-        ))}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+          <span className="text-[10px] font-bold text-zinc-500 uppercase shrink-0">Source:</span>
+          {['ALL', 'Phone Call', 'WhatsApp', 'Instagram', 'Walk-in', 'Reference'].map((src) => (
+            <button
+              key={src}
+              onClick={() => setSelectedSource(src)}
+              className={`text-[11px] font-bold px-3 py-1 rounded-xl shrink-0 transition-all cursor-pointer ${
+                selectedSource === src
+                  ? 'bg-zinc-950 text-white border-2 border-zinc-900'
+                  : 'bg-white text-zinc-700 border border-zinc-300 hover:bg-zinc-100'
+              }`}
+            >
+              {src === 'ALL' ? 'All Sources' : src}
+            </button>
+          ))}
+        </div>
       </div>
 
-      {/* Inquiries Cards List - Crisp White Background & Black Border (2 per row on mobile) */}
+      {/* Inquiries Cards List */}
       {filteredInquiries.length === 0 ? (
         <div className="bg-white rounded-3xl border-2 border-zinc-900 p-12 text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-zinc-100 text-zinc-900 flex items-center justify-center mx-auto border border-zinc-300">
@@ -297,21 +545,32 @@ export const TourInquiriesView: React.FC = () => {
           </div>
           <h3 className="text-base font-bold text-zinc-900">No Inquiries Found</h3>
           <p className="text-xs text-zinc-600 max-w-sm mx-auto">
-            No inquiries match this filter. Click "+ New Inquiry" to log a customer lead!
+            {selectedStatus === 'Lost'
+              ? 'No inquiries are marked as Lost.'
+              : selectedStatus === 'Today Follow-up'
+              ? 'No follow-up calls are due for today!'
+              : 'No inquiries match this filter. Click "+ New Inquiry" to log a customer lead!'}
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredInquiries.map((inq) => {
             const linkedPkg = customTourPackages.find((p) => p.id === inq.linkedPackageId);
+            const isDueToday = inq.followUpDate && inq.followUpDate <= todayStr && inq.status !== 'Converted' && inq.status !== 'Lost';
 
             return (
               <div
                 key={inq.id}
-                className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-4 flex flex-col justify-between hover:shadow-md transition-all group"
+                className={`bg-white text-zinc-950 rounded-2xl border-2 shadow-sm p-4 flex flex-col justify-between hover:shadow-md transition-all group ${
+                  inq.status === 'Lost'
+                    ? 'border-zinc-300 opacity-80 bg-zinc-50/50'
+                    : isDueToday
+                    ? 'border-amber-500 ring-1 ring-amber-400'
+                    : 'border-zinc-900'
+                }`}
               >
                 <div className="space-y-3">
-                  {/* Top Bar: Inquiry No, Source & Status */}
+                  {/* Top Bar: Inquiry No, Source & Status Dropdown */}
                   <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
                     <div className="flex items-center gap-1.5">
                       <span className="text-[10px] font-mono font-black text-zinc-950 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300">
@@ -319,14 +578,46 @@ export const TourInquiriesView: React.FC = () => {
                       </span>
                       {getSourceBadge(inq.source)}
                     </div>
-                    {getStatusBadge(inq.status)}
+
+                    {/* Quick Status Dropdown Directly on Card */}
+                    <div className="relative">
+                      <select
+                        value={inq.status}
+                        onChange={(e) => handleUpdateStatus(inq.id, e.target.value as InquiryStatus)}
+                        disabled={updatingId === inq.id}
+                        className={`text-[10px] font-black px-2 py-0.5 rounded border cursor-pointer outline-none ${
+                          inq.status === 'Lost'
+                            ? 'bg-rose-50 text-rose-800 border-rose-300'
+                            : inq.status === 'Converted'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
+                            : inq.status === 'Follow-up'
+                            ? 'bg-orange-50 text-orange-900 border-orange-300'
+                            : 'bg-zinc-100 text-zinc-900 border-zinc-300'
+                        }`}
+                      >
+                        <option value="New">🟡 New Lead</option>
+                        <option value="In Discussion">🔵 In Discussion</option>
+                        <option value="Package Sent">🟣 PDF Sent</option>
+                        <option value="Follow-up">🟠 Follow-up</option>
+                        <option value="Converted">🟢 ✓ Booked</option>
+                        <option value="Lost">🔴 Lost Lead</option>
+                      </select>
+                    </div>
                   </div>
 
                   {/* Customer Info & City */}
                   <div>
-                    <h3 className="text-sm sm:text-base font-black text-zinc-950 tracking-tight">
-                      {inq.customerName}
-                    </h3>
+                    <div className="flex items-start justify-between">
+                      <h3 className="text-sm sm:text-base font-black text-zinc-950 tracking-tight">
+                        {inq.customerName}
+                      </h3>
+                      {inq.status === 'Lost' && (
+                        <span className="text-[9px] font-black text-rose-700 bg-rose-100 px-1.5 py-0.5 rounded">
+                          Lost Lead
+                        </span>
+                      )}
+                    </div>
+
                     <div className="flex items-center gap-2 mt-0.5 text-xs">
                       <a
                         href={`tel:${inq.customerPhone}`}
@@ -364,16 +655,49 @@ export const TourInquiriesView: React.FC = () => {
                       </div>
                       {inq.preferredDate && (
                         <span className="text-zinc-500 font-medium text-[10px]">
-                          🗓️ {inq.preferredDate}
+                          🗓️ Tour: {inq.preferredDate}
                         </span>
                       )}
+                    </div>
+                  </div>
+
+                  {/* Follow-up Date Row with 1-Click Update */}
+                  <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-2 flex items-center justify-between text-[11px]">
+                    <div className="flex items-center gap-1 font-bold text-zinc-800">
+                      <Clock size={12} className="text-amber-700 shrink-0" />
+                      <span>Follow-up:</span>
+                      <input
+                        type="date"
+                        value={inq.followUpDate || ''}
+                        onChange={(e) => handleUpdateFollowUpDate(inq.id, e.target.value)}
+                        className="bg-white border border-zinc-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-900 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateFollowUpDate(inq.id, todayStr)}
+                        className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 hover:bg-amber-300"
+                        title="Set follow-up to today"
+                      >
+                        Today
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(1))}
+                        className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
+                        title="Set follow-up to tomorrow"
+                      >
+                        Tomorrow
+                      </button>
                     </div>
                   </div>
 
                   {/* Core Box: "Kya Baat Hui" / Discussion Summary */}
                   <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 space-y-1">
                     <div className="text-[10px] font-black uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                      <span>Conversation Details (Kya Baat Hui):</span>
+                      <span>Conversation Details:</span>
                       <span className="text-zinc-500 font-semibold">{inq.assignedTo}</span>
                     </div>
                     <p className="text-xs text-zinc-900 leading-relaxed font-medium line-clamp-3">
@@ -389,7 +713,7 @@ export const TourInquiriesView: React.FC = () => {
                   )}
                 </div>
 
-                {/* Bottom Actions: WhatsApp Share, Package Info Gujarati PDF, Convert, Edit, Delete */}
+                {/* Bottom Actions */}
                 <div className="pt-3 mt-3 border-t border-zinc-200 flex flex-col gap-2">
                   <div className="flex items-center gap-1.5">
                     {/* Gujarati PDF / Package Info Button */}
@@ -400,31 +724,53 @@ export const TourInquiriesView: React.FC = () => {
                       title="View Gujarati Package Brochure & PDF"
                     >
                       <FileText size={13} />
-                      <span>Gujarati PDF</span>
+                      <span>Brochure PDF</span>
                     </button>
 
                     {/* WhatsApp Proposal Share Button */}
                     <button
                       type="button"
-                      onClick={() => handleWhatsAppSend(inq)}
+                      onClick={() => handleWhatsAppSend(inq, false)}
                       className="py-1.5 px-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center justify-center gap-1 cursor-pointer shadow-xs active:scale-95 transition-all"
                       title="Share proposal on WhatsApp"
                     >
                       <Share2 size={13} />
-                      <span>WhatsApp Share</span>
+                      <span>WhatsApp</span>
                     </button>
                   </div>
 
                   <div className="flex items-center justify-between pt-1">
-                    {/* Convert to Booking */}
-                    <button
-                      type="button"
-                      onClick={() => handleConvertToBooking(inq)}
-                      className="text-[11px] font-black text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
-                    >
-                      <CheckCircle2 size={13} />
-                      <span>Convert to Booking &rarr;</span>
-                    </button>
+                    {/* Convert or Mark Lost */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => handleConvertToBooking(inq)}
+                        className="text-[11px] font-black text-emerald-800 hover:text-emerald-950 flex items-center gap-1 cursor-pointer"
+                      >
+                        <CheckCircle2 size={13} />
+                        <span>Convert to Booking &rarr;</span>
+                      </button>
+
+                      {inq.status !== 'Lost' ? (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(inq.id, 'Lost')}
+                          className="text-[10px] font-black text-rose-700 hover:text-rose-900 bg-rose-50 px-2 py-0.5 rounded border border-rose-200 cursor-pointer"
+                          title="Mark inquiry as lost"
+                        >
+                          Mark Lost
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => handleUpdateStatus(inq.id, 'Follow-up')}
+                          className="text-[10px] font-black text-zinc-700 hover:text-zinc-900 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300 cursor-pointer"
+                          title="Reopen inquiry"
+                        >
+                          Reopen
+                        </button>
+                      )}
+                    </div>
 
                     <div className="flex items-center gap-1">
                       <button
@@ -435,7 +781,6 @@ export const TourInquiriesView: React.FC = () => {
                       >
                         <Edit2 size={12} />
                       </button>
-
                       <button
                         type="button"
                         onClick={() => handleDelete(inq)}

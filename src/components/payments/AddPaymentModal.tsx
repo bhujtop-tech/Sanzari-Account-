@@ -11,13 +11,18 @@ export const AddPaymentModal: React.FC = () => {
   const {
     isAddPaymentOpen,
     setIsAddPaymentOpen,
+    businessMode,
     customers,
     wallets,
+    dryfruitWallets,
+    tourWallets,
     formatCurrency,
     prefilledCustomerIdForPayment,
     setPrefilledCustomerIdForPayment,
   } = useData();
   const { user } = useAuth();
+
+  const activeWallets = businessMode === 'tourism' ? tourWallets : dryfruitWallets.length > 0 ? dryfruitWallets : wallets;
 
   const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -40,8 +45,8 @@ export const AddPaymentModal: React.FC = () => {
       setDate(getCurrentDateString());
       setFormError(null);
 
-      if (wallets.length > 0) {
-        setSelectedWalletId(wallets[0].id);
+      if (activeWallets.length > 0) {
+        setSelectedWalletId(activeWallets[0].id);
       }
 
       if (prefilledCustomerIdForPayment) {
@@ -264,7 +269,7 @@ export const AddPaymentModal: React.FC = () => {
               Received In Wallet *
             </label>
             <div className="grid grid-cols-3 gap-2">
-              {wallets.map((w) => (
+              {activeWallets.map((w) => (
                 <button
                   key={w.id}
                   type="button"

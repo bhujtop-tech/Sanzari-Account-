@@ -483,7 +483,9 @@ export async function ensureAllDefaultWalletsExist(): Promise<void> {
     for (const dw of defaultsToAdd) {
       const targetName = dw.name.toLowerCase().trim();
       const alreadyExists = existing.some(
-        (w) => w.name === targetName || (dw.scope === 'tourism' && dw.partnerKey === 'bus' && w.name.includes('bus'))
+        (w) =>
+          (w.name === targetName || (dw.scope === 'tourism' && dw.partnerKey === 'bus' && w.name.includes('bus'))) &&
+          (!w.scope || w.scope === dw.scope)
       );
       if (!alreadyExists) {
         const wRef = doc(collection(db, 'wallets'));
@@ -1776,7 +1778,7 @@ export async function updateStoreSettings(data: Partial<StoreSettings>): Promise
 // SANZARI TOURISM: TOUR BATCHES (Tour Folders / Dates)
 // ----------------------------------------------------
 export function subscribeTourBatches(callback: (batches: TourBatch[]) => void) {
-  const q = query(collection(db, 'tourBatches'), orderBy('departureDate', 'asc'));
+  const q = query(collection(db, 'tourBatches'));
   return onSnapshot(
     q,
     (snap) => {
@@ -1784,6 +1786,7 @@ export function subscribeTourBatches(callback: (batches: TourBatch[]) => void) {
         id: d.id,
         ...(d.data() as Omit<TourBatch, 'id'>),
       }));
+      batches.sort((a, b) => (a.departureDate || '').localeCompare(b.departureDate || ''));
       callback(batches);
     },
     (error) => {
@@ -1872,7 +1875,7 @@ export async function deleteTourBatch(id: string, userEmail: string): Promise<vo
 // SANZARI TOURISM: TOUR BOOKINGS
 // ----------------------------------------------------
 export function subscribeTourBookings(callback: (bookings: TourBooking[]) => void) {
-  const q = query(collection(db, 'tourBookings'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, 'tourBookings'));
   return onSnapshot(
     q,
     (snap) => {
@@ -1880,6 +1883,12 @@ export function subscribeTourBookings(callback: (bookings: TourBooking[]) => voi
         id: d.id,
         ...(d.data() as Omit<TourBooking, 'id'>),
       }));
+      // Safe client-side sorting: newest created/tour date first
+      bookings.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.tourDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.tourDate || 0).getTime();
+        return timeB - timeA;
+      });
       callback(bookings);
     },
     (error) => {
@@ -1914,50 +1923,88 @@ export async function addTourBooking(
       }
     }
 
-    await runTransaction(db, async (transaction) => {
-      // READS FIRST
-      let batchRef = null;
-      let batchSnap = null;
-      if (bookingData.tourBatchId) {
-        batchRef = doc(db, 'tourBatches', bookingData.tourBatchId);
-        batchSnap = await transaction.get(batchRef);
-      }
-
-      let wRef = null;
-      let wSnap = null;
-      if (targetWalletId) {
-        wRef = doc(db, 'wallets', targetWalletId);
-        wSnap = await transaction.get(wRef);
-      }
-
-      // WRITES SECOND
-      if (batchRef && batchSnap && batchSnap.exists()) {
-        const currentBooked = Number(batchSnap.data().bookedSeats || 0);
-        const newBooked = currentBooked + Number(bookingData.membersCount || 1);
-        transaction.update(batchRef, {
-          bookedSeats: newBooked,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-
-      if (wRef && wSnap && wSnap.exists()) {
-        const currentBal = Number(wSnap.data().currentBalance || 0);
-        transaction.update(wRef, {
-          currentBalance: currentBal + Number(bookingData.advancePaid),
-          updatedAt: new Date().toISOString(),
-        });
-      }
-
-      transaction.set(bookingRef, sanitizeForFirestore({
-        ...bookingData,
-        bookingNumber,
-        monthKey,
-        pendingAmount,
-        paymentStatus,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
+    const cleanPayload = sanitizeForFirestore({
+      ...bookingData,
+      bookingNumber,
+      monthKey,
+      pendingAmount,
+      paymentStatus,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        // READS FIRST
+        let batchRef = null;
+        let batchSnap = null;
+        if (bookingData.tourBatchId) {
+          batchRef = doc(db, 'tourBatches', bookingData.tourBatchId);
+          batchSnap = await transaction.get(batchRef);
+        }
+
+        let wRef = null;
+        let wSnap = null;
+        if (targetWalletId) {
+          wRef = doc(db, 'wallets', targetWalletId);
+          wSnap = await transaction.get(wRef);
+        }
+
+        // WRITES SECOND
+        if (batchRef && batchSnap && batchSnap.exists()) {
+          const currentBooked = Number(batchSnap.data().bookedSeats || 0);
+          const newBooked = currentBooked + Number(bookingData.membersCount || 1);
+          transaction.update(batchRef, {
+            bookedSeats: newBooked,
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        if (wRef && wSnap && wSnap.exists()) {
+          const currentBal = Number(wSnap.data().currentBalance || 0);
+          transaction.update(wRef, {
+            currentBalance: currentBal + Number(bookingData.advancePaid),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        transaction.set(bookingRef, cleanPayload);
+      });
+    } catch (txErr) {
+      console.warn('Transaction failed, saving booking directly with setDoc fallback:', txErr);
+      // Guarantee booking is NEVER lost: direct setDoc
+      await setDoc(bookingRef, cleanPayload);
+
+      // Best effort update for batch & wallet
+      if (bookingData.tourBatchId) {
+        try {
+          const bRef = doc(db, 'tourBatches', bookingData.tourBatchId);
+          const bSnap = await getDoc(bRef);
+          if (bSnap.exists()) {
+            await updateDoc(bRef, {
+              bookedSeats: Number(bSnap.data().bookedSeats || 0) + Number(bookingData.membersCount || 1),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          console.warn('Batch update fallback error:', e);
+        }
+      }
+      if (targetWalletId && Number(bookingData.advancePaid) > 0) {
+        try {
+          const wRef = doc(db, 'wallets', targetWalletId);
+          const wSnap = await getDoc(wRef);
+          if (wSnap.exists()) {
+            await updateDoc(wRef, {
+              currentBalance: Number(wSnap.data().currentBalance || 0) + Number(bookingData.advancePaid),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch (e) {
+          console.warn('Wallet balance fallback error:', e);
+        }
+      }
+    }
 
     // Audit log
     await addDoc(collection(db, 'auditLogs'), {
@@ -2524,7 +2571,7 @@ export async function updateTransactionRecord(params: {
 // SANZARI TOURISM: TOUR INQUIRIES
 // ----------------------------------------------------
 export function subscribeTourInquiries(callback: (inquiries: TourInquiry[]) => void) {
-  const q = query(collection(db, 'tourInquiries'), orderBy('createdAt', 'desc'));
+  const q = query(collection(db, 'tourInquiries'));
   return onSnapshot(
     q,
     (snap) => {
@@ -2532,6 +2579,11 @@ export function subscribeTourInquiries(callback: (inquiries: TourInquiry[]) => v
         id: d.id,
         ...(d.data() as Omit<TourInquiry, 'id'>),
       }));
+      inquiries.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.followUpDate || 0).getTime();
+        const timeB = new Date(b.createdAt || b.followUpDate || 0).getTime();
+        return timeB - timeA;
+      });
       callback(inquiries);
     },
     (error) => {

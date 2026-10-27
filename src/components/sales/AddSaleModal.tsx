@@ -15,6 +15,8 @@ export const AddSaleModal: React.FC = () => {
     customers,
     products,
     wallets,
+    dryfruitWallets,
+    tourWallets,
     formatCurrency,
   } = useData();
   const { user } = useAuth();
@@ -40,15 +42,13 @@ export const AddSaleModal: React.FC = () => {
 
   // Set default wallet matching salesPerson
   useEffect(() => {
-    if (wallets.length > 0) {
-      const match = wallets.find((w) => w.partnerKey === salesPerson.toLowerCase() || w.name.toLowerCase().includes(salesPerson.toLowerCase()));
+    const list = dryfruitWallets.length > 0 ? dryfruitWallets : wallets;
+    if (list.length > 0) {
+      const match = list.find((w) => w.partnerKey === salesPerson.toLowerCase() || w.name.toLowerCase().includes(salesPerson.toLowerCase()));
       if (match) setSelectedWalletId(match.id);
-      else setSelectedWalletId(wallets[0].id);
+      else setSelectedWalletId(list[0].id);
     }
-  }, [salesPerson, wallets]);
-
-  const dryfruitWallets = wallets.filter((w) => w.scope === 'dryfruit' || (!w.scope && !w.name.includes('(Tour)')));
-  const tourWallets = wallets.filter((w) => w.scope === 'tourism' || w.name.includes('(Tour)'));
+  }, [salesPerson, dryfruitWallets, wallets]);
 
   const [saleWalletId, setSaleWalletId] = useState<string>(() => {
     const defaultDry = dryfruitWallets[0] || wallets[0];
@@ -166,7 +166,10 @@ export const AddSaleModal: React.FC = () => {
         return;
       }
 
-      const activeWallet = wallets.find((w) => w.id === saleWalletId) || dryfruitWallets[0] || wallets[0];
+      const activeWallet =
+        wallets.find((w) => w.id === selectedWalletId || w.id === saleWalletId) ||
+        dryfruitWallets[0] ||
+        wallets[0];
       if (!activeWallet) {
         setFormError('Please configure at least one wallet');
         return;

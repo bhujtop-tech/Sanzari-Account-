@@ -191,6 +191,9 @@ interface DataContextType {
   thisMonthTourAdvance: number;
   thisMonthTourPending: number;
   thisMonthTourExpenses: number;
+  totalTourRevenue: number;
+  totalTourAdvance: number;
+  totalTourPending: number;
   totalTourPassengers: number;
   upcomingTourBatches: TourBatch[];
   recentActivity: ActivityItem[];
@@ -641,6 +644,19 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
   }, [tourExpenses, currentMonthKey]);
 
+  // Overall Season Tour Totals (Confirmed Bookings)
+  const totalTourRevenue = useMemo(() => {
+    return tourBookings.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
+  }, [tourBookings]);
+
+  const totalTourAdvance = useMemo(() => {
+    return tourBookings.reduce((sum, b) => sum + (Number(b.advancePaid) || 0), 0);
+  }, [tourBookings]);
+
+  const totalTourPending = useMemo(() => {
+    return tourBookings.reduce((sum, b) => sum + (Number(b.pendingAmount) || 0), 0);
+  }, [tourBookings]);
+
   const totalTourPassengers = useMemo(() => {
     return tourBookings.reduce((sum, b) => sum + (Number(b.membersCount) || 1), 0);
   }, [tourBookings]);
@@ -835,12 +851,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return items.sort((a, b) => (b.rawDate > a.rawDate ? 1 : b.rawDate < a.rawDate ? -1 : 0));
   }, [businessMode, sales, expenses, payments, purchases, transfers, tourBookings, tourExpenses]);
 
+  const allEffectiveWallets = useMemo(() => {
+    const map = new Map<string, Wallet>();
+    wallets.forEach((w) => map.set(w.id, w));
+    dryfruitWallets.forEach((w) => map.set(w.id, w));
+    tourWallets.forEach((w) => map.set(w.id, w));
+    return Array.from(map.values());
+  }, [wallets, dryfruitWallets, tourWallets]);
+
   return (
     <DataContext.Provider
       value={{
         businessMode,
         setBusinessMode,
-        wallets,
+        wallets: allEffectiveWallets,
         dryfruitWallets,
         tourWallets,
         customers,
@@ -952,6 +976,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         thisMonthTourAdvance,
         thisMonthTourPending,
         thisMonthTourExpenses,
+        totalTourRevenue,
+        totalTourAdvance,
+        totalTourPending,
         totalTourPassengers,
         upcomingTourBatches,
         recentActivity,
