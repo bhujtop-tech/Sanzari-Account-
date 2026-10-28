@@ -255,7 +255,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Tourism State - REAL data only
   const [tourBatches, setTourBatches] = useState<TourBatch[]>(() => getCache('sz_tour_batches', []));
-  const [tourBookings, setTourBookings] = useState<TourBooking[]>(() => getCache('sz_tour_bookings', []));
+  const [tourBookings, setTourBookings] = useState<TourBooking[]>(() => getCache('sz_tour_bookings', INITIAL_TOUR_BOOKINGS));
   const [tourExpenses, setTourExpenses] = useState<TourExpense[]>(() => getCache('sz_tour_expenses', []));
   const [tourInquiries, setTourInquiries] = useState<TourInquiry[]>(() => getCache('sz_tour_inquiries', []));
   const [customTourPackages, setCustomTourPackages] = useState<CustomTourPackage[]>(() => getCache('sz_custom_tour_packages', []));
@@ -489,8 +489,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
 
     const unsubTourBookings = subscribeTourBookings((bookings) => {
-      setTourBookings(bookings);
-      localStorage.setItem('sz_tour_bookings', JSON.stringify(bookings));
+      if (bookings && bookings.length > 0) {
+        setTourBookings(bookings);
+        localStorage.setItem('sz_tour_bookings', JSON.stringify(bookings));
+      } else {
+        setTourBookings((prev) => (prev && prev.length > 0 ? prev : INITIAL_TOUR_BOOKINGS));
+      }
       markLoaded();
     });
 

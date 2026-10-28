@@ -1898,15 +1898,16 @@ export function subscribeTourBookings(callback: (bookings: TourBooking[]) => voi
 }
 
 export async function addTourBooking(
-  bookingData: Omit<TourBooking, 'id' | 'bookingNumber' | 'createdAt' | 'updatedAt' | 'pendingAmount' | 'paymentStatus'>,
+  bookingData: Omit<TourBooking, 'id' | 'createdAt' | 'updatedAt' | 'pendingAmount' | 'paymentStatus'> & { bookingNumber?: string; balanceDue?: number },
   userEmail: string
 ): Promise<string> {
   try {
     const bookingRef = doc(collection(db, 'tourBookings'));
-    const bookingNumber = `SZ-TOUR-${Date.now().toString().slice(-4)}`;
+    const bookingNumber = bookingData.bookingNumber || `SZ-TOUR-${Math.floor(1000 + Math.random() * 9000)}`;
     const pendingAmount = Math.max(0, Number(bookingData.totalAmount) - Number(bookingData.advancePaid || 0));
+    const balanceDue = pendingAmount;
     const paymentStatus =
-      pendingAmount === 0 ? 'Paid' : Number(bookingData.advancePaid) > 0 ? 'Partial' : 'Pending';
+      pendingAmount === 0 ? 'Paid' : Number(bookingData.advancePaid) > 0 ? 'Partial' : 'Due';
     const monthKey = getMonthKey(bookingData.tourDate);
 
     // Resolve target wallet ID outside transaction
@@ -1928,7 +1929,10 @@ export async function addTourBooking(
       bookingNumber,
       monthKey,
       pendingAmount,
+      balanceDue,
       paymentStatus,
+      bookingStatus: bookingData.bookingStatus || 'Confirmed',
+      packageCategory: bookingData.packageCategory || 'Deluxe',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -2142,79 +2146,85 @@ export async function updateTourBooking(
     const oldBatchRef = oldBatchId ? doc(db, 'tourBatches', oldBatchId) : null;
     const newBatchRef = newBatchId && newBatchId !== oldBatchId ? doc(db, 'tourBatches', newBatchId) : null;
 
-    await runTransaction(db, async (transaction) => {
-      let wSnap = null;
-      if (targetWalletRef) {
-        wSnap = await transaction.get(targetWalletRef);
-      }
-
-      let oldBatchSnap = null;
-      if (oldBatchRef) {
-        oldBatchSnap = await transaction.get(oldBatchRef);
-      }
-
-      let newBatchSnap = null;
-      if (newBatchRef) {
-        newBatchSnap = await transaction.get(newBatchRef);
-      }
-
-      // WRITES SECOND
-      if (targetWalletRef && wSnap && wSnap.exists()) {
-        const currentBal = Number(wSnap.data().currentBalance || 0);
-        transaction.update(targetWalletRef, {
-          currentBalance: currentBal + diffAdvance,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-
-      if (oldBatchRef && oldBatchSnap && oldBatchSnap.exists()) {
-        if (oldBatchId === newBatchId && oldMembers !== newMembers) {
-          const diffSeats = newMembers - oldMembers;
-          const booked = Number(oldBatchSnap.data().bookedSeats || 0);
-          transaction.update(oldBatchRef, {
-            bookedSeats: Math.max(0, booked + diffSeats),
-            updatedAt: new Date().toISOString(),
-          });
-        } else if (oldBatchId !== newBatchId) {
-          const booked = Number(oldBatchSnap.data().bookedSeats || 0);
-          transaction.update(oldBatchRef, {
-            bookedSeats: Math.max(0, booked - oldMembers),
-            updatedAt: new Date().toISOString(),
-          });
-        }
-      }
-
-      if (newBatchRef && newBatchSnap && newBatchSnap.exists() && oldBatchId !== newBatchId) {
-        const booked = Number(newBatchSnap.data().bookedSeats || 0);
-        transaction.update(newBatchRef, {
-          bookedSeats: booked + newMembers,
-          updatedAt: new Date().toISOString(),
-        });
-      }
-
       const cleanPayload = sanitizeForFirestore({
         ...bookingData,
         pendingAmount,
+        balanceDue: pendingAmount,
         paymentStatus,
         updatedAt: new Date().toISOString(),
       });
 
-      transaction.update(bookingRef, cleanPayload);
-    });
+      try {
+        await runTransaction(db, async (transaction) => {
+          let wSnap = null;
+          if (targetWalletRef) {
+            wSnap = await transaction.get(targetWalletRef);
+          }
 
-    await addDoc(collection(db, 'auditLogs'), {
-      userEmail,
-      action: 'UPDATE_TOUR_BOOKING',
-      recordType: 'tourBookings',
-      recordId: id,
-      newValue: JSON.stringify(bookingData),
-      timestamp: new Date().toISOString(),
-    });
-  } catch (error) {
-    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${id}`);
-    throw error;
+          let oldBatchSnap = null;
+          if (oldBatchRef) {
+            oldBatchSnap = await transaction.get(oldBatchRef);
+          }
+
+          let newBatchSnap = null;
+          if (newBatchRef) {
+            newBatchSnap = await transaction.get(newBatchRef);
+          }
+
+          // WRITES SECOND
+          if (targetWalletRef && wSnap && wSnap.exists()) {
+            const currentBal = Number(wSnap.data().currentBalance || 0);
+            transaction.update(targetWalletRef, {
+              currentBalance: currentBal + diffAdvance,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          if (oldBatchRef && oldBatchSnap && oldBatchSnap.exists()) {
+            if (oldBatchId === newBatchId && oldMembers !== newMembers) {
+              const diffSeats = newMembers - oldMembers;
+              const booked = Number(oldBatchSnap.data().bookedSeats || 0);
+              transaction.update(oldBatchRef, {
+                bookedSeats: Math.max(0, booked + diffSeats),
+                updatedAt: new Date().toISOString(),
+              });
+            } else if (oldBatchId !== newBatchId) {
+              const booked = Number(oldBatchSnap.data().bookedSeats || 0);
+              transaction.update(oldBatchRef, {
+                bookedSeats: Math.max(0, booked - oldMembers),
+                updatedAt: new Date().toISOString(),
+              });
+            }
+          }
+
+          if (newBatchRef && newBatchSnap && newBatchSnap.exists() && oldBatchId !== newBatchId) {
+            const booked = Number(newBatchSnap.data().bookedSeats || 0);
+            transaction.update(newBatchRef, {
+              bookedSeats: booked + newMembers,
+              updatedAt: new Date().toISOString(),
+            });
+          }
+
+          transaction.update(bookingRef, cleanPayload);
+        });
+      } catch (txErr) {
+        console.warn('Transaction update failed, using direct updateDoc fallback:', txErr);
+        await updateDoc(bookingRef, cleanPayload);
+      }
+
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'UPDATE_TOUR_BOOKING',
+        recordType: 'tourBookings',
+        recordId: id,
+        newValue: JSON.stringify(bookingData),
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${id}`);
+      throw error;
+    }
   }
-}
 
 export async function deleteTourBooking(id: string, userEmail: string): Promise<void> {
   if (!id) return;

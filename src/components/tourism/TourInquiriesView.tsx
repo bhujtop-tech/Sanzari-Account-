@@ -21,12 +21,15 @@ import {
   AlertTriangle,
   RotateCcw,
   ChevronDown,
+  MessageSquare,
+  ChevronRight,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { updateTourInquiry } from '../../services/db';
-import { InquirySource, InquiryStatus, TourInquiry } from '../../types';
+import { InquirySource, InquiryStatus, TourInquiry, InquiryFollowUpNote } from '../../types';
 import { InquiriesSkeleton } from '../common/Skeleton';
+import { FollowUpChatModal } from './FollowUpChatModal';
 
 export const TourInquiriesView: React.FC = () => {
   const { user } = useAuth();
@@ -47,6 +50,10 @@ export const TourInquiriesView: React.FC = () => {
   const [selectedSource, setSelectedSource] = useState<string>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<string>('ALL');
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+
+  // Follow-up Chat & Timeline Modal State
+  const [chatModalInquiry, setChatModalInquiry] = useState<TourInquiry | null>(null);
+  const [chatModalInitialDate, setChatModalInitialDate] = useState<string>('');
 
   // Today date string (YYYY-MM-DD)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -117,7 +124,74 @@ export const TourInquiriesView: React.FC = () => {
     }
   };
 
-  const handleUpdateFollowUpDate = async (inqId: string, newDate: string) => {
+  const handleOpenChatModal = (inq: TourInquiry, initialDate?: string) => {
+    setChatModalInquiry(inq);
+    setChatModalInitialDate(initialDate || inq.followUpDate || getDateOffset(1));
+  };
+
+  const handleSaveFollowUp = async (
+    inq: TourInquiry,
+    replyNote: string,
+    nextDate: string,
+    newStatus?: InquiryStatus
+  ) => {
+    setUpdatingId(inq.id);
+    const now = new Date();
+    const newNote: InquiryFollowUpNote = {
+      id: `fup_${Date.now()}`,
+      date: now.toISOString(),
+      note: replyNote.trim() || `Follow-up updated for ${nextDate}`,
+      nextFollowUpDate: nextDate,
+      status: newStatus || inq.status,
+      loggedBy: user?.displayName || user?.email?.split('@')[0] || 'Office Staff',
+    };
+
+    const existingHistory: InquiryFollowUpNote[] = Array.isArray(inq.followUpHistory)
+      ? [...inq.followUpHistory]
+      : [];
+
+    if (existingHistory.length === 0 && inq.discussionSummary) {
+      existingHistory.push({
+        id: `init_${inq.id}`,
+        date: inq.createdAt || inq.updatedAt || now.toISOString(),
+        note: inq.discussionSummary,
+        nextFollowUpDate: inq.followUpDate,
+        status: inq.status,
+        loggedBy: inq.assignedTo || 'Office Staff',
+      });
+    }
+
+    const updatedHistory = [...existingHistory, newNote];
+
+    try {
+      await updateTourInquiry(
+        inq.id,
+        {
+          discussionSummary: replyNote.trim() || inq.discussionSummary,
+          followUpDate: nextDate,
+          status: newStatus || (inq.status === 'New' ? 'Follow-up' : inq.status),
+          followUpHistory: updatedHistory,
+        },
+        user?.email || 'admin@sanzari.com'
+      );
+    } catch (err) {
+      console.error('Failed to update follow-up note:', err);
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const handleUpdateFollowUpDate = async (inqId: string, newDate: string, noteText?: string) => {
+    const targetInq = tourInquiries.find((i) => i.id === inqId);
+    if (targetInq) {
+      await handleSaveFollowUp(
+        targetInq,
+        noteText || `Rescheduled follow-up to ${newDate}`,
+        newDate,
+        'Follow-up'
+      );
+      return;
+    }
     setUpdatingId(inqId);
     try {
       await updateTourInquiry(
@@ -395,9 +469,24 @@ export const TourInquiriesView: React.FC = () => {
                   </p>
 
                   {inq.discussionSummary && (
-                    <p className="text-[11px] text-zinc-700 bg-zinc-50 p-2 rounded-lg border border-zinc-200 mt-1 line-clamp-2">
-                      💬 <strong>Kya baat hui:</strong> {inq.discussionSummary}
-                    </p>
+                    <div className="bg-zinc-50 p-2.5 rounded-xl border border-zinc-200 mt-1 space-y-1">
+                      <div className="flex items-center justify-between text-[10px]">
+                        <span className="text-zinc-800 font-black flex items-center gap-1">
+                          <span>💬 Kya baat hui:</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleOpenChatModal(inq)}
+                          className="text-[10px] font-black text-blue-700 hover:text-blue-900 underline flex items-center gap-0.5 cursor-pointer"
+                        >
+                          <span>Timeline ({Array.isArray(inq.followUpHistory) ? inq.followUpHistory.length : 1})</span>
+                          <ChevronRight size={10} />
+                        </button>
+                      </div>
+                      <p className="text-[11px] text-zinc-900 font-medium leading-relaxed line-clamp-2">
+                        {inq.discussionSummary}
+                      </p>
+                    </div>
                   )}
                 </div>
 
@@ -407,7 +496,8 @@ export const TourInquiriesView: React.FC = () => {
                     {/* Call Direct */}
                     <a
                       href={`tel:${inq.customerPhone}`}
-                      className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-black flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Direct Phone Call"
                     >
                       <Phone size={12} />
                       <span>Call</span>
@@ -416,47 +506,76 @@ export const TourInquiriesView: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => handleWhatsAppSend(inq, true)}
-                      className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 cursor-pointer"
+                      className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-black flex items-center gap-1 cursor-pointer transition-colors"
+                      title="Send WhatsApp Follow-up"
                     >
                       <MessageCircle size={12} />
                       <span>WhatsApp</span>
                     </button>
                   </div>
 
-                  <div className="flex items-center gap-1">
-                    {/* Next Follow-up Quick Reschedule */}
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {/* Next Follow-up Quick Reschedule: +1 Day */}
                     <button
                       type="button"
-                      onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(1))}
-                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300"
-                      title="Follow up tomorrow"
+                      onClick={() => handleOpenChatModal(inq, getDateOffset(1))}
+                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300 transition-colors cursor-pointer"
+                      title="Follow up tomorrow (+1 Day)"
                     >
                       +1 Day
                     </button>
+
+                    {/* +3 Days */}
                     <button
                       type="button"
-                      onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(3))}
-                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300"
-                      title="Follow up in 3 days"
+                      onClick={() => handleOpenChatModal(inq, getDateOffset(3))}
+                      className="px-2 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300 transition-colors cursor-pointer"
+                      title="Follow up in 3 days (+3 Days)"
                     >
                       +3 Days
                     </button>
+
+                    {/* Custom Date Option */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChatModal(inq, inq.followUpDate || todayStr)}
+                      className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 text-[10px] font-black border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="Pick custom date & log reply note"
+                    >
+                      <Calendar size={11} />
+                      <span>Custom Date</span>
+                    </button>
+
+                    {/* Chat Timeline & Reply Note */}
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChatModal(inq)}
+                      className="px-2 py-1 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-900 text-[10px] font-black border border-blue-300 transition-colors flex items-center gap-1 cursor-pointer"
+                      title="View conversation timeline & add reply notes"
+                    >
+                      <MessageSquare size={11} />
+                      <span>Chat ({Array.isArray(inq.followUpHistory) ? inq.followUpHistory.length : inq.discussionSummary ? 1 : 0})</span>
+                    </button>
+
                     {/* 1-Click Lost */}
                     <button
                       type="button"
                       onClick={() => handleUpdateStatus(inq.id, 'Lost')}
-                      className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300 cursor-pointer"
+                      className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-800 text-[10px] font-black border border-rose-300 cursor-pointer transition-colors"
                       title="Customer said no / cancelled"
                     >
                       🔴 Lost
                     </button>
+
                     {/* Convert */}
                     <button
                       type="button"
                       onClick={() => handleConvertToBooking(inq)}
-                      className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 text-[10px] font-black border border-emerald-300 cursor-pointer"
+                      className="px-2.5 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-950 text-[10px] font-black border border-emerald-400 cursor-pointer flex items-center gap-1 transition-colors"
+                      title="Convert to Confirmed Tour Booking"
                     >
-                      ✓ Book
+                      <CheckCircle2 size={11} />
+                      <span>✓ Book</span>
                     </button>
                   </div>
                 </div>
@@ -661,44 +780,71 @@ export const TourInquiriesView: React.FC = () => {
                     </div>
                   </div>
 
-                  {/* Follow-up Date Row with 1-Click Update */}
-                  <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-2 flex items-center justify-between text-[11px]">
-                    <div className="flex items-center gap-1 font-bold text-zinc-800">
-                      <Clock size={12} className="text-amber-700 shrink-0" />
-                      <span>Follow-up:</span>
-                      <input
-                        type="date"
-                        value={inq.followUpDate || ''}
-                        onChange={(e) => handleUpdateFollowUpDate(inq.id, e.target.value)}
-                        className="bg-white border border-zinc-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-900 cursor-pointer"
-                      />
-                    </div>
+                  {/* Follow-up Date Row with 1-Click Update, +1 Day, +3 Days, Custom Date, and Chat Timeline */}
+                  <div className="bg-amber-50/60 border border-amber-200 rounded-xl p-2.5 space-y-2">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1 font-bold text-zinc-900">
+                        <Clock size={12} className="text-amber-700 shrink-0" />
+                        <span>Follow-up Due:</span>
+                        <input
+                          type="date"
+                          value={inq.followUpDate || ''}
+                          onChange={(e) => handleUpdateFollowUpDate(inq.id, e.target.value)}
+                          className="bg-white border border-zinc-300 rounded px-1.5 py-0.5 text-[10px] font-bold text-zinc-900 cursor-pointer"
+                        />
+                      </div>
 
-                    <div className="flex items-center gap-1">
                       <button
                         type="button"
-                        onClick={() => handleUpdateFollowUpDate(inq.id, todayStr)}
-                        className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-amber-200 text-amber-900 hover:bg-amber-300"
-                        title="Set follow-up to today"
+                        onClick={() => handleOpenChatModal(inq)}
+                        className="text-[10px] font-black text-blue-700 hover:text-blue-900 underline flex items-center gap-0.5 cursor-pointer"
                       >
-                        Today
+                        <MessageSquare size={10} />
+                        <span>Chat ({Array.isArray(inq.followUpHistory) ? inq.followUpHistory.length : inq.discussionSummary ? 1 : 0})</span>
+                      </button>
+                    </div>
+
+                    {/* Quick Reschedule Action Buttons: +1 Day, +3 Days, Custom Date */}
+                    <div className="flex items-center gap-1 flex-wrap pt-0.5">
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChatModal(inq, getDateOffset(1))}
+                        className="px-2 py-0.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300 transition-colors cursor-pointer"
+                        title="Follow up tomorrow (+1 Day)"
+                      >
+                        +1 Day
                       </button>
                       <button
                         type="button"
-                        onClick={() => handleUpdateFollowUpDate(inq.id, getDateOffset(1))}
-                        className="text-[9px] font-extrabold px-1.5 py-0.5 rounded bg-zinc-200 text-zinc-800 hover:bg-zinc-300"
-                        title="Set follow-up to tomorrow"
+                        onClick={() => handleOpenChatModal(inq, getDateOffset(3))}
+                        className="px-2 py-0.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 text-[10px] font-black border border-zinc-300 transition-colors cursor-pointer"
+                        title="Follow up in 3 days (+3 Days)"
                       >
-                        Tomorrow
+                        +3 Days
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChatModal(inq, inq.followUpDate || todayStr)}
+                        className="px-2 py-0.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-950 text-[10px] font-black border border-amber-300 transition-colors flex items-center gap-1 cursor-pointer"
+                        title="Custom Date Pick & Chat Reply"
+                      >
+                        <Calendar size={10} />
+                        <span>Custom Date</span>
                       </button>
                     </div>
                   </div>
 
                   {/* Core Box: "Kya Baat Hui" / Discussion Summary */}
                   <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-2.5 space-y-1">
-                    <div className="text-[10px] font-black uppercase tracking-wider text-zinc-600 flex items-center justify-between">
-                      <span>Conversation Details:</span>
-                      <span className="text-zinc-500 font-semibold">{inq.assignedTo}</span>
+                    <div className="text-[10px] font-black uppercase tracking-wider text-zinc-700 flex items-center justify-between">
+                      <span>💬 Kya Baat Hui (Discussion):</span>
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChatModal(inq)}
+                        className="text-[10px] font-black text-blue-700 hover:text-blue-900 underline flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <span>Timeline History &rarr;</span>
+                      </button>
                     </div>
                     <p className="text-xs text-zinc-900 leading-relaxed font-medium line-clamp-3">
                       {inq.discussionSummary || 'No discussion notes.'}
@@ -797,6 +943,17 @@ export const TourInquiriesView: React.FC = () => {
           })}
         </div>
       )}
+
+      {/* Follow-up & Chat Timeline Modal */}
+      <FollowUpChatModal
+        isOpen={Boolean(chatModalInquiry)}
+        onClose={() => setChatModalInquiry(null)}
+        inquiry={chatModalInquiry}
+        initialNextDate={chatModalInitialDate}
+        onSaveFollowUp={handleSaveFollowUp}
+        onWhatsAppSend={handleWhatsAppSend}
+        onConvertToBooking={handleConvertToBooking}
+      />
     </div>
   );
 };

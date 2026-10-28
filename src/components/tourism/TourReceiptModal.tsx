@@ -152,7 +152,7 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
 
           {/* Customer & Passengers */}
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4 p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3.5 rounded-xl bg-zinc-50 border border-zinc-200">
               <div>
                 <span className="text-[10px] font-bold text-zinc-500 uppercase block">Customer Name</span>
                 <span className="text-sm font-bold text-zinc-950">{booking.customerName}</span>
@@ -160,6 +160,10 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
               <div>
                 <span className="text-[10px] font-bold text-zinc-500 uppercase block">Contact Number</span>
                 <span className="text-sm font-bold text-zinc-950 font-mono">{booking.customerPhone}</span>
+              </div>
+              <div>
+                <span className="text-[10px] font-bold text-zinc-500 uppercase block">City</span>
+                <span className="text-sm font-bold text-zinc-950">{booking.city || 'Bhuj'}</span>
               </div>
             </div>
 
@@ -176,6 +180,7 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
                       <th className="p-2.5 text-center w-10">#</th>
                       <th className="p-2.5">Passenger Name</th>
                       <th className="p-2.5 text-center">Age</th>
+                      <th className="p-2.5 text-center">Gender</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-zinc-100 font-medium">
@@ -185,6 +190,9 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
                         <td className="p-2.5 font-bold text-zinc-900">{m.name}</td>
                         <td className="p-2.5 text-center font-mono text-zinc-700">
                           {m.age ? `${m.age} yrs` : 'Adult'}
+                        </td>
+                        <td className="p-2.5 text-center font-medium text-zinc-600">
+                          {m.gender || 'Male'}
                         </td>
                       </tr>
                     ))}
@@ -203,7 +211,7 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
               </span>
             </div>
             <div className="flex items-center justify-between text-xs text-emerald-700">
-              <span className="font-semibold">Advance Received ({booking.paymentMode || 'Online'}):</span>
+              <span className="font-semibold">Advance Received ({booking.paymentMode || 'Online'} • {booking.walletName || 'Rizwan'}):</span>
               <span className="font-mono font-black text-sm">
                 {formatCurrency(booking.advancePaid)}
               </span>
@@ -211,9 +219,15 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
             <div className="border-t border-zinc-200 pt-2 flex items-center justify-between text-sm">
               <span className="font-bold text-zinc-900">Remaining Due Balance:</span>
               <span className="font-mono font-black text-rose-600 text-base">
-                {formatCurrency(booking.pendingAmount)}
+                {formatCurrency(booking.balanceDue ?? booking.pendingAmount)}
               </span>
             </div>
+            {booking.bookedBy && (
+              <div className="text-[11px] text-zinc-500 pt-1 border-t border-zinc-100 flex items-center justify-between">
+                <span>Booked By: <strong>{booking.bookedBy}</strong></span>
+                <span>Payment Status: <strong className="uppercase">{booking.paymentStatus}</strong></span>
+              </div>
+            )}
           </div>
 
           {booking.specialNotes && (

@@ -21,8 +21,8 @@ export interface Wallet {
 // ==========================================
 export type TourStatus = 'Upcoming' | 'Ongoing' | 'Completed' | 'Cancelled';
 export type TourType = 'Group Tour' | 'Private Tour' | 'Custom Package';
-export type TravelClass = 'AC Train' | 'Non-AC Train' | 'Non-AC Sleeper' | 'Flight' | 'Volvo Bus' | 'Self Drive';
-export type TourPaymentMode = 'Online' | 'Offline';
+export type TravelClass = 'AC Train' | '3AC Train' | 'Sleeper Train' | 'Non-AC Train' | 'Non-AC Sleeper' | 'Flight' | 'Volvo Bus' | 'Self Drive';
+export type TourPaymentMode = 'Online' | 'Offline' | 'UPI' | 'Cash';
 export type TourBookingStatus = 'Confirmed' | 'Pending' | 'Completed' | 'Cancelled';
 
 export interface TourMember {
@@ -65,8 +65,9 @@ export interface TourBatch {
 
 export interface TourBooking {
   id: string;
-  bookingNumber: string; // e.g. "SZ-TOUR-101"
+  bookingNumber: string; // e.g. "SZ-TOUR-2518"
   tourBatchId?: string;
+  tourBatchTitle?: string;
   tourTitle: string;
   destination: string;
   tourDate: string; // YYYY-MM-DD
@@ -81,26 +82,31 @@ export interface TourBooking {
   
   // Members & Passenger list
   membersCount: number;
+  adultsCount?: number;
+  kidsCount?: number;
+  couplesCount?: number;
   members: TourMember[];
   
   // Tour & Travel Options
   tourType: TourType; // 'Group Tour' | 'Private Tour'
-  travelClass: TravelClass; // 'AC Train' | 'Non-AC Sleeper' | 'Flight' | 'Volvo Bus'
+  travelClass: TravelClass; // 'AC Train' | 'Sleeper Train' etc.
   packageCategory?: 'Standard' | 'Deluxe' | 'Super Deluxe' | 'Luxury';
   
   // Financials
   totalAmount: number;
   advancePaid: number;
   pendingAmount: number;
-  paymentStatus: PaymentStatus; // 'Paid' | 'Partial' | 'Pending'
-  paymentMode: TourPaymentMode; // 'Online' | 'Offline'
+  balanceDue?: number; // Exactly matched with Booking Receipt Generator
+  paymentStatus: PaymentStatus | 'Due'; // 'Paid' | 'Partial' | 'Pending' | 'Due'
+  paymentMode: TourPaymentMode; // 'Online' | 'Offline' | 'UPI' | 'Cash'
   paymentMethod: PaymentMethod; // 'UPI' | 'Cash' | 'Bank' | 'Other'
   walletId?: string;
-  walletName: string; // e.g. "Rizwan", "Sahil", "Avesh", "Bank"
+  walletName: string; // e.g. "Rizwan (Tour)", "Sahil (Tour)"
   
   // Additional Notes & Status
-  specialNotes?: string;
   bookingStatus: TourBookingStatus;
+  bookedBy?: string;
+  specialNotes?: string;
   
   createdAt?: string;
   updatedAt?: string;
@@ -129,6 +135,15 @@ export interface TourExpense {
 export type InquirySource = 'Instagram' | 'WhatsApp' | 'Phone Call' | 'Walk-in' | 'Reference' | 'Other';
 export type InquiryStatus = 'New' | 'In Discussion' | 'Package Sent' | 'Follow-up' | 'Converted' | 'Lost';
 
+export interface InquiryFollowUpNote {
+  id: string;
+  date: string; // ISO timestamp
+  note: string; // customer reply or discussion note
+  nextFollowUpDate?: string; // YYYY-MM-DD
+  status?: InquiryStatus;
+  loggedBy?: string; // staff name
+}
+
 export interface TourInquiry {
   id: string;
   inquiryNumber: string; // e.g. "INQ-101"
@@ -138,6 +153,7 @@ export interface TourInquiry {
   destination: string; // e.g. "Kashmir", "Shimla Manali", "Goa", "Dubai"
   fromCity?: string; // e.g. "Vadodara", "Ahmedabad", "Surat"
   discussionSummary: string; // "kya baat hui"
+  followUpHistory?: InquiryFollowUpNote[]; // chat-style date-wise reply & follow-up timeline
   paxAdults: number;
   paxChildren: number;
   totalPax: number;

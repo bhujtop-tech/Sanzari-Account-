@@ -53,16 +53,28 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
 
   const filteredBookings = useMemo(() => {
     return tourBookings.filter((b) => {
-      const q = searchQuery.toLowerCase();
-      const matchesSearch =
-        b.customerName.toLowerCase().includes(q) ||
-        b.customerPhone.includes(q) ||
-        b.destination.toLowerCase().includes(q) ||
-        b.bookingNumber.toLowerCase().includes(q) ||
-        b.members.some((m) => m.name.toLowerCase().includes(q));
+      const q = searchQuery.toLowerCase().trim();
 
-      const matchesStatus = statusFilter === 'ALL' || b.paymentStatus === statusFilter;
-      return matchesSearch && matchesStatus;
+      const pStatus = b.paymentStatus || (Number(b.pendingAmount || 0) === 0 ? 'Paid' : 'Partial');
+      const matchesStatus = statusFilter === 'ALL' || pStatus === statusFilter;
+      if (!matchesStatus) return false;
+
+      if (!q) return true;
+
+      const cName = (b.customerName || '').toLowerCase();
+      const cPhone = String(b.customerPhone || '');
+      const cDest = (b.destination || '').toLowerCase();
+      const bNum = (b.bookingNumber || '').toLowerCase();
+      const members = Array.isArray(b.members) ? b.members : [];
+      const matchMember = members.some((m) => (m?.name || '').toLowerCase().includes(q));
+
+      return (
+        cName.includes(q) ||
+        cPhone.includes(q) ||
+        cDest.includes(q) ||
+        bNum.includes(q) ||
+        matchMember
+      );
     });
   }, [tourBookings, searchQuery, statusFilter]);
 
@@ -242,13 +254,20 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                       <h3 className="text-sm sm:text-base font-black text-zinc-950 truncate tracking-tight">
                         {b.customerName}
                       </h3>
-                      <a
-                        href={`tel:${b.customerPhone}`}
-                        className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-950 flex items-center gap-1 truncate mt-0.5"
-                      >
-                        <Phone size={11} className="text-zinc-900 shrink-0" />
-                        <span className="truncate">{b.customerPhone}</span>
-                      </a>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
+                        <a
+                          href={`tel:${b.customerPhone}`}
+                          className="text-[11px] font-semibold text-zinc-600 hover:text-zinc-950 flex items-center gap-1 truncate"
+                        >
+                          <Phone size={11} className="text-zinc-900 shrink-0" />
+                          <span className="truncate">{b.customerPhone}</span>
+                        </a>
+                        {b.city && (
+                          <span className="text-[10px] font-bold text-zinc-700 bg-zinc-100 px-1.5 py-0.2 rounded border border-zinc-200">
+                            📍 {b.city}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -274,8 +293,8 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </div>
                   </div>
 
-                  {/* Money Summary */}
-                  <div className="grid grid-cols-2 gap-1.5 bg-zinc-50 rounded-xl p-2 text-center text-[10px] font-medium border border-zinc-200">
+                  {/* Money Summary: Total, Advance, Due */}
+                  <div className="grid grid-cols-3 gap-1 bg-zinc-50 rounded-xl p-2 text-center text-[10px] font-medium border border-zinc-200">
                     <div>
                       <span className="text-zinc-500 block text-[9px] font-bold uppercase">Total</span>
                       <strong className="text-zinc-950 font-black text-xs">{formatCurrency(b.totalAmount)}</strong>
@@ -283,6 +302,12 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     <div>
                       <span className="text-emerald-700 block text-[9px] font-bold uppercase">Advance</span>
                       <strong className="text-emerald-700 font-black text-xs">{formatCurrency(b.advancePaid)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-rose-600 block text-[9px] font-bold uppercase">Due</span>
+                      <strong className="text-rose-600 font-black text-xs">
+                        {formatCurrency(b.balanceDue ?? b.pendingAmount ?? 0)}
+                      </strong>
                     </div>
                   </div>
                 </div>
@@ -401,7 +426,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                         {b.paymentStatus === 'Partial' ? 'Advance' : b.paymentStatus}
                       </span>
                     </h4>
-                    <div className="flex items-center gap-2 text-xs text-zinc-600 mt-0.5">
+                    <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-600 mt-0.5">
                       <a
                         href={`tel:${b.customerPhone}`}
                         className="font-bold text-zinc-900 hover:underline flex items-center gap-1"
@@ -409,6 +434,11 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                         <Phone size={11} className="text-zinc-900 shrink-0" />
                         <span>{b.customerPhone}</span>
                       </a>
+                      {b.city && (
+                        <span className="text-[10px] font-bold text-zinc-700 bg-zinc-100 px-1.5 py-0.2 rounded border border-zinc-200">
+                          📍 {b.city}
+                        </span>
+                      )}
                       {b.walletName && (
                         <span className="text-[10px] font-bold text-zinc-500 bg-zinc-100 px-1.5 py-0.2 rounded">
                           💳 {b.walletName}
@@ -452,9 +482,9 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                       <div className="text-[11px] font-bold text-emerald-700">
                         Adv: {formatCurrency(b.advancePaid)}
                       </div>
-                      {b.pendingAmount > 0 && (
+                      {(Number(b.balanceDue ?? b.pendingAmount ?? 0) > 0) && (
                         <div className="text-[10px] font-bold text-rose-600">
-                          Due: {formatCurrency(b.pendingAmount)}
+                          Due: {formatCurrency(b.balanceDue ?? b.pendingAmount)}
                         </div>
                       )}
                     </div>
