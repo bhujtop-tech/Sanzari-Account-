@@ -25,6 +25,7 @@ import {
   Store,
   LogOut,
   FileText,
+  Calculator,
 } from 'lucide-react';
 
 export const Sidebar: React.FC = () => {
@@ -41,6 +42,7 @@ export const Sidebar: React.FC = () => {
     setIsAddTourExpenseOpen,
     setIsAddTourInquiryOpen,
     setIsAiAssistantOpen,
+    setIsTourCalculatorOpen,
     businessMode,
   } = useData();
 
@@ -208,8 +210,27 @@ export const Sidebar: React.FC = () => {
         })}
       </div>
 
-      {/* AI Assistant Widget */}
+      {/* Bottom Widgets */}
       <div className="mt-auto pt-3 border-t border-zinc-100 space-y-2">
+        {/* Tour Fare & Family Cost Calculator */}
+        <button
+          onClick={() => setIsTourCalculatorOpen(true)}
+          className="w-full p-2.5 rounded-2xl bg-gradient-to-br from-blue-500/10 via-sky-500/5 to-indigo-500/10 border-2 border-blue-500/30 text-left hover:border-blue-600 hover:bg-blue-50/70 transition-all cursor-pointer group shadow-2xs"
+          title="Instant family tour cost calculation: AC / Non-AC, child age discounts & private room"
+        >
+          <div className="flex items-center justify-between mb-0.5">
+            <span className="flex items-center gap-1.5 text-xs font-black text-zinc-950 group-hover:text-blue-700">
+              <Calculator size={14} className="text-blue-600 stroke-[2.5]" />
+              Tour Calculator
+            </span>
+            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-blue-100 text-blue-900 font-black border border-blue-200">
+              🧮 Fare
+            </span>
+          </div>
+          <p className="text-[10px] text-zinc-500 font-medium">Family PAX, age discounts &amp; room</p>
+        </button>
+
+        {/* AI Assistant Widget */}
         <button
           onClick={() => setIsAiAssistantOpen(true)}
           className="w-full p-2.5 rounded-2xl bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-indigo-500/10 border border-amber-500/20 text-left hover:border-amber-500/40 transition-all cursor-pointer"

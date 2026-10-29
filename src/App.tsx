@@ -50,6 +50,7 @@ import { AddTourInquiryModal } from './components/tourism/AddTourInquiryModal';
 import { AddCustomPackageModal } from './components/tourism/AddCustomPackageModal';
 import { TourPackagePdfModal } from './components/tourism/TourPackagePdfModal';
 import { PackageExplainerModal } from './components/tourism/PackageExplainerModal';
+import { TourCalculatorModal } from './components/tourism/TourCalculatorModal';
 
 import { PublicStorePortal } from './components/public/PublicStorePortal';
 import { GoogleSheetsSyncModal } from './components/sheets/GoogleSheetsSyncModal';
@@ -87,6 +88,8 @@ const MainAppContent: React.FC = () => {
     setIsTourPackagePdfOpen,
     selectedPackageForPdf,
     selectedInquiryForPdf,
+    isTourCalculatorOpen,
+    setIsTourCalculatorOpen,
   } = useData();
 
   const [selectedBatchForBooking, setSelectedBatchForBooking] = useState<string>('');
@@ -270,6 +273,10 @@ const MainAppContent: React.FC = () => {
         inquiry={selectedInquiryForPdf}
       />
       <PackageExplainerModal />
+      <TourCalculatorModal
+        isOpen={isTourCalculatorOpen}
+        onClose={() => setIsTourCalculatorOpen(false)}
+      />
     </div>
   );
 };

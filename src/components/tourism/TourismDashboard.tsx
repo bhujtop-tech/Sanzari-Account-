@@ -155,8 +155,16 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
           <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono">
             {formatCurrency(totalTourAdvance)}
           </div>
-          <div className="text-[11px] text-emerald-700 font-semibold mt-1">
-            Cash Received in Wallets
+          <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center justify-between flex-wrap gap-1">
+            <span>Sahil + Rizwan Wallets</span>
+            {tourWallets.length > 0 && (
+              <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                {tourWallets
+                  .filter((w) => Number(w.currentBalance) > 0)
+                  .map((w) => `${w.name.replace(' (Tour)', '')}: ${formatCurrency(w.currentBalance)}`)
+                  .join(' • ')}
+              </span>
+            )}
           </div>
         </div>
 

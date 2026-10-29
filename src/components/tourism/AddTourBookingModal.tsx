@@ -143,8 +143,11 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   const [paymentMode, setPaymentMode] = useState<TourPaymentMode>('Online');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('UPI');
   const [walletName, setWalletName] = useState<string>(() => {
-    const defaultTour = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan')) || tourWallets[0];
-    return defaultTour?.name || 'Rizwan (Tour)';
+    const isSahil = currentUserProfile?.name?.toLowerCase().includes('sahil') || user?.displayName?.toLowerCase().includes('sahil');
+    const sahilW = tourWallets.find((w) => w.name.toLowerCase().includes('sahil'));
+    const rizwanW = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan'));
+    if (isSahil && sahilW) return sahilW.name;
+    return rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)';
   });
   const [bookedBy, setBookedBy] = useState<string>('Office Staff');
   const [specialNotes, setSpecialNotes] = useState('');
@@ -315,8 +318,11 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
       setAdvancePaid('');
       setPaymentMode('Online');
       setPaymentMethod('UPI');
-      const defaultTour = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan')) || tourWallets[0];
-      setWalletName(defaultTour?.name || 'Rizwan (Tour)');
+      const isSahil = currentUserProfile?.name?.toLowerCase().includes('sahil') || user?.displayName?.toLowerCase().includes('sahil');
+      const sahilW = tourWallets.find((w) => w.name.toLowerCase().includes('sahil'));
+      const rizwanW = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan'));
+      const defaultWallet = isSahil && sahilW ? sahilW.name : (rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)');
+      setWalletName(defaultWallet);
       setBookedBy(currentUserProfile?.name || user?.displayName || 'Office Staff');
       setSpecialNotes('');
       setIsManualPrice(false);

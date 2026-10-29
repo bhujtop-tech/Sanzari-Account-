@@ -172,6 +172,8 @@ interface DataContextType {
   setIsPdfCustomizerOpen: (open: boolean) => void;
   isPackageExplainerOpen: boolean;
   setIsPackageExplainerOpen: (open: boolean) => void;
+  isTourCalculatorOpen: boolean;
+  setIsTourCalculatorOpen: (open: boolean) => void;
 
   // Selected items for modal view
   selectedWalletId: string | null;
@@ -411,6 +413,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isGoogleSheetsOpen, setIsGoogleSheetsOpen] = useState(false);
   const [isPdfCustomizerOpen, setIsPdfCustomizerOpen] = useState(false);
   const [isPackageExplainerOpen, setIsPackageExplainerOpen] = useState(false);
+  const [isTourCalculatorOpen, setIsTourCalculatorOpen] = useState(false);
 
   // Selections
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -688,13 +691,17 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return tourBookings.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
   }, [tourBookings]);
 
+  // Total Advance in Tour: takes from both Sahil & Rizwan tour wallets (and all tour wallets)
   const totalTourAdvance = useMemo(() => {
-    return tourBookings.reduce((sum, b) => sum + (Number(b.advancePaid) || 0), 0);
-  }, [tourBookings]);
+    const walletsSum = tourWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0);
+    const bookingsSum = tourBookings.reduce((sum, b) => sum + (Number(b.advancePaid) || 0), 0);
+    // Combines both Sahil and Rizwan tour wallets
+    return Math.max(walletsSum, bookingsSum);
+  }, [tourWallets, tourBookings]);
 
   const totalTourPending = useMemo(() => {
-    return tourBookings.reduce((sum, b) => sum + (Number(b.pendingAmount) || 0), 0);
-  }, [tourBookings]);
+    return Math.max(0, totalTourRevenue - totalTourAdvance);
+  }, [totalTourRevenue, totalTourAdvance]);
 
   const totalTourPassengers = useMemo(() => {
     return tourBookings.reduce((sum, b) => sum + (Number(b.membersCount) || 1), 0);
@@ -994,6 +1001,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsPdfCustomizerOpen,
         isPackageExplainerOpen,
         setIsPackageExplainerOpen,
+        isTourCalculatorOpen,
+        setIsTourCalculatorOpen,
         selectedWalletId,
         setSelectedWalletId,
         selectedCustomerId,

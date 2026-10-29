@@ -28,6 +28,7 @@ import {
   Luggage,
   Plus,
   FolderPlus,
+  Calculator,
 } from 'lucide-react';
 
 interface SlideMenuProps {
@@ -50,6 +51,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     setIsAddTourBatchOpen,
     setIsAddTourInquiryOpen,
     setIsPackageExplainerOpen,
+    setIsTourCalculatorOpen,
   } = useData();
   const { currentUserProfile, lockApp } = useAuth();
 
@@ -234,6 +236,49 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
                       <span>+ Tour Date</span>
                     </button>
                   </div>
+                </div>
+              )}
+
+              {/* Tourism Tools (Shown in tourism mode) */}
+              {businessMode === 'tourism' && (
+                <div className="p-3 px-4 bg-linear-to-r from-blue-50 to-indigo-50 border-b border-blue-200/50 space-y-2">
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsTourCalculatorOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between text-left cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
+                        <Calculator size={16} />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-zinc-900">Tour Fare Calculator</h4>
+                        <p className="text-[10px] text-blue-700 font-medium">Family PAX, age discounts &amp; rooms</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      onClose();
+                      setIsAiAssistantOpen(true);
+                    }}
+                    className="w-full flex items-center justify-between text-left pt-2 border-t border-blue-200/60 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shadow-xs">
+                        <Sparkles size={16} className="fill-amber-200" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs font-bold text-zinc-900">Ask AI Assistant</h4>
+                        <p className="text-[10px] text-zinc-500">Bookings, batches &amp; business metrics</p>
+                      </div>
+                    </div>
+                    <ChevronRight size={16} className="text-zinc-400" />
+                  </button>
                 </div>
               )}
 
