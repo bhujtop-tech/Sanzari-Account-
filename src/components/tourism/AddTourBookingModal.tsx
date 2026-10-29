@@ -22,12 +22,14 @@ import {
   Unlock,
   Sparkles,
   Car,
+  Settings,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { addTourBooking, updateTourBooking } from '../../services/db';
 import { TourMember, TourType, TravelClass, TourPaymentMode, PaymentMethod, PaymentStatus } from '../../types';
 import { GoogleContactsAutofill } from './GoogleContactsAutofill';
+import { PricingDiscountSettingsPanel } from './PricingDiscountSettingsPanel';
 
 interface AddTourBookingModalProps {
   isOpen: boolean;
@@ -50,11 +52,15 @@ export const calculateAgeFromMonthYear = (birthYear: number, birthMonth: number 
 };
 
 // Helper for child discount badge
-export const getPassengerDiscountBadge = (ageNum: number) => {
+export const getPassengerDiscountBadge = (
+  ageNum: number,
+  child5To7Percent: number = 50,
+  child8To11Percent: number = 75
+) => {
   if (ageNum <= 0) return { label: 'Adult (12+ yrs)', color: 'bg-zinc-100 text-zinc-700 border-zinc-300' };
   if (ageNum < 5) return { label: 'Infant (<5 yrs: Free 0%)', color: 'bg-emerald-100 text-emerald-900 border-emerald-400' };
-  if (ageNum >= 5 && ageNum <= 7) return { label: 'Child (5-7 yrs: 50% Fare)', color: 'bg-amber-100 text-amber-900 border-amber-400' };
-  if (ageNum >= 8 && ageNum <= 11) return { label: 'Child (8-11 yrs: 75% Fare)', color: 'bg-sky-100 text-sky-900 border-sky-400' };
+  if (ageNum >= 5 && ageNum <= 7) return { label: `Child (5-7 yrs: ${child5To7Percent}% Fare)`, color: 'bg-amber-100 text-amber-900 border-amber-400' };
+  if (ageNum >= 8 && ageNum <= 11) return { label: `Child (8-11 yrs: ${child8To11Percent}% Fare)`, color: 'bg-sky-100 text-sky-900 border-sky-400' };
   return { label: 'Adult (12+ yrs: Full Fare)', color: 'bg-zinc-100 text-zinc-800 border-zinc-300' };
 };
 
@@ -87,6 +93,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
     editingTourBooking,
     setEditingTourBooking,
     deleteTourBookingById,
+    tourPricingSettings,
   } = useData();
   const { currentUserProfile, user } = useAuth();
 
@@ -104,7 +111,6 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   const [city, setCity] = useState('Bhuj');
 
   // Travel Class & Package Category
-  // Options: 3AC Train (Base ₹15,999) & Sleeper Train (Base ₹13,999)
   const [travelClass, setTravelClass] = useState<TravelClass>('AC Train');
   const [packageCategory, setPackageCategory] = useState<'Standard' | 'Deluxe' | 'Super Deluxe' | 'Luxury'>('Deluxe');
 
@@ -123,6 +129,9 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
     { name: '', age: '30', gender: 'Male' },
     { name: '', age: '28', gender: 'Female' },
   ]);
+
+  // Pricing & Discount Settings Panel State
+  const [showPricingSettings, setShowPricingSettings] = useState(false);
 
   // Dedicated Auto Age Calculator Tool State
   const [showAgeCalcTool, setShowAgeCalcTool] = useState(false);
@@ -146,16 +155,22 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   // Total PAX
   const membersCount = Math.max(1, adultsCount + kidsCount);
 
+  // Dynamic Pricing Rates from Firestore
+  const currentSleeperPrice = tourPricingSettings?.sleeperPrice ?? 13999;
+  const currentAcTrainPrice = tourPricingSettings?.acTrainPrice ?? 15999;
+  const currentCoupleSurcharge = tourPricingSettings?.coupleRoomSurcharge ?? 3000;
+  const currentChild5To7Percent = tourPricingSettings?.child5To7Percent ?? 50;
+  const currentChild8To11Percent = tourPricingSettings?.child8To11Percent ?? 75;
+
   // Auto-calculate Base Price & Breakdown
-  // Sleeper Train: ₹13,999 | 3AC Train / AC Train: ₹15,999
   const baseRatePerAdult = useMemo(() => {
     if (travelClass === 'Sleeper Train' || travelClass === 'Non-AC Sleeper' || travelClass === 'Non-AC Train') {
-      return 13999;
+      return currentSleeperPrice;
     }
-    return 15999;
-  }, [travelClass]);
+    return currentAcTrainPrice;
+  }, [travelClass, currentSleeperPrice, currentAcTrainPrice]);
 
-  // Calculate Auto Total Amount based on Passenger Ages
+  // Calculate Auto Total Amount based on Passenger Ages, Rates, and Couple Rooms
   const calculatedTotal = useMemo(() => {
     // 1. Adults base amount
     let total = adultsCount * baseRatePerAdult;
@@ -168,29 +183,60 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
           // Free (<5 yrs): 0%
           total += 0;
         } else if (ageNum >= 5 && ageNum <= 7) {
-          // 5-7 yrs: 50% discount (50% fare)
-          total += Math.round(baseRatePerAdult * 0.5);
+          // 5-7 yrs discount fare
+          total += Math.round(baseRatePerAdult * (currentChild5To7Percent / 100));
         } else if (ageNum >= 8 && ageNum <= 11) {
-          // 8-11 yrs: 75% of base fare (25% off)
-          total += Math.round(baseRatePerAdult * 0.75);
+          // 8-11 yrs discount fare
+          total += Math.round(baseRatePerAdult * (currentChild8To11Percent / 100));
         }
       }
     });
 
-    // 3. Couple Separate Room (+₹3,000 per couple)
+    // 3. Couple Separate Room (+₹3,000 / currentCoupleSurcharge per couple)
     if (couplesCount > 0) {
-      total += couplesCount * 3000;
+      total += couplesCount * currentCoupleSurcharge;
     }
 
     return total;
-  }, [adultsCount, baseRatePerAdult, members, couplesCount]);
+  }, [adultsCount, baseRatePerAdult, members, couplesCount, currentCoupleSurcharge, currentChild5To7Percent, currentChild8To11Percent]);
 
   // Update totalAmount when auto-calculating and manual override is off
   useEffect(() => {
-    if (!isManualPrice && !editingTourBooking) {
+    if (!isManualPrice) {
       setTotalAmount(calculatedTotal);
     }
-  }, [calculatedTotal, isManualPrice, editingTourBooking]);
+  }, [calculatedTotal, isManualPrice]);
+
+  // Handler for Couple Room Count changes:
+  // Directly updates totalAmount so clicking '+' ALWAYS adds +₹3,000 (surcharge)
+  // in BOTH new and edit modes, and even if manual override is active!
+  const handleCoupleCountChange = (delta: number) => {
+    const nextCouples = Math.max(0, couplesCount + delta);
+    if (nextCouples === couplesCount) return;
+    const diff = (nextCouples - couplesCount) * currentCoupleSurcharge;
+    setCouplesCount(nextCouples);
+
+    setTotalAmount((prev) => {
+      const currentVal = Number(prev || 0);
+      return Math.max(0, currentVal + diff);
+    });
+  };
+
+  const handleTravelClassChange = (newClass: TravelClass) => {
+    if (travelClass === newClass) return;
+    const oldBase = travelClass === 'Sleeper Train' || travelClass === 'Non-AC Sleeper' || travelClass === 'Non-AC Train'
+      ? currentSleeperPrice
+      : currentAcTrainPrice;
+    const newBase = newClass === 'Sleeper Train' || newClass === 'Non-AC Sleeper' || newClass === 'Non-AC Train'
+      ? currentSleeperPrice
+      : currentAcTrainPrice;
+    const diff = (newBase - oldBase) * adultsCount;
+    setTravelClass(newClass);
+
+    if (isManualPrice) {
+      setTotalAmount((prev) => Math.max(0, Number(prev || 0) + diff));
+    }
+  };
 
   // Reset or pre-fill form state when modal opens or editingTourBooking changes
   useEffect(() => {
@@ -805,7 +851,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
-                  onClick={() => setTravelClass('AC Train')}
+                  onClick={() => handleTravelClassChange('AC Train')}
                   className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                     travelClass === 'AC Train' || travelClass === '3AC Train'
                       ? 'bg-blue-50 border-blue-600 text-zinc-950 shadow-sm ring-2 ring-blue-600'
@@ -814,14 +860,14 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-black text-xs text-zinc-950">🚆 3AC Train Deluxe</span>
-                    <span className="text-xs font-black text-blue-700 font-mono">₹15,999</span>
+                    <span className="text-xs font-black text-blue-700 font-mono">₹{currentAcTrainPrice.toLocaleString('en-IN')}</span>
                   </div>
                   <p className="text-[10px] text-zinc-500 font-semibold mt-0.5">Base Fare per Adult</p>
                 </button>
 
                 <button
                   type="button"
-                  onClick={() => setTravelClass('Sleeper Train')}
+                  onClick={() => handleTravelClassChange('Sleeper Train')}
                   className={`p-3 rounded-2xl border-2 text-left transition-all cursor-pointer ${
                     travelClass === 'Sleeper Train' || travelClass === 'Non-AC Sleeper'
                       ? 'bg-amber-50 border-amber-500 text-zinc-950 shadow-sm ring-2 ring-amber-500'
@@ -830,7 +876,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 >
                   <div className="flex items-center justify-between">
                     <span className="font-black text-xs text-zinc-950">🚂 Sleeper Train</span>
-                    <span className="text-xs font-black text-amber-700 font-mono">₹13,999</span>
+                    <span className="text-xs font-black text-amber-700 font-mono">₹{currentSleeperPrice.toLocaleString('en-IN')}</span>
                   </div>
                   <p className="text-[10px] text-zinc-500 font-semibold mt-0.5">Base Fare per Adult</p>
                 </button>
@@ -902,15 +948,15 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   </div>
                 </div>
 
-                {/* Couple Separate Room (+₹3,000) */}
+                {/* Couple Separate Room (+₹3,000 / currentCoupleSurcharge) */}
                 <div className="bg-zinc-50 p-2.5 rounded-xl border-2 border-zinc-900">
                   <label className="block text-[10px] font-black uppercase text-pink-700 mb-1 flex items-center gap-1">
-                    <Heart size={11} className="fill-pink-500 text-pink-500" /> Couple Room (+3k)
+                    <Heart size={11} className="fill-pink-500 text-pink-500" /> Couple (+₹{currentCoupleSurcharge.toLocaleString('en-IN')})
                   </label>
                   <div className="flex items-center justify-between">
                     <button
                       type="button"
-                      onClick={() => setCouplesCount((prev) => Math.max(0, prev - 1))}
+                      onClick={() => handleCoupleCountChange(-1)}
                       className="w-7 h-7 rounded-lg bg-zinc-200 hover:bg-zinc-300 text-zinc-900 font-black flex items-center justify-center border border-zinc-400 cursor-pointer"
                     >
                       -
@@ -918,7 +964,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     <span className="text-sm font-black text-pink-700 font-mono">{couplesCount}</span>
                     <button
                       type="button"
-                      onClick={() => setCouplesCount((prev) => prev + 1)}
+                      onClick={() => handleCoupleCountChange(1)}
                       className="w-7 h-7 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-black flex items-center justify-center cursor-pointer"
                     >
                       +
@@ -927,17 +973,41 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 </div>
               </div>
 
-              {/* Child Discount Guide Note */}
-              <div className="text-[10px] text-zinc-700 bg-amber-50 p-2.5 rounded-xl border border-amber-300 flex items-center justify-between flex-wrap gap-1 font-semibold">
-                <span>👶 <strong>Child Discounts:</strong></span>
-                <span className="text-emerald-800 font-black">&lt;5 yrs: Free (0%)</span>
-                <span>•</span>
-                <span className="text-amber-800 font-black">5-7 yrs: 50% Fare</span>
-                <span>•</span>
-                <span className="text-sky-800 font-black">8-11 yrs: 75% Fare</span>
-                <span>•</span>
-                <span className="text-pink-800 font-black">Couple Room: +₹3,000</span>
+              {/* Child Discount Guide Note with Settings Gear Icon */}
+              <div className="text-[10px] text-zinc-800 bg-amber-50 p-2.5 rounded-xl border-2 border-amber-300 flex items-center justify-between flex-wrap gap-2 font-semibold shadow-2xs">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>👶 <strong>Child Discounts:</strong></span>
+                  <span className="text-emerald-800 font-black">&lt;5 yrs: Free (0%)</span>
+                  <span>•</span>
+                  <span className="text-amber-800 font-black">5-7 yrs: {currentChild5To7Percent}% Fare</span>
+                  <span>•</span>
+                  <span className="text-sky-800 font-black">8-11 yrs: {currentChild8To11Percent}% Fare</span>
+                  <span>•</span>
+                  <span className="text-pink-800 font-black">Couple Room: +₹{currentCoupleSurcharge.toLocaleString('en-IN')}</span>
+                </div>
+
+                {/* Gear Icon button to open Pricing & Discount Settings */}
+                <button
+                  type="button"
+                  onClick={() => setShowPricingSettings(!showPricingSettings)}
+                  className={`px-2 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1.5 font-black text-[11px] ${
+                    showPricingSettings
+                      ? 'bg-amber-600 text-white border-amber-700 shadow-xs'
+                      : 'bg-white hover:bg-amber-100 text-amber-900 border-amber-300 shadow-2xs'
+                  }`}
+                  title="Configure Package Rates, Child Discounts & Couple Room"
+                >
+                  <Settings size={13} className={showPricingSettings ? 'rotate-90 transition-transform' : ''} />
+                  <span>Configure Rates</span>
+                </button>
               </div>
+
+              {/* Expandable Pricing & Discount Settings Panel */}
+              {showPricingSettings && (
+                <div className="mt-2 animate-in fade-in slide-in-from-top-2">
+                  <PricingDiscountSettingsPanel onClose={() => setShowPricingSettings(false)} />
+                </div>
+              )}
             </div>
 
             {/* 4. Members List (Passenger Manifest) & Auto Age Calculator */}
@@ -1054,7 +1124,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     </span>
                     <span>•</span>
                     <span className="px-2 py-0.5 rounded bg-white border border-amber-300 font-extrabold text-[10px]">
-                      {getPassengerDiscountBadge(calculateAgeFromMonthYear(Number(calcBirthYear), calcBirthMonth)).label}
+                      {getPassengerDiscountBadge(calculateAgeFromMonthYear(Number(calcBirthYear), calcBirthMonth), currentChild5To7Percent, currentChild8To11Percent).label}
                     </span>
                   </div>
                 </div>
@@ -1064,7 +1134,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               <div className="space-y-2.5">
                 {members.map((m, idx) => {
                   const ageNum = Number(m.age || 0);
-                  const discountInfo = getPassengerDiscountBadge(ageNum);
+                  const discountInfo = getPassengerDiscountBadge(ageNum, currentChild5To7Percent, currentChild8To11Percent);
 
                   return (
                     <div
@@ -1189,11 +1259,24 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     <label className="text-[11px] text-zinc-800 font-bold">
                       Total Amount (₹) *
                     </label>
-                    {!isManualPrice && (
-                      <span className="text-[10px] text-blue-700 font-black bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200">
-                        Auto
-                      </span>
-                    )}
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsManualPrice(false);
+                          setTotalAmount(calculatedTotal);
+                        }}
+                        className="text-[10px] font-black text-blue-700 hover:text-blue-900 bg-blue-50 hover:bg-blue-100 px-2 py-0.5 rounded border border-blue-300 transition-colors cursor-pointer flex items-center gap-1"
+                        title="Re-calculate total using current passenger ages, discounts, and couple room"
+                      >
+                        🔄 Auto Calc (₹{calculatedTotal.toLocaleString('en-IN')})
+                      </button>
+                      {!isManualPrice && (
+                        <span className="text-[10px] text-emerald-800 font-black bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-300">
+                          Auto
+                        </span>
+                      )}
+                    </div>
                   </div>
                   <input
                     type="number"

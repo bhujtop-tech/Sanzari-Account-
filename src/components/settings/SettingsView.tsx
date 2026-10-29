@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { updateStoreSettings } from '../../services/db';
 import { Settings, Download, ShieldCheck, Database, FileSpreadsheet, Check } from 'lucide-react';
+import { PricingDiscountSettingsPanel } from '../tourism/PricingDiscountSettingsPanel';
 
 export const SettingsView: React.FC = () => {
   const { settings, sales, customers, expenses, products, wallets, formatCurrency } = useData();
@@ -185,6 +186,9 @@ export const SettingsView: React.FC = () => {
           )}
         </button>
       </form>
+
+      {/* Tour Pricing & Discount Settings (Sanzari Tours) */}
+      <PricingDiscountSettingsPanel />
 
       {/* Backup & CSV Exports */}
       <div className="p-5 rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-3">

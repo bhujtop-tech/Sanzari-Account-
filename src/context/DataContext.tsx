@@ -21,6 +21,8 @@ import {
   TourExpense,
   TourInquiry,
   CustomTourPackage,
+  TourPricingSettings,
+  DEFAULT_TOUR_PRICING,
 } from '../types';
 import {
   initializeStoreDataIfEmpty,
@@ -41,6 +43,8 @@ import {
   subscribeTourExpenses,
   subscribeTourInquiries,
   subscribeCustomTourPackages,
+  subscribeTourPricingSettings,
+  updateTourPricingSettings,
   deleteTourBooking,
   deleteTourBatch,
   deleteTourInquiry,
@@ -108,6 +112,10 @@ interface DataContextType {
   setIsTourReceiptOpen: (open: boolean) => void;
   tourReceiptBooking: TourBooking | null;
   setTourReceiptBooking: (booking: TourBooking | null) => void;
+
+  // Tour Pricing & Discount Settings
+  tourPricingSettings: TourPricingSettings;
+  updateTourPricing: (data: Partial<TourPricingSettings>) => Promise<void>;
 
   // Tour Inquiries & Custom Packages
   tourInquiries: TourInquiry[];
@@ -268,6 +276,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAddTourExpenseOpen, setIsAddTourExpenseOpen] = useState(false);
   const [isTourReceiptOpen, setIsTourReceiptOpen] = useState(false);
   const [tourReceiptBooking, setTourReceiptBooking] = useState<TourBooking | null>(null);
+
+  // Tour Pricing & Discount Settings State
+  const [tourPricingSettings, setTourPricingSettings] = useState<TourPricingSettings>(() => {
+    try {
+      const cached = localStorage.getItem('sz_tour_pricing_settings');
+      return cached ? JSON.parse(cached) : DEFAULT_TOUR_PRICING;
+    } catch {
+      return DEFAULT_TOUR_PRICING;
+    }
+  });
+
+  const updateTourPricing = async (data: Partial<TourPricingSettings>) => {
+    setTourPricingSettings((prev) => ({ ...prev, ...data }));
+    try {
+      await updateTourPricingSettings(data, user?.email || 'admin@sanzari.com');
+    } catch (err) {
+      console.error('Failed to update tour pricing settings:', err);
+    }
+  };
 
   // Inquiries & Custom Packages Modals state
   const [selectedTourInquiryId, setSelectedTourInquiryId] = useState<string | null>(null);
@@ -515,6 +542,13 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       markLoaded();
     });
 
+    const unsubTourPricing = subscribeTourPricingSettings((tp) => {
+      if (tp) {
+        setTourPricingSettings(tp);
+        localStorage.setItem('sz_tour_pricing_settings', JSON.stringify(tp));
+      }
+    });
+
     return () => {
       clearTimeout(safetyTimer);
       unsubWallets();
@@ -534,6 +568,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTourExpenses();
       unsubTourInquiries();
       unsubCustomPackages();
+      unsubTourPricing();
     };
   }, [user]);
 
@@ -904,6 +939,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsTourReceiptOpen,
         tourReceiptBooking,
         setTourReceiptBooking,
+        tourPricingSettings,
+        updateTourPricing,
         tourInquiries,
         setTourInquiries,
         customTourPackages,

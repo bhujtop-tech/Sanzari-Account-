@@ -129,6 +129,24 @@ export interface TourExpense {
   updatedAt?: string;
 }
 
+export interface TourPricingSettings {
+  sleeperPrice: number; // e.g. 13999
+  acTrainPrice: number; // e.g. 15999
+  coupleRoomSurcharge: number; // e.g. 3000
+  child5To7Percent: number; // e.g. 50
+  child8To11Percent: number; // e.g. 75
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
+export const DEFAULT_TOUR_PRICING: TourPricingSettings = {
+  sleeperPrice: 13999,
+  acTrainPrice: 15999,
+  coupleRoomSurcharge: 3000,
+  child5To7Percent: 50,
+  child8To11Percent: 75,
+};
+
 // ==========================================
 // INQUIRY & CUSTOM TOUR PACKAGE MANAGEMENT
 // ==========================================

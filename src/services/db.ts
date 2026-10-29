@@ -41,6 +41,8 @@ import {
   PaymentStatus,
   ExpenseCategory,
   TourPaymentMode,
+  TourPricingSettings,
+  DEFAULT_TOUR_PRICING,
 } from '../types';
 import {
   INITIAL_WALLETS,
@@ -1770,6 +1772,99 @@ export async function updateStoreSettings(data: Partial<StoreSettings>): Promise
     );
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, 'settings/store_config');
+    throw error;
+  }
+}
+
+// ----------------------------------------------------
+// TOUR PRICING & DISCOUNT SETTINGS (Synced with Firestore)
+// ----------------------------------------------------
+export function subscribeTourPricingSettings(callback: (settings: TourPricingSettings) => void) {
+  const tourPricingRef = doc(db, 'settings', 'tourPricing');
+  return onSnapshot(
+    tourPricingRef,
+    async (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        callback({
+          ...DEFAULT_TOUR_PRICING,
+          ...data,
+          sleeperPrice: Number(data.sleeperPrice || DEFAULT_TOUR_PRICING.sleeperPrice),
+          acTrainPrice: Number(data.acTrainPrice || DEFAULT_TOUR_PRICING.acTrainPrice),
+          coupleRoomSurcharge: Number(data.coupleRoomSurcharge ?? DEFAULT_TOUR_PRICING.coupleRoomSurcharge),
+          child5To7Percent: Number(data.child5To7Percent ?? DEFAULT_TOUR_PRICING.child5To7Percent),
+          child8To11Percent: Number(data.child8To11Percent ?? DEFAULT_TOUR_PRICING.child8To11Percent),
+        });
+      } else {
+        // Fallback: check if store_config has tourPricing
+        try {
+          const storeSnap = await getDoc(doc(db, 'settings', 'store_config'));
+          if (storeSnap.exists() && storeSnap.data().tourPricing) {
+            const data = storeSnap.data().tourPricing;
+            callback({
+              ...DEFAULT_TOUR_PRICING,
+              ...data,
+              sleeperPrice: Number(data.sleeperPrice || DEFAULT_TOUR_PRICING.sleeperPrice),
+              acTrainPrice: Number(data.acTrainPrice || DEFAULT_TOUR_PRICING.acTrainPrice),
+              coupleRoomSurcharge: Number(data.coupleRoomSurcharge ?? DEFAULT_TOUR_PRICING.coupleRoomSurcharge),
+              child5To7Percent: Number(data.child5To7Percent ?? DEFAULT_TOUR_PRICING.child5To7Percent),
+              child8To11Percent: Number(data.child8To11Percent ?? DEFAULT_TOUR_PRICING.child8To11Percent),
+            });
+            return;
+          }
+        } catch {
+          // Ignore
+        }
+        callback(DEFAULT_TOUR_PRICING);
+      }
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.GET, 'settings/tourPricing');
+      callback(DEFAULT_TOUR_PRICING);
+    }
+  );
+}
+
+export async function updateTourPricingSettings(
+  data: Partial<TourPricingSettings>,
+  userEmail?: string
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    const cleanData = sanitizeForFirestore({
+      ...data,
+      updatedAt: now,
+      updatedBy: userEmail || 'system',
+    });
+
+    // 1. Save in settings/tourPricing
+    const tourPricingRef = doc(db, 'settings', 'tourPricing');
+    await setDoc(tourPricingRef, cleanData, { merge: true });
+
+    // 2. Also merge into settings/store_config.tourPricing without deleting anything
+    const storeConfigRef = doc(db, 'settings', 'store_config');
+    await setDoc(
+      storeConfigRef,
+      {
+        tourPricing: cleanData,
+        updatedAt: now,
+      },
+      { merge: true }
+    );
+
+    // Audit log
+    if (userEmail) {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'UPDATE_TOUR_PRICING_SETTINGS',
+        recordType: 'settings',
+        recordId: 'tourPricing',
+        newValue: JSON.stringify(cleanData),
+        timestamp: now,
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.WRITE, 'settings/tourPricing');
     throw error;
   }
 }
