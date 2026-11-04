@@ -3,7 +3,12 @@ import autoTable from 'jspdf-autotable';
 import { TourBooking, TourBatch } from '../types';
 
 export type MembersDisplayMode = 'all_members' | 'first_person_only' | 'one_row_per_member';
-export type AmountDisplayPreset = 'all_amounts' | 'due_only' | 'advance_only' | 'advance_and_due' | 'no_amounts';
+export type AmountDisplayPreset =
+  | 'all_amounts'
+  | 'due_only'
+  | 'advance_only'
+  | 'advance_and_due'
+  | 'no_amounts';
 
 export interface TourPDFCustomConfig {
   // Header & Metadata
@@ -11,9 +16,9 @@ export interface TourPDFCustomConfig {
   subtitle?: string;
   batch?: TourBatch | null;
   filterLabel?: string;
-  orientation?: 'landscape' | 'portrait';
+  orientation?: 'portrait' | 'landscape';
 
-  // Booking Status Filter inside generator (optional)
+  // Booking Status Filter inside generator
   paymentFilter?: 'ALL' | 'Due' | 'Paid';
 
   // Members Display Mode
@@ -40,7 +45,7 @@ export interface TourPDFCustomConfig {
 export const DEFAULT_PDF_CONFIG: Required<
   Omit<TourPDFCustomConfig, 'title' | 'subtitle' | 'batch' | 'filterLabel'>
 > = {
-  orientation: 'landscape',
+  orientation: 'portrait', // Standard A4 Vertical by default
   paymentFilter: 'ALL',
   membersMode: 'all_members',
   showBookingIdAndDate: true,
@@ -83,7 +88,7 @@ export const generateTourGroupPDF = (
     ...options,
   };
 
-  // Filter bookings by paymentFilter if requested
+  // Filter bookings by paymentFilter
   const filteredBookings = bookings.filter((b) => {
     const tot = Number(b.totalAmount || 0);
     const adv = Number(b.advancePaid || 0);
@@ -101,6 +106,7 @@ export const generateTourGroupPDF = (
     return (a.bookingNumber || '').localeCompare(b.bookingNumber || '');
   });
 
+  // Always A4 format (210mm x 297mm in portrait)
   const doc = new jsPDF({
     orientation: cfg.orientation,
     unit: 'mm',
@@ -109,15 +115,21 @@ export const generateTourGroupPDF = (
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
+  const marginX = 10;
+  const contentWidth = pageWidth - marginX * 2;
 
   // Compute Summary Metrics
   const totalBookings = sortedBookings.length;
   const totalPax = sortedBookings.reduce(
-    (sum, b) => sum + (Number(b.membersCount) || (Array.isArray(b.members) ? b.members.length : 1)),
+    (sum, b) =>
+      sum + (Number(b.membersCount) || (Array.isArray(b.members) ? b.members.length : 1)),
     0
   );
   const totalPackageValue = sortedBookings.reduce((sum, b) => sum + Number(b.totalAmount || 0), 0);
-  const totalAdvanceReceived = sortedBookings.reduce((sum, b) => sum + Number(b.advancePaid || 0), 0);
+  const totalAdvanceReceived = sortedBookings.reduce(
+    (sum, b) => sum + Number(b.advancePaid || 0),
+    0
+  );
   const totalBaakiDue = sortedBookings.reduce((sum, b) => {
     const tot = Number(b.totalAmount || 0);
     const adv = Number(b.advancePaid || 0);
@@ -155,263 +167,336 @@ export const generateTourGroupPDF = (
   });
 
   // ---------------------------------------------------------
-  // 1. TOP HEADER BANNER
+  // 1. MODERN EXECUTIVE HEADER BANNER (A4 PROPORTIONED)
   // ---------------------------------------------------------
-  doc.setFillColor(15, 23, 42);
-  doc.rect(0, 0, pageWidth, 26, 'F');
+  // Dark Navy Header Background
+  doc.setFillColor(11, 17, 32); // #0B1120
+  doc.rect(0, 0, pageWidth, 30, 'F');
 
+  // Gold Accent Stripe under Header
+  doc.setFillColor(245, 158, 11); // #F59E0B Amber/Gold
+  doc.rect(0, 30, pageWidth, 1.5, 'F');
+
+  // Brand Title (Left)
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(16);
-  doc.text('SANZARI TOURS & TRAVELS', 12, 11);
+  doc.setFontSize(15);
+  doc.text('SANZARI TOURS & TRAVELS', marginX, 11.5);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.setTextColor(251, 191, 36); // Amber Gold
+  doc.text('BHUJ (KUTCH)  •  OFFICIAL GROUP BOOKINGS & PAYMENT STATEMENT', marginX, 16.5);
 
   const modeDesc =
     cfg.membersMode === 'first_person_only'
-      ? 'Customer / Lead Person Summary List'
+      ? 'Customer / Lead Person Summary Sheet'
       : cfg.membersMode === 'one_row_per_member'
-      ? 'Individual Passenger-Wise Manifest'
-      : 'Group Bookings & All Passengers Manifest';
+      ? 'Passenger-Wise Serial Manifest'
+      : 'Complete Booking-Wise & Family Members Manifest';
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9);
+  doc.setFontSize(8);
   doc.setTextColor(203, 213, 225);
-  doc.text(modeDesc, 12, 17.5);
+  doc.text(modeDesc, marginX, 22.5);
 
+  // Group / Folder Title Badge (Right Side)
   const reportTitle = options.batch
-    ? `GROUP: ${options.batch.title.toUpperCase()} (${options.batch.destination.toUpperCase()})`
+    ? `${options.batch.title.toUpperCase()} — ${options.batch.destination.toUpperCase()}`
     : options.title
     ? options.title.toUpperCase()
-    : 'CONFIRMED TOUR BOOKINGS LIST';
+    : 'ALL CONFIRMED TOUR BOOKINGS';
 
   const reportSub = options.batch
-    ? `Departure: ${formatDisplayDate(options.batch.departureDate)}  |  ${totalBookings} Bookings (${totalPax} PAX)`
+    ? `Departure: ${formatDisplayDate(options.batch.departureDate)}  |  Mode: ${
+        options.batch.travelMode || 'Train'
+      }`
     : options.subtitle ||
       options.filterLabel ||
-      `${totalBookings} Bookings  |  ${totalPax} Passengers (PAX)`;
+      `Active Bookings: ${totalBookings}  |  Total Travelers: ${totalPax} PAX`;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(11);
-  doc.setTextColor(250, 204, 21);
-  doc.text(reportTitle, pageWidth - 12, 11, { align: 'right' });
+  doc.setTextColor(255, 255, 255);
+  doc.text(reportTitle, pageWidth - marginX, 11.5, { align: 'right' });
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8.5);
+  doc.setFontSize(8);
   doc.setTextColor(226, 232, 240);
-  doc.text(reportSub, pageWidth - 12, 17, { align: 'right' });
+  doc.text(reportSub, pageWidth - marginX, 17, { align: 'right' });
 
-  doc.setFontSize(7.5);
+  doc.setFontSize(7.2);
   doc.setTextColor(148, 163, 184);
   doc.text(
-    `Printed: ${new Date().toLocaleString('en-IN', {
+    `Generated: ${new Date().toLocaleString('en-IN', {
       day: '2-digit',
       month: 'short',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
     })}`,
-    pageWidth - 12,
+    pageWidth - marginX,
     22.5,
     { align: 'right' }
   );
 
   // ---------------------------------------------------------
-  // 2. KPI SUMMARY BOXES (Optional)
+  // 2. MODERN 4-CARD KPI SUMMARY STRIP
   // ---------------------------------------------------------
-  let tableStartY = 31;
+  let tableStartY = 36;
   const anyAmountShown = cfg.showTotalAmount || cfg.showAdvanceAmount || cfg.showDueAmount;
 
   if (cfg.showTopSummaryCards) {
-    const boxY = 30;
-    const boxHeight = 18;
-    const gap = 3.5;
-    const availableWidth = pageWidth - 24;
+    const boxY = 35;
+    const boxHeight = 19;
+    const gap = 3;
 
     if (anyAmountShown) {
-      const boxWidth = (availableWidth - gap * 3) / 4;
+      const boxWidth = (contentWidth - gap * 3) / 4;
 
-      // Box 1: Bookings & PAX
-      const x1 = 12;
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(203, 213, 225);
-      doc.setLineWidth(0.35);
-      doc.roundedRect(x1, boxY, boxWidth, boxHeight, 2, 2, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text('BOOKINGS & TRAVELERS', x1 + 3.5, boxY + 5.5);
-      doc.setFontSize(11.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(`${totalBookings} Bookings | ${totalPax} PAX`, x1 + 3.5, boxY + 12.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Paid: ${fullPaidCount}  •  Due: ${baakiCount}`, x1 + 3.5, boxY + 16.5);
+      // Helper to draw a modern card with top colored accent bar
+      const drawModernCard = (
+        x: number,
+        accentRgb: [number, number, number],
+        bgRgb: [number, number, number],
+        borderRgb: [number, number, number],
+        label: string,
+        mainValue: string,
+        valueRgb: [number, number, number],
+        subText: string
+      ) => {
+        doc.setFillColor(...bgRgb);
+        doc.setDrawColor(...borderRgb);
+        doc.setLineWidth(0.3);
+        doc.roundedRect(x, boxY, boxWidth, boxHeight, 2, 2, 'FD');
 
-      // Box 2: Total Package
-      const x2 = x1 + boxWidth + gap;
-      doc.setFillColor(248, 250, 252);
-      doc.setDrawColor(203, 213, 225);
-      doc.roundedRect(x2, boxY, boxWidth, boxHeight, 2, 2, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(100, 116, 139);
-      doc.text('TOTAL PACKAGE AMOUNT', x2 + 3.5, boxY + 5.5);
-      doc.setFontSize(11.5);
-      doc.setTextColor(15, 23, 42);
-      doc.text(cfg.showTotalAmount ? formatRs(totalPackageValue) : '-', x2 + 3.5, boxY + 12.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(71, 85, 105);
-      doc.text(`Total Booked Package Value`, x2 + 3.5, boxY + 16.5);
+        // Top accent bar inside card
+        doc.setFillColor(...accentRgb);
+        doc.rect(x + 0.5, boxY + 0.5, boxWidth - 1, 1.5, 'F');
 
-      // Box 3: Advance / Received
-      const x3 = x2 + boxWidth + gap;
-      doc.setFillColor(236, 253, 245);
-      doc.setDrawColor(16, 185, 129);
-      doc.roundedRect(x3, boxY, boxWidth, boxHeight, 2, 2, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(6, 95, 70);
-      doc.text('ADVANCE / RECEIVED', x3 + 3.5, boxY + 5.5);
-      doc.setFontSize(11.5);
-      doc.setTextColor(4, 120, 87);
-      doc.text(cfg.showAdvanceAmount ? formatRs(totalAdvanceReceived) : '-', x3 + 3.5, boxY + 12.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.8);
-      doc.setTextColor(6, 95, 70);
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(6.8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(label, x + 3, boxY + 6);
+
+        doc.setFont('helvetica', 'bold');
+        doc.setFontSize(10.5);
+        doc.setTextColor(...valueRgb);
+        doc.text(mainValue, x + 3, boxY + 12.5);
+
+        doc.setFont('helvetica', 'normal');
+        doc.setFontSize(6.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(subText, x + 3, boxY + 16.8);
+      };
+
       const sahilAmt = walletTotals['Sahil (Tour)'] || 0;
       const rizwanAmt = walletTotals['Rizwan (Tour)'] || 0;
-      doc.text(
+
+      // Card 1: Bookings & PAX
+      drawModernCard(
+        marginX,
+        [15, 23, 42],
+        [248, 250, 252],
+        [203, 213, 225],
+        'BOOKINGS & PAX',
+        `${totalBookings} Bkgs  |  ${totalPax} PAX`,
+        [15, 23, 42],
+        `Full Paid: ${fullPaidCount}  •  Due: ${baakiCount}`
+      );
+
+      // Card 2: Total Package Value
+      drawModernCard(
+        marginX + (boxWidth + gap) * 1,
+        [37, 99, 235],
+        [248, 250, 252],
+        [203, 213, 225],
+        'TOTAL PACKAGE VALUE',
+        cfg.showTotalAmount ? formatRs(totalPackageValue) : '-',
+        [15, 23, 42],
+        `Across ${totalBookings} confirmed bookings`
+      );
+
+      // Card 3: Advance / Received
+      drawModernCard(
+        marginX + (boxWidth + gap) * 2,
+        [16, 185, 129],
+        [240, 253, 244],
+        [134, 239, 172],
+        'ADVANCE / RECEIVED',
+        cfg.showAdvanceAmount ? formatRs(totalAdvanceReceived) : '-',
+        [4, 120, 87],
         cfg.showAccountAndMode
           ? `Sahil: ${formatRs(sahilAmt)} | Rizwan: ${formatRs(rizwanAmt)}`
-          : 'Total Payment Received',
-        x3 + 3.5,
-        boxY + 16.5
+          : 'Total Amount Collected'
       );
 
-      // Box 4: Remaining Baaki (Due)
-      const x4 = x3 + boxWidth + gap;
-      doc.setFillColor(254, 242, 242);
-      doc.setDrawColor(244, 63, 94);
-      doc.roundedRect(x4, boxY, boxWidth, boxHeight, 2, 2, 'FD');
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.5);
-      doc.setTextColor(159, 18, 57);
-      doc.text('REMAINING BAAKI (DUE)', x4 + 3.5, boxY + 5.5);
-      doc.setFontSize(11.5);
-      doc.setTextColor(190, 18, 60);
-      doc.text(cfg.showDueAmount ? formatRs(totalBaakiDue) : '-', x4 + 3.5, boxY + 12.5);
-      doc.setFont('helvetica', 'normal');
-      doc.setFontSize(7);
-      doc.setTextColor(159, 18, 57);
-      doc.text(
-        baakiCount > 0 ? `Pending from ${baakiCount} booking(s)` : 'All bookings Full Paid',
-        x4 + 3.5,
-        boxY + 16.5
+      // Card 4: Remaining Baaki (Due)
+      drawModernCard(
+        marginX + (boxWidth + gap) * 3,
+        [244, 63, 94],
+        [255, 241, 242],
+        [253, 164, 175],
+        'REMAINING BAAKI (DUE)',
+        cfg.showDueAmount ? formatRs(totalBaakiDue) : '-',
+        [190, 18, 60],
+        baakiCount > 0 ? `Pending from ${baakiCount} booking(s)` : 'All bookings 100% Paid'
       );
+
+      tableStartY = 58;
     } else {
-      // No-amount summary bar (For Hotel / Tour Manager / Bus Sheet)
+      // Compact Summary Strip when Money is hidden (Hotel / Bus / Tour Manager Sheet)
       doc.setFillColor(248, 250, 252);
       doc.setDrawColor(203, 213, 225);
-      doc.roundedRect(12, boxY, availableWidth, 12, 2, 2, 'FD');
+      doc.setLineWidth(0.3);
+      doc.roundedRect(marginX, boxY, contentWidth, 11, 2, 2, 'FD');
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(9.5);
+      doc.setFontSize(8.8);
       doc.setTextColor(15, 23, 42);
       doc.text(
-        `Total Confirmed Bookings: ${totalBookings}   |   Total Passengers (PAX): ${totalPax}`,
-        16,
-        boxY + 7.5
+        `Total Confirmed Bookings: ${totalBookings}    •    Total Passengers (PAX): ${totalPax}`,
+        marginX + 4,
+        boxY + 7
       );
-      tableStartY = 46;
-    }
-
-    if (anyAmountShown) {
-      tableStartY = 52;
+      tableStartY = 50;
     }
   }
 
   // ---------------------------------------------------------
-  // 3. BUILD DYNAMIC COLUMNS & ROWS
+  // 3. BUILD A4-OPTIMIZED COLUMNS & ROWS
   // ---------------------------------------------------------
+  // On Portrait A4 (190mm content width), we combine Booking ID + Customer info cleanly so every column has generous breathing room!
   interface ColDef {
     key: string;
     header: string;
     align?: 'left' | 'center' | 'right';
     bold?: boolean;
+    widthWeight: number;
   }
 
-  const columns: ColDef[] = [{ key: 'index', header: '#', align: 'center', bold: true }];
+  const columns: ColDef[] = [
+    { key: 'index', header: '#', align: 'center', bold: true, widthWeight: 7 },
+  ];
 
-  if (cfg.showBookingIdAndDate) {
-    columns.push({ key: 'bookingInfo', header: 'Booking ID & Date', bold: true });
-  }
+  const hasCustomerCol =
+    cfg.showBookingIdAndDate || cfg.showCustomerName || cfg.showCustomerPhone || cfg.showCity;
 
   if (cfg.membersMode === 'one_row_per_member') {
-    columns.push({ key: 'passengerName', header: 'Passenger Name', bold: true });
-    columns.push({ key: 'passengerAgeGender', header: 'Age / Gender', align: 'center' });
-    if (cfg.showCustomerName || cfg.showCustomerPhone || cfg.showCity) {
-      columns.push({ key: 'customerContact', header: 'Booked By (Main Customer)' });
+    columns.push({
+      key: 'passengerName',
+      header: 'Passenger Name & Berth',
+      bold: true,
+      widthWeight: 38,
+    });
+    columns.push({
+      key: 'passengerAgeGender',
+      header: 'Age / Gender',
+      align: 'center',
+      widthWeight: 18,
+    });
+    if (hasCustomerCol) {
+      columns.push({
+        key: 'customerContact',
+        header: 'Customer / Booking Info',
+        widthWeight: 36,
+      });
     }
   } else {
-    if (cfg.showCustomerName || cfg.showCustomerPhone || cfg.showCity) {
-      const custHeader =
-        cfg.membersMode === 'first_person_only'
-          ? 'Main Customer / First Person'
-          : 'Customer & Contact';
-      columns.push({ key: 'customerContact', header: custHeader, bold: true });
+    if (hasCustomerCol) {
+      columns.push({
+        key: 'customerContact',
+        header:
+          cfg.membersMode === 'first_person_only'
+            ? 'Customer / 1st Person & Contact'
+            : 'Customer & Booking Details',
+        bold: true,
+        widthWeight: cfg.membersMode === 'first_person_only' ? 48 : 38,
+      });
     }
 
     if (cfg.showPaxCount) {
-      columns.push({ key: 'pax', header: 'PAX', align: 'center', bold: true });
+      columns.push({
+        key: 'pax',
+        header: 'PAX',
+        align: 'center',
+        bold: true,
+        widthWeight: 11,
+      });
     }
 
     if (cfg.membersMode === 'all_members') {
       columns.push({
         key: 'membersList',
-        header: 'All Members (Name, Age, Gender)',
+        header: 'Passengers List (Name, Age, Gender)',
+        widthWeight: 54,
       });
     } else if (cfg.membersMode === 'first_person_only' && cfg.showSpecialNotes) {
       columns.push({
         key: 'notesOnly',
         header: 'Room / Special Notes',
+        widthWeight: 32,
       });
     }
   }
 
   if (cfg.showTravelClass) {
-    columns.push({ key: 'travelClass', header: 'Travel Mode' });
+    columns.push({
+      key: 'travelClass',
+      header: 'Class / Mode',
+      align: 'center',
+      widthWeight: 20,
+    });
   }
 
   if (cfg.showTotalAmount) {
-    columns.push({ key: 'totalAmount', header: 'Total Amount', align: 'right', bold: true });
+    columns.push({
+      key: 'totalAmount',
+      header: 'Total Package',
+      align: 'right',
+      bold: true,
+      widthWeight: 22,
+    });
   }
 
   if (cfg.showAdvanceAmount) {
     columns.push({
       key: 'advanceAmount',
-      header: cfg.showAccountAndMode ? 'Advance / Recd (Account & Mode)' : 'Advance / Recd',
+      header: cfg.showAccountAndMode ? 'Received (Account & Mode)' : 'Advance / Recd',
       align: 'right',
       bold: true,
+      widthWeight: cfg.showAccountAndMode ? 28 : 22,
     });
   } else if (cfg.showAccountAndMode) {
     columns.push({
       key: 'accountModeOnly',
       header: 'Account & Mode',
       align: 'center',
+      widthWeight: 22,
     });
   }
 
   if (cfg.showDueAmount) {
-    columns.push({ key: 'dueAmount', header: 'Baaki (Due)', align: 'right', bold: true });
+    columns.push({
+      key: 'dueAmount',
+      header: 'Baaki (Due)',
+      align: 'right',
+      bold: true,
+      widthWeight: 22,
+    });
   }
 
   if (cfg.showPaymentStatus) {
-    columns.push({ key: 'paymentStatus', header: 'Status', align: 'center', bold: true });
+    columns.push({
+      key: 'paymentStatus',
+      header: 'Status',
+      align: 'center',
+      bold: true,
+      widthWeight: 18,
+    });
   }
 
   // Build Body Rows
   const bodyRows: string[][] = [];
-  // Track row metadata for coloring Due / Status cells
   const rowMeta: Array<{ isPaid: boolean; due: number }> = [];
 
   if (cfg.membersMode === 'one_row_per_member') {
@@ -441,9 +526,6 @@ export const generateTourGroupPDF = (
             case 'index':
               row.push(String(pIndex++));
               break;
-            case 'bookingInfo':
-              row.push(`${b.bookingNumber || '-'}\n${formatDisplayDate(b.tourDate)}`);
-              break;
             case 'passengerName': {
               const berth =
                 m.seatBerthPreference && m.seatBerthPreference !== 'No Preference'
@@ -458,7 +540,7 @@ export const generateTourGroupPDF = (
             }
             case 'passengerAgeGender': {
               const ageStr = m.age ? `${m.age} yrs` : 'Adult';
-              const genStr = m.gender ? ` • ${m.gender}` : '';
+              const genStr = m.gender ? ` • ${m.gender.charAt(0).toUpperCase()}` : '';
               row.push(`${ageStr}${genStr}`);
               break;
             }
@@ -466,7 +548,9 @@ export const generateTourGroupPDF = (
               const parts: string[] = [];
               if (cfg.showCustomerName) parts.push(b.customerName || '-');
               if (cfg.showCustomerPhone && b.customerPhone) parts.push(`Ph: ${b.customerPhone}`);
-              if (cfg.showCity && b.city) parts.push(`City: ${b.city}`);
+              if (cfg.showBookingIdAndDate) {
+                parts.push(`${b.bookingNumber || ''} • ${formatDisplayDate(b.tourDate)}`);
+              }
               row.push(parts.join('\n') || '-');
               break;
             }
@@ -484,7 +568,7 @@ export const generateTourGroupPDF = (
                 const modeLabel = b.paymentMode || 'UPI';
                 row.push(
                   cfg.showAccountAndMode
-                    ? `${formatRs(adv)}\n(${walletLabel} • ${modeLabel})`
+                    ? `${formatRs(adv)}\n[${walletLabel} • ${modeLabel}]`
                     : formatRs(adv)
                 );
               }
@@ -500,9 +584,7 @@ export const generateTourGroupPDF = (
               row.push(isFirstInBooking ? (due === 0 ? 'Rs. 0' : formatRs(due)) : '-');
               break;
             case 'paymentStatus':
-              row.push(
-                isFirstInBooking ? (isFullPaid ? 'FULL PAID' : 'BAAKI DUE') : '"'
-              );
+              row.push(isFirstInBooking ? (isFullPaid ? 'FULL PAID' : 'DUE') : '-');
               break;
             default:
               row.push('-');
@@ -520,7 +602,8 @@ export const generateTourGroupPDF = (
       const adv = Number(b.advancePaid || 0);
       const due = Math.max(0, total - adv);
       const isFullPaid = due === 0 && total > 0;
-      const paxCount = Number(b.membersCount) || (Array.isArray(b.members) ? b.members.length : 1);
+      const paxCount =
+        Number(b.membersCount) || (Array.isArray(b.members) ? b.members.length : 1);
 
       const firstMemberName =
         Array.isArray(b.members) && b.members.length > 0 ? b.members[0].name : b.customerName;
@@ -540,7 +623,8 @@ export const generateTourGroupPDF = (
               .join('\n')
           : `1. ${b.customerName}`;
 
-      const notesLine = cfg.showSpecialNotes && b.specialNotes ? `\nNote: ${b.specialNotes}` : '';
+      const notesLine =
+        cfg.showSpecialNotes && b.specialNotes ? `\nNote: ${b.specialNotes}` : '';
 
       // Payment & wallet info (Account + Payment Mode)
       const walletLabel = (b.walletName || 'Rizwan (Tour)').replace(' (Tour)', '');
@@ -553,36 +637,35 @@ export const generateTourGroupPDF = (
           const instBreakdown = instList
             .map(
               (p, idxNum) =>
-                `${idxNum + 1}) ${formatRs(p.amount)} [${(p.walletName || walletLabel).replace(' (Tour)', '')}-${p.paymentMode || modeLabel}]`
+                `${idxNum + 1}) ${formatRs(p.amount)} [${(p.walletName || walletLabel).replace(
+                  ' (Tour)',
+                  ''
+                )}-${p.paymentMode || modeLabel}]`
             )
             .join('\n');
           receivedSub = `${formatRs(adv)}\n${instBreakdown}`;
         } else if (instList.length === 1) {
           const p = instList[0];
-          receivedSub = `${formatRs(adv)}\n(${(p.walletName || walletLabel).replace(' (Tour)', '')} • ${p.paymentMode || modeLabel})`;
+          receivedSub = `${formatRs(adv)}\n[${(p.walletName || walletLabel).replace(
+            ' (Tour)',
+            ''
+          )} • ${p.paymentMode || modeLabel}]`;
         } else {
-          receivedSub = `${formatRs(adv)}\n(${walletLabel} • ${modeLabel})`;
+          receivedSub = `${formatRs(adv)}\n[${walletLabel} • ${modeLabel}]`;
         }
       }
 
       const statusLabel = isFullPaid
-        ? 'FULL PAID\n(Rs. 0 Due)'
+        ? 'FULL PAID'
         : adv > 0
-        ? `BAAKI DUE\n(${Math.round((adv / Math.max(1, total)) * 100)}% Paid)`
-        : 'UNPAID DUE';
+        ? `DUE\n(${Math.round((adv / Math.max(1, total)) * 100)}% Paid)`
+        : 'UNPAID';
 
       const row: string[] = [];
       columns.forEach((col) => {
         switch (col.key) {
           case 'index':
             row.push(String(idx + 1));
-            break;
-          case 'bookingInfo':
-            row.push(
-              `${b.bookingNumber || '-'}\n${formatDisplayDate(b.tourDate)}${
-                b.destination ? `\n${b.destination}` : ''
-              }`
-            );
             break;
           case 'customerContact': {
             const lines: string[] = [];
@@ -596,10 +679,12 @@ export const generateTourGroupPDF = (
               lines.push(displayName);
             }
             if (cfg.showCustomerPhone && b.customerPhone) {
-              lines.push(`Ph: ${b.customerPhone}`);
-            }
-            if (cfg.showCity && b.city) {
+              lines.push(`Ph: ${b.customerPhone}${cfg.showCity && b.city ? ` • ${b.city}` : ''}`);
+            } else if (cfg.showCity && b.city) {
               lines.push(`City: ${b.city}`);
+            }
+            if (cfg.showBookingIdAndDate) {
+              lines.push(`${b.bookingNumber || '-'}  •  ${formatDisplayDate(b.tourDate)}`);
             }
             row.push(lines.join('\n') || '-');
             break;
@@ -614,7 +699,7 @@ export const generateTourGroupPDF = (
             row.push(b.specialNotes || '-');
             break;
           case 'travelClass':
-            row.push(`${b.travelClass || 'Train'}\n(${b.tourType || 'Group'})`);
+            row.push(`${b.travelClass || 'Train'}`);
             break;
           case 'totalAmount':
             row.push(formatRs(total));
@@ -644,14 +729,12 @@ export const generateTourGroupPDF = (
   // Build Footer Row
   const footRow: string[] = columns.map((col, idx) => {
     if (idx === 0) return '';
-    if (idx === 1) return 'GRAND TOTAL';
+    if (idx === 1) return `GRAND TOTAL (${totalBookings} Bookings)`;
     switch (col.key) {
-      case 'customerContact':
-        return `${totalBookings} Bookings`;
       case 'pax':
         return `${totalPax} PAX`;
       case 'membersList':
-        return `Total Travelers: ${totalPax} PAX  |  Full Paid: ${fullPaidCount}  |  Baaki Due: ${baakiCount}`;
+        return `Total Travelers: ${totalPax} PAX   •   Paid: ${fullPaidCount}   •   Due: ${baakiCount}`;
       case 'totalAmount':
         return formatRs(totalPackageValue);
       case 'advanceAmount':
@@ -659,24 +742,23 @@ export const generateTourGroupPDF = (
       case 'dueAmount':
         return formatRs(totalBaakiDue);
       case 'paymentStatus':
-        return totalBaakiDue === 0 ? 'ALL PAID' : 'DUE PENDING';
+        return totalBaakiDue === 0 ? 'ALL PAID' : 'DUE';
       default:
         return '';
     }
   });
 
-  // Dynamic Column Styles
+  // Calculate Proportional Column Widths to fit 100% of contentWidth (190mm on A4 Portrait)
+  const totalWeight = columns.reduce((sum, c) => sum + c.widthWeight, 0);
   const columnStyles: Record<number, any> = {};
   columns.forEach((col, i) => {
+    const colWidth = Math.floor((col.widthWeight / totalWeight) * contentWidth * 10) / 10;
     columnStyles[i] = {
+      cellWidth: colWidth,
       halign: col.align || 'left',
       fontStyle: col.bold ? 'bold' : 'normal',
     };
-    if (col.key === 'index') {
-      columnStyles[i].cellWidth = 9;
-    } else if (col.key === 'pax') {
-      columnStyles[i].cellWidth = 13;
-    } else if (col.key === 'Advance' || col.key === 'advanceAmount') {
+    if (col.key === 'advanceAmount') {
       columnStyles[i].textColor = [4, 120, 87];
     }
   });
@@ -693,29 +775,41 @@ export const generateTourGroupPDF = (
     theme: 'grid',
     styles: {
       font: 'helvetica',
-      fontSize: columns.length > 8 ? 8 : 8.8,
-      cellPadding: 2.5,
+      fontSize: cfg.orientation === 'portrait' && columns.length >= 7 ? 7.6 : 8.4,
+      cellPadding: 2.4,
       textColor: [15, 23, 42],
-      lineColor: [203, 213, 225],
+      lineColor: [226, 232, 240],
       lineWidth: 0.25,
       valign: 'middle',
+      overflow: 'linebreak',
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252],
     },
     headStyles: {
       fillColor: [15, 23, 42],
       textColor: [255, 255, 255],
       fontStyle: 'bold',
-      fontSize: columns.length > 8 ? 8.2 : 9,
+      fontSize: cfg.orientation === 'portrait' && columns.length >= 7 ? 7.8 : 8.5,
+      cellPadding: 2.8,
     },
     footStyles: {
       fillColor: [241, 245, 249],
       textColor: [15, 23, 42],
       fontStyle: 'bold',
-      fontSize: 8.5,
+      fontSize: 8.2,
       lineColor: [15, 23, 42],
       lineWidth: 0.35,
+      cellPadding: 2.8,
     },
     columnStyles,
     didParseCell: (data) => {
+      if (data.section === 'head') {
+        const col = columns[data.column.index];
+        if (col?.align) {
+          data.cell.styles.halign = col.align;
+        }
+      }
       if (data.section === 'body') {
         const meta = rowMeta[data.row.index];
         if (meta) {
@@ -746,24 +840,34 @@ export const generateTourGroupPDF = (
         }
       }
     },
-    margin: { left: 12, right: 12, bottom: 14 },
+    margin: { left: marginX, right: marginX, bottom: 16 },
   });
 
   // ---------------------------------------------------------
-  // 4. PAGE FOOTER
+  // 4. MODERN PAGE FOOTER ON ALL A4 PAGES
   // ---------------------------------------------------------
   const pageCount = doc.getNumberOfPages();
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(7.8);
-    doc.setTextColor(100, 116, 139);
+    doc.setDrawColor(203, 213, 225);
+    doc.setLineWidth(0.3);
+    doc.line(marginX, pageHeight - 10, pageWidth - marginX, pageHeight - 10);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(71, 85, 105);
     doc.text(
-      `SANZARI TOURS & TRAVELS  •  ${reportTitle} (${modeDesc})`,
-      12,
+      `SANZARI TOURS & TRAVELS  •  ${reportTitle}`,
+      marginX,
       pageHeight - 5.5
     );
-    doc.text(`Page ${i} of ${pageCount}`, pageWidth - 12, pageHeight - 5.5, { align: 'right' });
+    doc.setFont('helvetica', 'normal');
+    doc.text(
+      `A4 Official Manifest  |  Page ${i} of ${pageCount}`,
+      pageWidth - marginX,
+      pageHeight - 5.5,
+      { align: 'right' }
+    );
   }
 
   const rawName = options.batch

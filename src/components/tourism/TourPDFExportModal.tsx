@@ -40,7 +40,7 @@ export const TourPDFExportModal: React.FC<TourPDFExportModalProps> = ({
   const [paymentFilter, setPaymentFilter] = useState<'ALL' | 'Due' | 'Paid'>(initialPaymentFilter);
   const [membersMode, setMembersMode] = useState<MembersDisplayMode>('all_members');
   const [amountPreset, setAmountPreset] = useState<AmountDisplayPreset>('all_amounts');
-  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
+  const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('portrait');
 
   // Individual column toggles
   const [showBookingIdAndDate, setShowBookingIdAndDate] = useState(true);
@@ -126,7 +126,7 @@ export const TourPDFExportModal: React.FC<TourPDFExportModalProps> = ({
       setShowPaxCount(true);
       setShowTravelClass(true);
       setShowSpecialNotes(true);
-      setOrientation('landscape');
+      setOrientation('portrait');
       applyAmountPreset('all_amounts');
     } else if (template === 'first_person_summary') {
       setPaymentFilter('ALL');
@@ -138,7 +138,7 @@ export const TourPDFExportModal: React.FC<TourPDFExportModalProps> = ({
       setShowPaxCount(true);
       setShowTravelClass(true);
       setShowSpecialNotes(false);
-      setOrientation('landscape');
+      setOrientation('portrait');
       applyAmountPreset('all_amounts');
     } else if (template === 'due_collection') {
       setPaymentFilter('Due');

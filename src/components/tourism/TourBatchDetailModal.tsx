@@ -8,17 +8,18 @@ import {
   Luggage,
   Edit2,
   Trash2,
-  Receipt,
   CheckCircle2,
   ArrowDownLeft,
   ArrowUpRight,
   FileDown,
   Wallet,
-  Calendar,
+  ChevronDown,
+  ChevronUp,
+  MessageCircle,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { TourBooking, TourExpense, TourPaymentMode } from '../../types';
+import { TourBooking, TourPaymentMode } from '../../types';
 import { addTourExpense, deleteTourExpense } from '../../services/db';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
@@ -52,19 +53,17 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   const { user, currentUserProfile } = useAuth();
 
   const [activeView, setActiveView] = useState<'manifest' | 'account'>('manifest');
-  const [accountSubTab, setAccountSubTab] = useState<'both' | 'cash_in' | 'cash_out'>('both');
+  const [cashTab, setCashTab] = useState<'cash_in' | 'cash_out'>('cash_in');
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
+  const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
 
-  // Cash Out (Folder Expense) Form State
+  // Simple Cash Out Form State
   const [expDescription, setExpDescription] = useState('');
-  const [expCategory, setExpCategory] = useState<TourExpense['category']>('Hotel & Stay');
   const [expAmount, setExpAmount] = useState('');
   const [expWalletName, setExpWalletName] = useState('Rizwan (Tour)');
   const [expPaymentMode, setExpPaymentMode] = useState<TourPaymentMode>('UPI');
-  const [expDate, setExpDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [isSavingExpense, setIsSavingExpense] = useState(false);
-  const [expError, setExpError] = useState('');
 
   const batch = useMemo(
     () => (batchId ? tourBatches.find((b) => b.id === batchId) || null : null),
@@ -81,28 +80,23 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     [batch, tourExpenses]
   );
 
-  // Compute Folder-Specific Account & Wallet Stats (Kisme Kitna He for THIS folder)
+  // Folder-Specific Account & Wallet Stats (Sahil vs Rizwan for THIS folder)
   const folderAccountStats = useMemo(() => {
-    const walletsMap: Record<
-      string,
-      { cashIn: number; cashOut: number; net: number }
-    > = {
-      'Sahil (Tour)': { cashIn: 0, cashOut: 0, net: 0 },
-      'Rizwan (Tour)': { cashIn: 0, cashOut: 0, net: 0 },
-    };
-
-    const ensureWallet = (wName: string) => {
-      const cleanName = wName || 'Rizwan (Tour)';
-      if (!walletsMap[cleanName]) {
-        walletsMap[cleanName] = { cashIn: 0, cashOut: 0, net: 0 };
-      }
-      return cleanName;
-    };
-
+    let sahilIn = 0;
+    let sahilOut = 0;
+    let rizwanIn = 0;
+    let rizwanOut = 0;
     let totalCashIn = 0;
     let totalCashOut = 0;
 
-    // 1. Aggregate Cash In from this folder's bookings (using paymentHistory if present)
+    const addIn = (wallet: string, amt: number) => {
+      if ((wallet || '').toLowerCase().includes('sahil')) {
+        sahilIn += amt;
+      } else {
+        rizwanIn += amt;
+      }
+    };
+
     bookings.forEach((b) => {
       const adv = Number(b.advancePaid || 0);
       totalCashIn += adv;
@@ -110,38 +104,36 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
       if (Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0) {
         const histSum = b.paymentHistory.reduce((s, h) => s + Number(h.amount || 0), 0);
         b.paymentHistory.forEach((h) => {
-          const w = ensureWallet(h.walletName || b.walletName || 'Rizwan (Tour)');
-          walletsMap[w].cashIn += Number(h.amount || 0);
+          addIn(h.walletName || b.walletName || 'Rizwan (Tour)', Number(h.amount || 0));
         });
-        // If advancePaid is higher than paymentHistory sum (legacy adjustment), attribute remainder to booking wallet
         if (adv > histSum) {
-          const w = ensureWallet(b.walletName || 'Rizwan (Tour)');
-          walletsMap[w].cashIn += adv - histSum;
+          addIn(b.walletName || 'Rizwan (Tour)', adv - histSum);
         }
       } else if (adv > 0) {
-        const w = ensureWallet(b.walletName || 'Rizwan (Tour)');
-        walletsMap[w].cashIn += adv;
+        addIn(b.walletName || 'Rizwan (Tour)', adv);
       }
     });
 
-    // 2. Aggregate Cash Out from this folder's expenses
     expenses.forEach((e) => {
       const amt = Number(e.amount || 0);
       totalCashOut += amt;
-      const w = ensureWallet(e.walletName || 'Rizwan (Tour)');
-      walletsMap[w].cashOut += amt;
-    });
-
-    // 3. Calculate Net per wallet
-    Object.keys(walletsMap).forEach((w) => {
-      walletsMap[w].net = walletsMap[w].cashIn - walletsMap[w].cashOut;
+      if ((e.walletName || '').toLowerCase().includes('sahil')) {
+        sahilOut += amt;
+      } else {
+        rizwanOut += amt;
+      }
     });
 
     return {
       totalCashIn,
       totalCashOut,
-      netFolderBalance: totalCashIn - totalCashOut,
-      walletsMap,
+      netBalance: totalCashIn - totalCashOut,
+      sahilIn,
+      sahilOut,
+      sahilNet: sahilIn - sahilOut,
+      rizwanIn,
+      rizwanOut,
+      rizwanNet: rizwanIn - rizwanOut,
     };
   }, [bookings, expenses]);
 
@@ -170,17 +162,8 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
   const handleAddFolderExpense = async (e: React.FormEvent) => {
     e.preventDefault();
-    setExpError('');
-
     const amt = Number(expAmount);
-    if (!expDescription.trim()) {
-      setExpError('Please enter expense description (e.g. Hotel Advance / Train Ticket).');
-      return;
-    }
-    if (!amt || amt <= 0) {
-      setExpError('Please enter a valid amount greater than ₹0.');
-      return;
-    }
+    if (!expDescription.trim() || !amt || amt <= 0) return;
 
     setIsSavingExpense(true);
     try {
@@ -188,37 +171,37 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
         (w) => w.name.toLowerCase() === expWalletName.toLowerCase()
       );
       const userEmail = currentUserProfile?.email || user?.email || 'admin@sanzari.com';
+      const today = new Date().toISOString().split('T')[0];
 
       await addTourExpense(
         {
           tourBatchId: batch.id,
           tourTitle: batch.title,
           destination: batch.destination,
-          category: expCategory,
+          category: 'Other',
           amount: amt,
           walletId: selectedWalletObj?.id || '',
           walletName: expWalletName,
           paymentMode: expPaymentMode,
-          date: expDate || new Date().toISOString().split('T')[0],
-          monthKey: (expDate || new Date().toISOString()).slice(0, 7),
+          date: today,
+          monthKey: today.slice(0, 7),
           description: expDescription.trim(),
-          notes: `Paid via ${expPaymentMode} from ${expWalletName}`,
+          notes: `${expPaymentMode} • ${expWalletName}`,
         },
         userEmail
       );
 
       setExpDescription('');
       setExpAmount('');
-    } catch (err: any) {
-      console.error('Failed to add folder expense:', err);
-      setExpError(err.message || 'Failed to save expense.');
+    } catch (err) {
+      console.error('Failed to add expense:', err);
     } finally {
       setIsSavingExpense(false);
     }
   };
 
   const handleDeleteFolderExpense = async (expId: string, desc: string) => {
-    if (window.confirm(`Delete Cash Out entry "${desc}"?`)) {
+    if (window.confirm(`Delete expense "${desc}"?`)) {
       try {
         const userEmail = currentUserProfile?.email || user?.email || 'admin@sanzari.com';
         await deleteTourExpense(expId, userEmail);
@@ -244,24 +227,45 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     setIsTourReceiptOpen(true);
   };
 
-  const handleExportGroupPDF = () => {
-    setIsPDFModalOpen(true);
+  const toggleBookingExpand = (id: string) => {
+    setExpandedBookingIds((prev) => ({
+      ...prev,
+      [id]: !prev[id],
+    }));
   };
 
-  const walletOptions =
-    tourWallets.length > 0
-      ? tourWallets
-      : [
-          { id: 'sahil', name: 'Sahil (Tour)' },
-          { id: 'rizwan', name: 'Rizwan (Tour)' },
-          { id: 'bus', name: 'Bus (Tour)' },
-        ];
+  const handleWhatsAppShareBooking = (e: React.MouseEvent, b: TourBooking) => {
+    e.stopPropagation();
+    const total = Number(b.totalAmount || 0);
+    const adv = Number(b.advancePaid || 0);
+    const due = Math.max(0, total - adv);
+    const memberText = b.members
+      .map((m, i) => `${i + 1}. ${m.name} (${m.age ? `${m.age} yrs` : 'Adult'}, ${m.gender})`)
+      .join('\n');
+    const msg =
+      `*SANZARI TOURS & TRAVELS*\n*Group Booking Details (${batch.title})*\n\n` +
+      `📌 *Booking ID:* ${b.bookingNumber}\n` +
+      `👤 *Customer:* ${b.customerName} (${b.customerPhone})\n` +
+      `📍 *Destination:* ${b.destination} (${b.tourDate})\n` +
+      `🚆 *Travel Class:* ${b.travelClass}\n\n` +
+      `*Passengers (${b.membersCount} Pax):*\n${memberText}\n\n` +
+      `💰 *Total Amount:* ₹${total.toLocaleString('en-IN')}\n` +
+      `✅ *Received:* ₹${adv.toLocaleString('en-IN')} (${(b.walletName || 'Rizwan').replace(' (Tour)', '')} • ${b.paymentMode || 'UPI'})\n` +
+      (due === 0
+        ? `🎉 *Status:* FULL PAID\n`
+        : `⏳ *Baaki Due:* ₹${due.toLocaleString('en-IN')}\n`) +
+      (b.specialNotes ? `📝 *Notes:* ${b.specialNotes}\n` : '');
+
+    const phoneClean = (b.customerPhone || '').replace(/[^0-9]/g, '');
+    const phoneWithCode = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+    window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, '_blank');
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden my-auto max-h-[92vh] flex flex-col">
-        {/* Header - Crisp White Background, Black Text & Black Borders */}
-        <div className="bg-white p-5 sm:p-6 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
+      <div className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+        {/* Clean Header */}
+        <div className="bg-white p-4 sm:p-5 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
           <div className="flex items-start justify-between gap-3 flex-wrap">
             <div>
               <div className="flex items-center gap-2">
@@ -272,7 +276,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                   {batch.tourType}
                 </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black mt-1.5 text-zinc-950 tracking-tight">
+              <h2 className="text-xl sm:text-2xl font-black mt-1 text-zinc-950 tracking-tight">
                 {batch.title}
               </h2>
               <p className="text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
@@ -281,35 +285,28 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
               </p>
             </div>
 
-            {/* Header Right: Folder Account Button (Marked Area), Download PDF, Delete Folder & Close */}
+            {/* Top Action Buttons: Account Button (Marked Area), Download PDF, Delete, Close */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* NEW: Folder Account (Cash In / Cash Out) Toggle Button */}
               <button
                 type="button"
                 onClick={() =>
                   setActiveView((prev) => (prev === 'account' ? 'manifest' : 'account'))
                 }
-                title="Open Folder Account (Cash In & Cash Out for this group)"
-                className={`px-3.5 py-2 rounded-xl border-2 text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs ${
+                className={`px-3.5 py-2 rounded-xl border-2 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeView === 'account'
                     ? 'bg-zinc-950 text-white border-zinc-950'
                     : 'bg-amber-400 hover:bg-amber-500 text-zinc-950 border-zinc-900'
                 }`}
               >
                 <Wallet size={14} className="stroke-[2.5]" />
-                <span>
-                  {activeView === 'account'
-                    ? '👥 Back to Bookings'
-                    : '💳 Folder Account (Cash In/Out)'}
-                </span>
+                <span>{activeView === 'account' ? '← Back to Bookings' : 'Account'}</span>
               </button>
 
               <button
                 type="button"
-                onClick={handleExportGroupPDF}
+                onClick={() => setIsPDFModalOpen(true)}
                 disabled={bookings.length === 0}
-                title="Download Group Bookings & Payment List PDF"
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-xs font-black flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <FileDown size={14} className="stroke-[2.5]" />
                 <span>Download Group PDF</span>
@@ -318,8 +315,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
               <button
                 type="button"
                 onClick={handleDeleteBatch}
-                title="Delete Tour Folder"
-                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer shadow-xs"
+                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <Trash2 size={13} />
                 <span>Delete Folder</span>
@@ -334,8 +330,8 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
             </div>
           </div>
 
-          {/* Seat Progress & Collection Summary Bar */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-4 border-t border-zinc-200 text-xs">
+          {/* 4 Summary Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-3 border-t border-zinc-200 text-xs">
             <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
               <span className="text-zinc-500 block text-[11px] font-medium">Seat Capacity</span>
               <span className="text-sm sm:text-base font-black text-zinc-950">
@@ -351,564 +347,170 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
             </div>
 
             <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl">
-              <span className="text-emerald-800 block text-[11px] font-bold">
-                Advance / Received (Cash In)
-              </span>
+              <span className="text-emerald-800 block text-[11px] font-bold">Advance / Received</span>
               <span className="text-sm sm:text-base font-black text-emerald-700">
                 {formatCurrency(totalAdvance)}
               </span>
             </div>
 
             <div className="bg-rose-50/70 border border-rose-200 p-2.5 rounded-xl">
-              <span className="text-rose-800 block text-[11px] font-bold">
-                Remaining Baaki (Due)
-              </span>
+              <span className="text-rose-800 block text-[11px] font-bold">Remaining Baaki (Due)</span>
               <span className="text-sm sm:text-base font-black text-rose-600">
                 {formatCurrency(totalPending)}
               </span>
             </div>
           </div>
-
-          {/* View Switcher Tabs inside Modal Header */}
-          <div className="flex items-center gap-2 mt-4 pt-3 border-t border-zinc-200">
-            <button
-              type="button"
-              onClick={() => setActiveView('manifest')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 border-2 transition-all cursor-pointer ${
-                activeView === 'manifest'
-                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
-                  : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:border-zinc-900'
-              }`}
-            >
-              <Users size={14} />
-              <span>👥 Bookings Manifest ({bookings.length})</span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setActiveView('account')}
-              className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 border-2 transition-all cursor-pointer ${
-                activeView === 'account'
-                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
-                  : 'bg-amber-50 text-amber-950 border-amber-400 hover:border-zinc-900'
-              }`}
-            >
-              <Wallet size={14} />
-              <span>
-                💳 Folder Account — Cash In / Cash Out (Net:{' '}
-                {formatCurrency(folderAccountStats.netFolderBalance)})
-              </span>
-            </button>
-          </div>
         </div>
 
-        {/* Scrollable Content */}
-        <div className="p-4 sm:p-6 overflow-y-auto space-y-6 flex-1 min-h-0 bg-white text-zinc-900">
+        {/* Scrollable Body */}
+        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 bg-white text-zinc-900">
           {activeView === 'account' ? (
             /* =========================================================
-               VIEW 2: FOLDER ACCOUNT (CASH IN & CASH OUT FOR THIS FOLDER)
+               SIMPLE FOLDER ACCOUNT VIEW (CASH IN / CASH OUT + WALLETS)
                ========================================================= */
-            <div className="space-y-5">
-              {/* 1. Folder Cash In / Cash Out / Net Balance Summary */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="p-4 rounded-2xl bg-emerald-50 border-2 border-emerald-500">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase text-emerald-900">
-                      🟢 Folder Cash In (Received)
+            <div className="space-y-4">
+              {/* Row 1: Kisme Kitna He (Sahil vs Rizwan vs Folder Net Balance) */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                {/* Sahil Box */}
+                <div className="p-3 rounded-2xl bg-purple-50/60 border-2 border-purple-300 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-purple-900 block">
+                      🟣 Sahil Account (Is Folder me)
                     </span>
-                    <ArrowDownLeft className="w-4 h-4 text-emerald-700 stroke-[2.5]" />
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-700 mt-1">
-                    + {formatCurrency(folderAccountStats.totalCashIn)}
-                  </div>
-                  <div className="text-[11px] text-emerald-800 font-semibold mt-0.5">
-                    From {bookings.filter((b) => (b.advancePaid || 0) > 0).length} customer bookings
+                    <span className="text-base sm:text-lg font-black font-mono text-zinc-950">
+                      {formatCurrency(folderAccountStats.sahilNet)}
+                    </span>
+                    <span className="text-[10px] font-bold text-zinc-600 block">
+                      In: +{formatCurrency(folderAccountStats.sahilIn)} • Out: -
+                      {formatCurrency(folderAccountStats.sahilOut)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-rose-50 border-2 border-rose-500">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase text-rose-900">
-                      🔴 Folder Cash Out (Expenses)
+                {/* Rizwan Box */}
+                <div className="p-3 rounded-2xl bg-blue-50/60 border-2 border-blue-300 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-blue-900 block">
+                      🔵 Rizwan Account (Is Folder me)
                     </span>
-                    <ArrowUpRight className="w-4 h-4 text-rose-700 stroke-[2.5]" />
-                  </div>
-                  <div className="text-xl sm:text-2xl font-black font-mono text-rose-600 mt-1">
-                    - {formatCurrency(folderAccountStats.totalCashOut)}
-                  </div>
-                  <div className="text-[11px] text-rose-800 font-semibold mt-0.5">
-                    Across {expenses.length} expense entries in this folder
+                    <span className="text-base sm:text-lg font-black font-mono text-zinc-950">
+                      {formatCurrency(folderAccountStats.rizwanNet)}
+                    </span>
+                    <span className="text-[10px] font-bold text-zinc-600 block">
+                      In: +{formatCurrency(folderAccountStats.rizwanIn)} • Out: -
+                      {formatCurrency(folderAccountStats.rizwanOut)}
+                    </span>
                   </div>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-zinc-950 text-white border-2 border-zinc-950">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-black uppercase text-amber-400">
-                      💼 Net Folder Balance (Bachat)
+                {/* Net Folder Balance */}
+                <div className="p-3 rounded-2xl bg-zinc-950 text-white border-2 border-zinc-950 flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] font-black uppercase text-amber-400 block">
+                      💼 Folder Net Balance (In - Out)
                     </span>
-                    <Wallet className="w-4 h-4 text-amber-400" />
-                  </div>
-                  <div
-                    className={`text-xl sm:text-2xl font-black font-mono mt-1 ${
-                      folderAccountStats.netFolderBalance >= 0
-                        ? 'text-emerald-400'
-                        : 'text-rose-400'
-                    }`}
-                  >
-                    {formatCurrency(folderAccountStats.netFolderBalance)}
-                  </div>
-                  <div className="text-[11px] text-zinc-400 font-semibold mt-0.5">
-                    Cash In ({formatCurrency(folderAccountStats.totalCashIn)}) - Cash Out (
-                    {formatCurrency(folderAccountStats.totalCashOut)})
+                    <span className="text-base sm:text-lg font-black font-mono text-emerald-400">
+                      {formatCurrency(folderAccountStats.netBalance)}
+                    </span>
+                    <span className="text-[10px] font-bold text-zinc-400 block">
+                      Total In: +{formatCurrency(folderAccountStats.totalCashIn)} • Out: -
+                      {formatCurrency(folderAccountStats.totalCashOut)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* 2. Kisme Kitna He? (Sahil vs Rizwan Wallet Breakdown for THIS Folder) */}
-              <div className="p-4 rounded-2xl bg-zinc-50 border-2 border-zinc-900 space-y-3">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <h4 className="text-xs font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                    <Wallet size={14} className="text-zinc-950" />
-                    <span>
-                      Kiske Account me Kitna He? — ({batch.title} Folder Breakdown)
-                    </span>
-                  </h4>
-                  <span className="text-[10px] font-bold bg-white px-2.5 py-0.5 rounded-full border border-zinc-300 text-zinc-700">
-                    Only this folder&apos;s Cash In &amp; Cash Out
-                  </span>
-                </div>
+              {/* Row 2: Simple 2-Button Toggle: Cash In vs Cash Out */}
+              <div className="grid grid-cols-2 gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setCashTab('cash_in')}
+                  className={`py-3 px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    cashTab === 'cash_in'
+                      ? 'bg-emerald-600 text-white border-emerald-800 shadow-sm'
+                      : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:border-emerald-600'
+                  }`}
+                >
+                  <ArrowDownLeft size={16} className="stroke-[3]" />
+                  <span>🟢 Cash In — Customer Wise ({formatCurrency(folderAccountStats.totalCashIn)})</span>
+                </button>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {Object.entries(folderAccountStats.walletsMap).map(([wName, wData]) => {
-                    const isSahil = wName.toLowerCase().includes('sahil');
-                    const isRizwan = wName.toLowerCase().includes('rizwan');
-                    return (
-                      <div
-                        key={wName}
-                        className="p-3.5 rounded-xl bg-white border-2 border-zinc-900 shadow-2xs space-y-2"
-                      >
-                        <div className="flex items-center justify-between border-b border-zinc-100 pb-2">
-                          <div className="flex items-center gap-2">
-                            <span
-                              className={`w-7 h-7 rounded-lg font-black text-xs text-white flex items-center justify-center ${
-                                isSahil
-                                  ? 'bg-purple-600'
-                                  : isRizwan
-                                  ? 'bg-blue-600'
-                                  : 'bg-amber-600'
-                              }`}
-                            >
-                              {wName.charAt(0).toUpperCase()}
-                            </span>
-                            <div>
-                              <span className="font-black text-xs text-zinc-950 block">
-                                {wName}
-                              </span>
-                              <span className="text-[9px] text-zinc-500 font-bold uppercase">
-                                Folder Account Balance
-                              </span>
-                            </div>
-                          </div>
-                          <span
-                            className={`text-sm font-black font-mono ${
-                              wData.net >= 0 ? 'text-emerald-700' : 'text-rose-600'
-                            }`}
-                          >
-                            {formatCurrency(wData.net)}
-                          </span>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-2 text-[11px] font-mono">
-                          <div className="bg-emerald-50/70 px-2 py-1 rounded-lg border border-emerald-200">
-                            <span className="text-[9px] font-sans font-bold uppercase text-emerald-800 block">
-                              Cash In (+)
-                            </span>
-                            <strong className="text-emerald-700 font-black">
-                              +{formatCurrency(wData.cashIn)}
-                            </strong>
-                          </div>
-                          <div className="bg-rose-50/70 px-2 py-1 rounded-lg border border-rose-200">
-                            <span className="text-[9px] font-sans font-bold uppercase text-rose-800 block">
-                              Cash Out (-)
-                            </span>
-                            <strong className="text-rose-600 font-black">
-                              -{formatCurrency(wData.cashOut)}
-                            </strong>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                <button
+                  type="button"
+                  onClick={() => setCashTab('cash_out')}
+                  className={`py-3 px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                    cashTab === 'cash_out'
+                      ? 'bg-rose-600 text-white border-rose-800 shadow-sm'
+                      : 'bg-rose-50 text-rose-900 border-rose-300 hover:border-rose-600'
+                  }`}
+                >
+                  <ArrowUpRight size={16} className="stroke-[3]" />
+                  <span>🔴 Cash Out — Expenses ({formatCurrency(folderAccountStats.totalCashOut)})</span>
+                </button>
               </div>
 
-              {/* 3. Sub-tab Filter: Both vs Cash In Only vs Cash Out Only */}
-              <div className="flex items-center justify-between flex-wrap gap-2 border-b border-zinc-200 pb-3">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button
-                    type="button"
-                    onClick={() => setAccountSubTab('both')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
-                      accountSubTab === 'both'
-                        ? 'bg-zinc-950 text-white border-zinc-950'
-                        : 'bg-zinc-100 text-zinc-700 border-zinc-300 hover:border-zinc-900'
-                    }`}
-                  >
-                    📊 Both (Cash In &amp; Cash Out)
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAccountSubTab('cash_in')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
-                      accountSubTab === 'cash_in'
-                        ? 'bg-emerald-600 text-white border-emerald-800'
-                        : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:border-emerald-600'
-                    }`}
-                  >
-                    🟢 Customer Cash In ({bookings.length})
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setAccountSubTab('cash_out')}
-                    className={`px-3.5 py-1.5 rounded-xl text-xs font-black border-2 transition-all cursor-pointer ${
-                      accountSubTab === 'cash_out'
-                        ? 'bg-rose-600 text-white border-rose-800'
-                        : 'bg-rose-50 text-rose-900 border-rose-300 hover:border-rose-600'
-                    }`}
-                  >
-                    🔴 Cash Out / Expenses ({expenses.length})
-                  </button>
-                </div>
-              </div>
-
-              {/* 4. CASH OUT SECTION: Add Folder Expense Form + Expense List */}
-              {(accountSubTab === 'both' || accountSubTab === 'cash_out') && (
-                <div className="p-4 rounded-2xl bg-rose-50/40 border-2 border-zinc-900 space-y-4">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                      <ArrowUpRight className="w-4 h-4 text-rose-600 stroke-[3]" />
-                      <span>
-                        🔴 Cash Out — Add Expense for {batch.title} ({formatCurrency(folderAccountStats.totalCashOut)})
-                      </span>
-                    </h4>
-                  </div>
-
-                  {/* Add Expense Form */}
-                  <form
-                    onSubmit={handleAddFolderExpense}
-                    className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 space-y-3"
-                  >
-                    {expError && (
-                      <div className="p-2 rounded-xl bg-rose-50 border border-rose-300 text-rose-700 text-xs font-bold">
-                        {expError}
-                      </div>
-                    )}
-
-                    {/* Quick Expense Presets */}
-                    <div className="flex items-center gap-1.5 flex-wrap">
-                      <span className="text-[10px] font-black uppercase text-zinc-500 mr-1">
-                        Quick Expense:
-                      </span>
-                      {[
-                        { label: '🏨 Hotel Advance', cat: 'Hotel & Stay' as const },
-                        { label: '🚆 Train Tickets', cat: 'Train & Transport' as const },
-                        { label: '🚌 Tempo / Cab Payment', cat: 'Train & Transport' as const },
-                        { label: '🍽️ Food / Maharaj', cat: 'Food & Meals' as const },
-                        { label: '🛶 Shikara / Entry', cat: 'Sightseeing & Entry' as const },
-                      ].map((preset) => (
-                        <button
-                          key={preset.label}
-                          type="button"
-                          onClick={() => {
-                            setExpDescription(preset.label.replace(/^[^\s]+\s/, ''));
-                            setExpCategory(preset.cat);
-                          }}
-                          className="px-2.5 py-1 rounded-lg bg-zinc-100 hover:bg-zinc-900 text-zinc-800 hover:text-white border border-zinc-300 text-[10px] font-bold transition-colors cursor-pointer"
-                        >
-                          {preset.label}
-                        </button>
-                      ))}
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                      <div className="sm:col-span-2">
-                        <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                          Expense Detail / Description *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          placeholder="e.g. Srinagar Hotel Advance / Bus Payment / Food"
-                          value={expDescription}
-                          onChange={(e) => setExpDescription(e.target.value)}
-                          className="w-full bg-zinc-50 border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-bold text-zinc-950 focus:bg-white focus:outline-none"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                          Cash Out Amount (₹) *
-                        </label>
-                        <input
-                          type="number"
-                          required
-                          min={1}
-                          placeholder="₹ Amount"
-                          value={expAmount}
-                          onChange={(e) => setExpAmount(e.target.value)}
-                          className="w-full bg-rose-50/60 border-2 border-rose-600 rounded-xl px-3 py-2 text-sm font-mono font-black text-rose-900 focus:bg-white focus:outline-none"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Account Selector + Mode Selector + Date + Submit */}
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 items-end">
-                      {/* Account Selector Buttons */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                          Paid From Account (Kiske Account se Gaya?) *
-                        </label>
-                        <div className="grid grid-cols-3 gap-1">
-                          {walletOptions.map((w) => {
-                            const selected = expWalletName === w.name;
-                            return (
-                              <button
-                                key={w.id}
-                                type="button"
-                                onClick={() => setExpWalletName(w.name)}
-                                className={`py-2 px-1.5 rounded-xl border-2 text-[11px] font-black truncate cursor-pointer transition-all ${
-                                  selected
-                                    ? 'bg-zinc-950 text-white border-zinc-950'
-                                    : 'bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-900'
-                                }`}
-                              >
-                                {w.name.replace(' (Tour)', '')}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-
-                      {/* Payment Mode Buttons */}
-                      <div>
-                        <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                          Payment Mode *
-                        </label>
-                        <div className="grid grid-cols-3 gap-1">
-                          {(['UPI', 'Cash', 'Online'] as TourPaymentMode[]).map((m) => (
-                            <button
-                              key={m}
-                              type="button"
-                              onClick={() => setExpPaymentMode(m)}
-                              className={`py-2 px-1.5 rounded-xl border-2 text-[11px] font-black cursor-pointer transition-all ${
-                                expPaymentMode === m
-                                  ? 'bg-rose-600 text-white border-rose-800'
-                                  : 'bg-zinc-50 text-zinc-800 border-zinc-300 hover:border-zinc-900'
-                              }`}
-                            >
-                              {m}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Date & Save Button */}
-                      <div className="flex items-center gap-2">
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-bold text-zinc-600 mb-1 flex items-center gap-1">
-                            <Calendar size={10} /> Date
-                          </label>
-                          <input
-                            type="date"
-                            value={expDate}
-                            onChange={(e) => setExpDate(e.target.value)}
-                            className="w-full bg-zinc-50 border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-xs font-bold text-zinc-950"
-                          />
-                        </div>
-
-                        <button
-                          type="submit"
-                          disabled={isSavingExpense}
-                          className="px-4 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs flex items-center gap-1 shadow-sm cursor-pointer active:scale-95 shrink-0"
-                        >
-                          <Plus size={14} className="stroke-[3]" />
-                          <span>{isSavingExpense ? 'Saving...' : '+ Add Cash Out'}</span>
-                        </button>
-                      </div>
-                    </div>
-                  </form>
-
-                  {/* Cash Out / Expenses List for this Folder */}
-                  {expenses.length === 0 ? (
-                    <div className="p-5 rounded-xl bg-white border border-zinc-200 text-center text-xs text-zinc-500 font-medium">
-                      No Cash Out / Expenses recorded in this folder yet. Use the form above to add hotel, train, or transport expenses.
-                    </div>
-                  ) : (
-                    <div className="divide-y divide-zinc-200 border-2 border-zinc-900 rounded-2xl overflow-hidden bg-white">
-                      {expenses.map((e, idx) => (
-                        <div
-                          key={e.id}
-                          className="p-3 sm:p-3.5 flex items-center justify-between gap-3 hover:bg-rose-50/30 transition-colors"
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="w-6 h-6 rounded-lg bg-rose-100 text-rose-800 border border-rose-300 font-black text-[10px] flex items-center justify-center shrink-0">
-                              {idx + 1}
-                            </span>
-                            <div className="min-w-0">
-                              <div className="font-black text-xs sm:text-sm text-zinc-950 truncate">
-                                {e.description}
-                              </div>
-                              <div className="flex items-center gap-1.5 flex-wrap text-[10px] font-bold text-zinc-600 mt-0.5">
-                                <span className="px-1.5 py-0.2 rounded bg-zinc-100 border border-zinc-300 text-zinc-900">
-                                  💳 {e.walletName}
-                                </span>
-                                {e.paymentMode && (
-                                  <span className="px-1.5 py-0.2 rounded bg-rose-50 border border-rose-200 text-rose-800">
-                                    {e.paymentMode}
-                                  </span>
-                                )}
-                                <span>• {e.category}</span>
-                                <span>• 📅 {formatDate(e.date)}</span>
-                              </div>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-2.5 shrink-0">
-                            <span className="font-mono font-black text-sm text-rose-600">
-                              - {formatCurrency(e.amount)}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteFolderExpense(e.id, e.description)}
-                              title="Delete Expense"
-                              className="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-600 text-zinc-500 hover:text-white transition-colors cursor-pointer"
-                            >
-                              <Trash2 size={13} />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* 5. CASH IN SECTION: Customer-Wise Received Payments List for THIS Folder */}
-              {(accountSubTab === 'both' || accountSubTab === 'cash_in') && (
-                <div className="p-4 rounded-2xl bg-emerald-50/40 border-2 border-zinc-900 space-y-3">
-                  <div className="flex items-center justify-between flex-wrap gap-2">
-                    <h4 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                      <ArrowDownLeft className="w-4 h-4 text-emerald-600 stroke-[3]" />
-                      <span>
-                        🟢 Cash In — Customer-Wise Received Payments ({formatCurrency(folderAccountStats.totalCashIn)})
-                      </span>
-                    </h4>
-                    <span className="text-[11px] font-bold text-rose-700 bg-rose-50 px-2.5 py-0.5 rounded-full border border-rose-300">
-                      Remaining Baaki in Folder: {formatCurrency(totalPending)}
-                    </span>
+              {/* Tab 1: CASH IN (Customer-Wise List) */}
+              {cashTab === 'cash_in' ? (
+                <div className="border-2 border-zinc-900 rounded-2xl overflow-hidden bg-white">
+                  <div className="bg-zinc-100 px-4 py-2.5 border-b-2 border-zinc-900 flex items-center justify-between text-xs font-black text-zinc-800">
+                    <span>CUSTOMER NAME &amp; ACCOUNT</span>
+                    <span>CASH IN (RECEIVED)</span>
                   </div>
 
                   {bookings.length === 0 ? (
-                    <div className="p-5 rounded-xl bg-white border border-zinc-200 text-center text-xs text-zinc-500 font-medium">
+                    <div className="p-6 text-center text-xs text-zinc-500 font-medium">
                       No customer bookings in this folder yet.
                     </div>
                   ) : (
-                    <div className="divide-y divide-zinc-200 border-2 border-zinc-900 rounded-2xl overflow-hidden bg-white">
+                    <div className="divide-y divide-zinc-200">
                       {bookings.map((b, idx) => {
                         const total = Number(b.totalAmount || 0);
                         const adv = Number(b.advancePaid || 0);
                         const due = Math.max(0, total - adv);
                         const isFullPaid = due === 0 && total > 0;
-                        const instList = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
+                        const walletShort = (b.walletName || 'Rizwan').replace(' (Tour)', '');
 
                         return (
                           <div
                             key={b.id}
-                            className="p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-emerald-50/20 transition-colors"
+                            className="p-3.5 flex items-center justify-between gap-3 hover:bg-zinc-50"
                           >
-                            <div className="flex items-start gap-2.5 min-w-0">
-                              <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center shrink-0 mt-0.5">
-                                {idx + 1}
-                              </span>
-                              <div className="min-w-0">
-                                <div className="flex items-center gap-2 flex-wrap">
-                                  <span className="font-black text-sm text-zinc-950">
-                                    {b.customerName}
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-mono font-bold text-zinc-400">
+                                  #{idx + 1}
+                                </span>
+                                <span className="font-black text-sm text-zinc-950">
+                                  {b.customerName}
+                                </span>
+                                <span className="text-[11px] font-bold text-zinc-500">
+                                  ({b.membersCount} Pax)
+                                </span>
+                              </div>
+                              <div className="text-[11px] font-bold text-zinc-600 mt-0.5 flex items-center gap-2 flex-wrap">
+                                <span className="px-2 py-0.2 rounded bg-zinc-100 border border-zinc-300 text-zinc-900">
+                                  💳 {walletShort} ({b.paymentMode || 'UPI'})
+                                </span>
+                                <span>Total: {formatCurrency(total)}</span>
+                                {!isFullPaid && (
+                                  <span className="text-rose-600">
+                                    • Baaki: {formatCurrency(due)}
                                   </span>
-                                  <span className="text-[10px] font-mono font-bold px-2 py-0.2 rounded bg-zinc-100 border border-zinc-300 text-zinc-700">
-                                    {b.bookingNumber}
-                                  </span>
-                                  <span className="text-[11px] font-bold text-zinc-600">
-                                    ({b.membersCount} Pax)
-                                  </span>
-                                </div>
-
-                                {/* Account & Mode Breakdown per Customer */}
-                                <div className="flex items-center gap-1.5 flex-wrap mt-1 text-[10px] font-bold">
-                                  {instList.length > 0 ? (
-                                    instList.map((inst, iIdx) => (
-                                      <span
-                                        key={inst.id || iIdx}
-                                        className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900"
-                                      >
-                                        #{iIdx + 1}: +{formatCurrency(inst.amount)} in{' '}
-                                        <strong>
-                                          {(inst.walletName || b.walletName || 'Rizwan').replace(
-                                            ' (Tour)',
-                                            ''
-                                          )}
-                                        </strong>{' '}
-                                        ({inst.paymentMode || 'UPI'})
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-300 text-emerald-900">
-                                      💳 Account:{' '}
-                                      <strong>
-                                        {(b.walletName || 'Rizwan').replace(' (Tour)', '')}
-                                      </strong>{' '}
-                                      • Mode: <strong>{b.paymentMode || 'UPI'}</strong>
-                                    </span>
-                                  )}
-                                </div>
+                                )}
                               </div>
                             </div>
 
-                            {/* Right Side: Cash In Amount, Remaining Baaki & + Receive Button */}
-                            <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-zinc-100">
-                              <div className="text-left sm:text-right font-mono">
-                                <div className="text-sm font-black text-emerald-700">
-                                  + {formatCurrency(adv)}
-                                </div>
-                                <div className="text-[10px] font-bold text-zinc-500">
-                                  Total: {formatCurrency(total)} •{' '}
-                                  {isFullPaid ? (
-                                    <span className="text-emerald-700 font-black">✅ Full Paid</span>
-                                  ) : (
-                                    <span className="text-rose-600 font-black">
-                                      Baaki: {formatCurrency(due)}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              {!isFullPaid ? (
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <span className="font-mono font-black text-sm sm:text-base text-emerald-700">
+                                + {formatCurrency(adv)}
+                              </span>
+                              {!isFullPaid && (
                                 <button
                                   type="button"
                                   onClick={() => setPaymentModalBooking(b)}
-                                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer"
+                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] cursor-pointer"
                                 >
-                                  <ArrowDownLeft size={13} className="stroke-[2.5]" />
-                                  <span>+ Receive</span>
-                                </button>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => setPaymentModalBooking(b)}
-                                  className="px-2.5 py-1.5 rounded-xl bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-bold text-xs flex items-center gap-1 cursor-pointer"
-                                >
-                                  <CheckCircle2 size={13} />
-                                  <span>Paid</span>
+                                  + Receive
                                 </button>
                               )}
                             </div>
@@ -918,39 +520,170 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                     </div>
                   )}
                 </div>
+              ) : (
+                /* Tab 2: CASH OUT (Simple Add Expense + Expense List) */
+                <div className="space-y-3">
+                  {/* Simple 1-Box Add Expense Form */}
+                  <form
+                    onSubmit={handleAddFolderExpense}
+                    className="p-3.5 rounded-2xl bg-rose-50/50 border-2 border-zinc-900 space-y-2.5"
+                  >
+                    <div className="text-xs font-black uppercase text-zinc-900">
+                      + Add Cash Out / Expense (Is Folder ke Liye)
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                      <input
+                        type="text"
+                        required
+                        placeholder="Expense Name (e.g. Hotel, Train, Bus, Food)"
+                        value={expDescription}
+                        onChange={(e) => setExpDescription(e.target.value)}
+                        className="sm:col-span-4 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-bold text-zinc-950 focus:outline-none"
+                      />
+
+                      <input
+                        type="number"
+                        required
+                        min={1}
+                        placeholder="₹ Amount"
+                        value={expAmount}
+                        onChange={(e) => setExpAmount(e.target.value)}
+                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-black text-rose-700 focus:outline-none"
+                      />
+
+                      <select
+                        value={expWalletName}
+                        onChange={(e) => setExpWalletName(e.target.value)}
+                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
+                      >
+                        <option value="Rizwan (Tour)">🔵 Rizwan</option>
+                        <option value="Sahil (Tour)">🟣 Sahil</option>
+                        <option value="Bus (Tour)">🟠 Bus</option>
+                      </select>
+
+                      <select
+                        value={expPaymentMode}
+                        onChange={(e) => setExpPaymentMode(e.target.value as TourPaymentMode)}
+                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
+                      >
+                        <option value="UPI">📱 UPI</option>
+                        <option value="Cash">💵 Cash</option>
+                        <option value="Online">🏦 Online</option>
+                      </select>
+
+                      <button
+                        type="submit"
+                        disabled={isSavingExpense}
+                        className="sm:col-span-2 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs cursor-pointer"
+                      >
+                        {isSavingExpense ? 'Saving...' : '+ Add Out'}
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Cash Out List */}
+                  <div className="border-2 border-zinc-900 rounded-2xl overflow-hidden bg-white">
+                    <div className="bg-zinc-100 px-4 py-2.5 border-b-2 border-zinc-900 flex items-center justify-between text-xs font-black text-zinc-800">
+                      <span>EXPENSE DETAIL &amp; ACCOUNT</span>
+                      <span>CASH OUT AMOUNT</span>
+                    </div>
+
+                    {expenses.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-zinc-500 font-medium">
+                        No expenses added in this folder yet.
+                      </div>
+                    ) : (
+                      <div className="divide-y divide-zinc-200">
+                        {expenses.map((e, idx) => (
+                          <div
+                            key={e.id}
+                            className="p-3.5 flex items-center justify-between gap-3 hover:bg-zinc-50"
+                          >
+                            <div>
+                              <div className="font-black text-sm text-zinc-950">
+                                {idx + 1}. {e.description}
+                              </div>
+                              <div className="text-[11px] font-bold text-zinc-600 mt-0.5 flex items-center gap-2">
+                                <span className="px-2 py-0.2 rounded bg-zinc-100 border border-zinc-300 text-zinc-900">
+                                  💳 {(e.walletName || 'Rizwan').replace(' (Tour)', '')}
+                                  {e.paymentMode ? ` (${e.paymentMode})` : ''}
+                                </span>
+                                <span>📅 {formatDate(e.date)}</span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2.5 shrink-0">
+                              <span className="font-mono font-black text-sm sm:text-base text-rose-600">
+                                - {formatCurrency(e.amount)}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteFolderExpense(e.id, e.description)}
+                                className="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-600 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           ) : (
             /* =========================================================
-               VIEW 1: BOOKED PASSENGERS MANIFEST
+               DEFAULT VIEW: BOOKED PASSENGERS MANIFEST
                ========================================================= */
             <>
-              {/* Top Actions */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-zinc-950" /> Booked Passengers Manifest (
-                  {bookings.length} Bookings • {totalPassengers} Pax)
-                </h3>
-                <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center justify-between gap-3 flex-wrap">
+                <div>
+                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-zinc-950 shrink-0" />
+                    <span>
+                      Booked Passengers Manifest ({bookings.length} Bookings • {totalPassengers} Pax)
+                    </span>
+                  </h3>
+                  <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
+                    💡 Click on any customer booking row below to expand &amp; view all members and details
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
                   {bookings.length > 0 && (
                     <button
                       type="button"
-                      onClick={handleExportGroupPDF}
-                      className="px-3.5 py-2 bg-emerald-50 hover:bg-emerald-600 text-emerald-900 hover:text-white border-2 border-emerald-600 rounded-xl text-xs font-black flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                      onClick={() => {
+                        const allExpanded = bookings.every((bk) => expandedBookingIds[bk.id]);
+                        if (allExpanded) {
+                          setExpandedBookingIds({});
+                        } else {
+                          const next: Record<string, boolean> = {};
+                          bookings.forEach((bk) => {
+                            next[bk.id] = true;
+                          });
+                          setExpandedBookingIds(next);
+                        }
+                      }}
+                      className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
                     >
-                      <FileDown className="w-3.5 h-3.5 stroke-[2.5]" /> 📄 Export PDF List
+                      {bookings.every((bk) => expandedBookingIds[bk.id])
+                        ? 'Collapse All'
+                        : 'Expand All'}
                     </button>
                   )}
+
                   <button
                     onClick={() => onAddBookingToBatch(batch.id)}
-                    className="px-3.5 py-2 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer w-fit"
+                    className="px-3.5 py-2 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
                   >
                     <Plus className="w-3.5 h-3.5 stroke-[3]" /> + Book Passenger for this Date
                   </button>
                 </div>
               </div>
 
-              {/* Bookings List */}
               {bookings.length === 0 ? (
                 <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 text-center space-y-2">
                   <Luggage className="w-8 h-8 text-zinc-400 mx-auto" />
@@ -963,34 +696,70 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <div className="space-y-2.5">
                   {bookings.map((b) => {
                     const total = Number(b.totalAmount || 0);
                     const adv = Number(b.advancePaid || 0);
                     const due = Math.max(0, total - adv);
                     const isFullPaid = due === 0 && total > 0;
+                    const isExpanded = Boolean(expandedBookingIds[b.id]);
+                    const instList = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
 
                     return (
                       <div
                         key={b.id}
-                        className={`bg-white border rounded-2xl p-4 shadow-xs hover:border-zinc-400 transition-all space-y-3 ${
-                          isFullPaid ? 'border-emerald-500 bg-emerald-50/10' : 'border-zinc-200'
+                        className={`bg-white border-2 rounded-2xl transition-all overflow-hidden ${
+                          isFullPaid
+                            ? 'border-emerald-500 bg-emerald-50/10'
+                            : isExpanded
+                            ? 'border-zinc-900 shadow-sm'
+                            : 'border-zinc-200 hover:border-zinc-400'
                         }`}
                       >
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-mono font-bold px-2 py-0.5 bg-zinc-100 rounded-lg text-zinc-800 border border-zinc-200">
+                        {/* Main Clickable Row (Customer Name, PAX, Payment Status & Actions) */}
+                        <div
+                          onClick={() => toggleBookingExpand(b.id)}
+                          className="p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none hover:bg-zinc-50/60 transition-colors"
+                        >
+                          {/* Left: Booking ID, Customer Name, Phone, PAX & Quick Financial Summary */}
+                          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 bg-zinc-100 rounded-lg text-zinc-800 border border-zinc-300">
                               {b.bookingNumber}
                             </span>
-                            <span className="text-sm font-black text-zinc-950">
+
+                            <span className="text-sm sm:text-base font-black text-zinc-950">
                               {b.customerName}
                             </span>
-                            <span className="text-xs text-zinc-500 font-mono font-medium">
+
+                            <span className="text-xs text-zinc-500 font-mono font-semibold">
                               ({b.customerPhone})
                             </span>
+
+                            <span className="px-2 py-0.5 rounded-lg bg-zinc-900 text-white text-[11px] font-black">
+                              {b.membersCount} Pax
+                            </span>
+
+                            {/* Inline Financial Summary on Closed Card */}
+                            <div className="flex items-center gap-2 text-xs font-mono pl-1">
+                              <span className="text-zinc-600">
+                                Total: <strong className="text-zinc-950">{formatCurrency(total)}</strong>
+                              </span>
+                              <span className="text-emerald-700 font-bold">
+                                • Recd: {formatCurrency(adv)}
+                              </span>
+                              {!isFullPaid && (
+                                <span className="text-rose-600 font-black">
+                                  • Baaki: {formatCurrency(due)}
+                                </span>
+                              )}
+                            </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 flex-wrap">
+                          {/* Right: Status Badge + Action Buttons + Expand Chevron */}
+                          <div
+                            className="flex items-center justify-between lg:justify-end gap-1.5 flex-wrap shrink-0"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <span
                               onClick={() => setPaymentModalBooking(b)}
                               className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg cursor-pointer ${
@@ -1023,117 +792,148 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             )}
 
                             <button
+                              type="button"
+                              onClick={(e) => handleWhatsAppShareBooking(e, b)}
+                              title="Share Booking Details on WhatsApp"
+                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                            >
+                              <MessageCircle className="w-3.5 h-3.5" /> Share
+                            </button>
+
+                            <button
+                              type="button"
                               onClick={() => openEditTourBookingModal(b)}
                               className="px-2.5 py-1 bg-zinc-100 text-zinc-800 hover:bg-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
                             >
                               <Edit2 className="w-3.5 h-3.5" /> Edit
                             </button>
+
                             <button
+                              type="button"
                               onClick={() => handleShareVoucher(b)}
                               className="px-2.5 py-1 bg-zinc-900 text-white hover:bg-black rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
                             >
                               <Share2 className="w-3.5 h-3.5" /> Slip
                             </button>
+
                             <button
+                              type="button"
                               onClick={() => handleDeleteBooking(b.id, b.customerName)}
                               title="Delete Booking"
                               className="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-50 text-zinc-500 hover:text-rose-600 transition-colors cursor-pointer"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
+
+                            <button
+                              type="button"
+                              onClick={() => toggleBookingExpand(b.id)}
+                              title={isExpanded ? 'Hide Details' : 'Show Members & Other Details'}
+                              className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 transition-colors cursor-pointer ml-1"
+                            >
+                              {isExpanded ? (
+                                <ChevronUp className="w-4 h-4" />
+                              ) : (
+                                <ChevronDown className="w-4 h-4" />
+                              )}
+                            </button>
                           </div>
                         </div>
 
-                        {/* Members Sub-list */}
-                        <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/80">
-                          <div className="text-[11px] font-bold text-zinc-600 uppercase mb-1.5">
-                            Members List ({b.membersCount} Pax)
-                          </div>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                            {b.members.map((m, mi) => (
-                              <div
-                                key={mi}
-                                className="bg-white p-2 rounded-lg border border-zinc-200 flex justify-between shadow-2xs"
-                              >
-                                <span className="font-bold text-zinc-900">
-                                  {mi + 1}. {m.name} ({m.gender})
+                        {/* Expandable Lower Details (Members List, Wallet/Mode, Installments, Notes) */}
+                        {isExpanded && (
+                          <div className="px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 space-y-3">
+                            {/* Members Sub-list */}
+                            <div className="bg-white p-3 rounded-xl border border-zinc-200">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="text-[11px] font-black text-zinc-700 uppercase">
+                                  👥 All Family Members ({b.membersCount} Pax) • {b.travelClass}
+                                  {b.city ? ` • 📍 ${b.city}` : ''}
                                 </span>
-                                <span className="text-zinc-500 font-mono font-medium">
-                                  Age: {m.age || 'Adult'}{' '}
-                                  {m.seatBerthPreference ? `• ${m.seatBerthPreference}` : ''}
-                                </span>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleWhatsAppShareBooking(e, b)}
+                                  className="text-[11px] font-black text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                >
+                                  <MessageCircle size={12} /> Share Details on WhatsApp
+                                </button>
                               </div>
-                            ))}
-                          </div>
-                        </div>
 
-                        {/* Financial Details */}
-                        <div className="flex items-center justify-between text-xs pt-1 border-t border-zinc-100 flex-wrap gap-2">
-                          <span className="text-zinc-500 font-medium">
-                            Wallet:{' '}
-                            <strong className="text-zinc-900">
-                              {b.walletName || 'Rizwan (Tour)'}
-                            </strong>{' '}
-                            • Mode: <strong className="text-zinc-900">{b.paymentMode}</strong>
-                          </span>
-                          <div className="flex items-center gap-4 font-mono">
-                            <span>
-                              Total:{' '}
-                              <strong className="text-zinc-950 font-black">
-                                {formatCurrency(total)}
-                              </strong>
-                            </span>
-                            <span className="text-emerald-700">
-                              Received:{' '}
-                              <strong className="font-black">{formatCurrency(adv)}</strong>
-                            </span>
-                            {isFullPaid ? (
-                              <span className="text-emerald-700 font-black">✅ Full Paid</span>
-                            ) : (
-                              <span className="text-rose-600 font-black">
-                                Baaki Due: {formatCurrency(due)}
-                              </span>
-                            )}
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                                {b.members.map((m, mi) => (
+                                  <div
+                                    key={mi}
+                                    className="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 flex justify-between items-center"
+                                  >
+                                    <span className="font-bold text-zinc-950">
+                                      {mi + 1}. {m.name} ({m.gender})
+                                    </span>
+                                    <span className="text-zinc-600 font-mono font-semibold text-[11px]">
+                                      Age: {m.age || 'Adult'}
+                                      {m.seatBerthPreference &&
+                                      m.seatBerthPreference !== 'No Preference'
+                                        ? ` • ${m.seatBerthPreference}`
+                                        : ''}
+                                    </span>
+                                  </div>
+                                ))}
+                              </div>
+
+                              {b.specialNotes && (
+                                <div className="mt-2 pt-2 border-t border-zinc-100 text-xs text-amber-900 font-semibold">
+                                  📝 Special Note: {b.specialNotes}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Financial & Installment Details */}
+                            <div className="flex items-center justify-between text-xs flex-wrap gap-2 px-1">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="text-zinc-600 font-semibold">
+                                  Account:{' '}
+                                  <strong className="text-zinc-950">
+                                    {b.walletName || 'Rizwan (Tour)'}
+                                  </strong>{' '}
+                                  • Mode: <strong className="text-zinc-950">{b.paymentMode}</strong>
+                                </span>
+                                {instList.length > 1 &&
+                                  instList.map((inst, iIdx) => (
+                                    <span
+                                      key={inst.id || iIdx}
+                                      className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]"
+                                    >
+                                      #{iIdx + 1}: {formatCurrency(inst.amount)} (
+                                      {(inst.walletName || 'Rizwan').replace(' (Tour)', '')} •{' '}
+                                      {inst.paymentMode})
+                                    </span>
+                                  ))}
+                              </div>
+
+                              <div className="flex items-center gap-4 font-mono">
+                                <span>
+                                  Total:{' '}
+                                  <strong className="text-zinc-950 font-black">
+                                    {formatCurrency(total)}
+                                  </strong>
+                                </span>
+                                <span className="text-emerald-700">
+                                  Received:{' '}
+                                  <strong className="font-black">{formatCurrency(adv)}</strong>
+                                </span>
+                                {isFullPaid ? (
+                                  <span className="text-emerald-700 font-black">✅ Full Paid</span>
+                                ) : (
+                                  <span className="text-rose-600 font-black">
+                                    Baaki Due: {formatCurrency(due)}
+                                  </span>
+                                )}
+                              </div>
+                            </div>
                           </div>
-                        </div>
+                        )}
                       </div>
                     );
                   })}
-                </div>
-              )}
-
-              {/* Tour Expenses Breakdown at bottom of Manifest */}
-              {expenses.length > 0 && (
-                <div className="space-y-3 pt-2">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                      <Receipt className="w-4 h-4 text-rose-600" /> Folder Cash Out / Expenses Log (
-                      {formatCurrency(folderAccountStats.totalCashOut)})
-                    </h3>
-                    <button
-                      type="button"
-                      onClick={() => setActiveView('account')}
-                      className="text-xs font-black text-rose-700 hover:underline cursor-pointer"
-                    >
-                      + Add / Manage in Folder Account →
-                    </button>
-                  </div>
-                  <div className="divide-y border border-zinc-200 rounded-2xl overflow-hidden text-xs bg-white shadow-2xs">
-                    {expenses.map((e) => (
-                      <div key={e.id} className="p-3 bg-white flex items-center justify-between">
-                        <div>
-                          <span className="font-bold text-zinc-900 block">{e.description}</span>
-                          <span className="text-zinc-500 text-[11px] font-medium">
-                            {e.category} • Wallet: {e.walletName}{' '}
-                            {e.paymentMode ? `(${e.paymentMode})` : ''} • {formatDate(e.date)}
-                          </span>
-                        </div>
-                        <span className="font-extrabold text-rose-600 font-mono">
-                          - {formatCurrency(e.amount)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
                 </div>
               )}
             </>
