@@ -11,15 +11,17 @@ import {
   Edit2,
   LayoutGrid,
   List,
-  Calendar,
-  Wallet,
   CheckCircle2,
   Clock,
-  AlertCircle,
+  ArrowDownLeft,
+  FileDown,
+  Folder,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBooking } from '../../types';
 import { BookingsSkeleton } from '../common/Skeleton';
+import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
+import { TourPDFExportModal } from './TourPDFExportModal';
 
 interface TourBookingsViewProps {
   onOpenBookingDetail?: (booking: TourBooking) => void;
@@ -29,6 +31,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   const {
     loading,
     tourBookings,
+    tourBatches,
     formatCurrency,
     setTourReceiptBooking,
     setIsTourReceiptOpen,
@@ -37,27 +40,65 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   } = useData();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Partial' | 'Pending'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Due'>('ALL');
+  const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     return (localStorage.getItem('sz_tour_bookings_view_mode') as 'card' | 'list') || 'card';
   });
+  const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
+  const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
 
   const toggleViewMode = (mode: 'card' | 'list') => {
     setViewMode(mode);
     localStorage.setItem('sz_tour_bookings_view_mode', mode);
   };
 
-  if (loading) {
-    return <BookingsSkeleton />;
-  }
+  // Bookings filtered by Group/Batch first (for accurate KPI stats)
+  const batchFilteredBookings = useMemo(() => {
+    if (selectedBatchId === 'ALL') return tourBookings;
+    return tourBookings.filter((b) => b.tourBatchId === selectedBatchId);
+  }, [tourBookings, selectedBatchId]);
+
+  // Summary counts for Full Paid vs Baaki Due
+  const summaryStats = useMemo(() => {
+    let fullPaidCount = 0;
+    let dueCount = 0;
+    let totalReceived = 0;
+    let totalDue = 0;
+
+    batchFilteredBookings.forEach((b) => {
+      const total = Number(b.totalAmount || 0);
+      const adv = Number(b.advancePaid || 0);
+      const due = Math.max(0, total - adv);
+
+      totalReceived += adv;
+      totalDue += due;
+
+      if (due === 0 && total > 0) {
+        fullPaidCount++;
+      } else {
+        dueCount++;
+      }
+    });
+
+    return {
+      fullPaidCount,
+      dueCount,
+      totalReceived,
+      totalDue,
+    };
+  }, [batchFilteredBookings]);
 
   const filteredBookings = useMemo(() => {
-    return tourBookings.filter((b) => {
+    return batchFilteredBookings.filter((b) => {
       const q = searchQuery.toLowerCase().trim();
+      const total = Number(b.totalAmount || 0);
+      const adv = Number(b.advancePaid || 0);
+      const due = Math.max(0, total - adv);
+      const isFullPaid = due === 0 && total > 0;
 
-      const pStatus = b.paymentStatus || (Number(b.pendingAmount || 0) === 0 ? 'Paid' : 'Partial');
-      const matchesStatus = statusFilter === 'ALL' || pStatus === statusFilter;
-      if (!matchesStatus) return false;
+      if (statusFilter === 'Paid' && !isFullPaid) return false;
+      if (statusFilter === 'Due' && isFullPaid) return false;
 
       if (!q) return true;
 
@@ -76,7 +117,15 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         matchMember
       );
     });
-  }, [tourBookings, searchQuery, statusFilter]);
+  }, [batchFilteredBookings, searchQuery, statusFilter]);
+
+  if (loading) {
+    return <BookingsSkeleton />;
+  }
+
+  const handleExportPDF = () => {
+    setIsPDFModalOpen(true);
+  };
 
   const handleShareReceipt = (b: TourBooking) => {
     setTourReceiptBooking(b);
@@ -93,8 +142,10 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
     }
   };
 
-  // Quick WhatsApp share direct message
   const handleWhatsAppSend = (b: TourBooking) => {
+    const total = Number(b.totalAmount || 0);
+    const adv = Number(b.advancePaid || 0);
+    const due = Math.max(0, total - adv);
     const memberText = b.members
       .map((m, i) => `${i + 1}. ${m.name} (${m.age ? `${m.age} yrs` : 'Adult'})`)
       .join('\n');
@@ -107,51 +158,186 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
       `🚆 *Travel Mode:* ${b.travelClass}\n` +
       `👥 *Tour Type:* ${b.tourType}\n\n` +
       `*Travelers (${b.membersCount} Members):*\n${memberText}\n\n` +
-      `💰 *Total Amount:* ₹${b.totalAmount}\n` +
-      `✅ *Advance Paid:* ₹${b.advancePaid} (${b.paymentMode || 'Online'})\n` +
-      `⚠️ *Remaining Due:* ₹${b.pendingAmount}\n\n` +
+      `💰 *Total Amount:* ₹${total.toLocaleString('en-IN')}\n` +
+      `✅ *Total Paid (Received):* ₹${adv.toLocaleString('en-IN')} (${b.paymentMode || 'Online'})\n` +
+      (due === 0
+        ? `🎉 *Payment Status:* FULL PAID (₹0 Due)\n\n`
+        : `⚠️ *Remaining Due:* ₹${due.toLocaleString('en-IN')}\n\n`) +
       (b.specialNotes ? `📝 *Note:* ${b.specialNotes}\n\n` : '') +
       `Thank you for booking with Sanzari Tours & Travels!`;
 
-    const phoneClean = b.customerPhone.replace(/[^0-9]/g, '');
+    const phoneClean = (b.customerPhone || '').replace(/[^0-9]/g, '');
     const phoneWithCode = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
     const url = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`;
     window.open(url, '_blank');
   };
 
+  const formatShortDate = (dStr?: string) => {
+    if (!dStr) return '';
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return '';
+    return d.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' });
+  };
+
   return (
-    <div className="space-y-5 pb-48 sm:pb-24">
-      {/* Filter & View Switcher Bar */}
-      <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex flex-col sm:flex-row gap-3 items-stretch sm:items-center justify-between">
-        {/* Search */}
-        <div className="relative flex-1">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            type="text"
-            placeholder="Search by customer name, phone, destination, or passenger name..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-950 font-medium"
-          />
+    <div className="space-y-4 pb-48 sm:pb-24">
+      {/* Quick Payment Status Summary Strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+        <div
+          onClick={() => setStatusFilter('ALL')}
+          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+            statusFilter === 'ALL'
+              ? 'bg-zinc-950 text-white border-zinc-950 shadow-sm'
+              : 'bg-white text-zinc-900 border-zinc-200 hover:border-zinc-900'
+          }`}
+        >
+          <span
+            className={`text-[10px] font-bold uppercase block ${
+              statusFilter === 'ALL' ? 'text-zinc-400' : 'text-zinc-500'
+            }`}
+          >
+            Total Confirmed
+          </span>
+          <span className="text-base sm:text-lg font-black font-mono">
+            {batchFilteredBookings.length} Bookings
+          </span>
         </div>
 
-        {/* Status Filter & View Toggle */}
-        <div className="flex items-center justify-between sm:justify-end gap-2 overflow-x-auto pb-1 sm:pb-0">
+        <div
+          onClick={() => setStatusFilter('Paid')}
+          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+            statusFilter === 'Paid'
+              ? 'bg-emerald-600 text-white border-emerald-800 shadow-sm'
+              : 'bg-emerald-50/70 text-emerald-950 border-emerald-300 hover:border-emerald-600'
+          }`}
+        >
+          <span
+            className={`text-[10px] font-bold uppercase flex items-center gap-1 ${
+              statusFilter === 'Paid' ? 'text-emerald-100' : 'text-emerald-800'
+            }`}
+          >
+            <CheckCircle2 size={11} /> Full Payment Aagaya
+          </span>
+          <span className="text-base sm:text-lg font-black font-mono">
+            {summaryStats.fullPaidCount} Paid
+          </span>
+        </div>
+
+        <div
+          onClick={() => setStatusFilter('Due')}
+          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+            statusFilter === 'Due'
+              ? 'bg-rose-600 text-white border-rose-800 shadow-sm'
+              : 'bg-rose-50/70 text-rose-950 border-rose-300 hover:border-rose-600'
+          }`}
+        >
+          <span
+            className={`text-[10px] font-bold uppercase flex items-center gap-1 ${
+              statusFilter === 'Due' ? 'text-rose-100' : 'text-rose-800'
+            }`}
+          >
+            <Clock size={11} /> Baaki Payment (Due)
+          </span>
+          <span className="text-base sm:text-lg font-black font-mono">
+            {summaryStats.dueCount} Bookings
+          </span>
+        </div>
+
+        <div className="p-3 rounded-2xl bg-white border-2 border-zinc-900">
+          <span className="text-[10px] font-bold uppercase text-zinc-500 block">
+            Total Baaki to Collect
+          </span>
+          <span className="text-base sm:text-lg font-black font-mono text-rose-600">
+            {formatCurrency(summaryStats.totalDue)}
+          </span>
+        </div>
+      </div>
+
+      {/* Filter, Group Selector & PDF Download Bar */}
+      <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm space-y-2.5">
+        <div className="flex flex-col md:flex-row gap-2.5 items-stretch md:items-center justify-between">
+          {/* Search */}
+          <div className="relative flex-1">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+            <input
+              type="text"
+              placeholder="Search customer name, phone, destination, or passenger name..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs bg-zinc-50 border border-zinc-200 rounded-xl text-zinc-800 focus:outline-none focus:ring-2 focus:ring-zinc-950 font-medium"
+            />
+          </div>
+
+          {/* Group / Date Folder Dropdown + Download PDF Button */}
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+            <div className="relative flex-1 sm:flex-initial">
+              <Folder className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-zinc-600 pointer-events-none" />
+              <select
+                value={selectedBatchId}
+                onChange={(e) => setSelectedBatchId(e.target.value)}
+                className="w-full sm:w-auto pl-8 pr-7 py-2 text-xs font-black bg-zinc-100 border-2 border-zinc-900 rounded-xl text-zinc-950 focus:outline-none cursor-pointer"
+              >
+                <option value="ALL">📂 All Groups / Folders ({tourBookings.length})</option>
+                {tourBatches.map((batch) => {
+                  const cnt = tourBookings.filter((b) => b.tourBatchId === batch.id).length;
+                  return (
+                    <option key={batch.id} value={batch.id}>
+                      📂 {batch.title} - {batch.destination} ({cnt})
+                    </option>
+                  );
+                })}
+              </select>
+            </div>
+
+            <button
+              type="button"
+              onClick={handleExportPDF}
+              disabled={filteredBookings.length === 0}
+              title="Download Clean Booking-wise Group PDF with Advance & Remaining Due"
+              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+            >
+              <FileDown size={15} className="stroke-[2.5]" />
+              <span>Download Group PDF ({filteredBookings.length})</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Status Filter Pills & View Mode Toggle */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 overflow-x-auto">
           {/* Status Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto">
-            {(['ALL', 'Paid', 'Partial', 'Pending'] as const).map((st) => (
-              <button
-                key={st}
-                onClick={() => setStatusFilter(st)}
-                className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer ${
-                  statusFilter === st
-                    ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
-                    : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
-                }`}
-              >
-                {st === 'ALL' ? 'All Bookings' : st === 'Partial' ? 'Advance' : st}
-              </button>
-            ))}
+            <button
+              onClick={() => setStatusFilter('ALL')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer ${
+                statusFilter === 'ALL'
+                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
+                  : 'bg-zinc-50 text-zinc-600 border-zinc-200 hover:bg-zinc-100'
+              }`}
+            >
+              All ({batchFilteredBookings.length})
+            </button>
+            <button
+              onClick={() => setStatusFilter('Paid')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                statusFilter === 'Paid'
+                  ? 'bg-emerald-600 text-white border-emerald-700 shadow-xs'
+                  : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'
+              }`}
+            >
+              <CheckCircle2 size={12} />
+              <span>Full Paid ({summaryStats.fullPaidCount})</span>
+            </button>
+            <button
+              onClick={() => setStatusFilter('Due')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                statusFilter === 'Due'
+                  ? 'bg-rose-600 text-white border-rose-700 shadow-xs'
+                  : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+              }`}
+            >
+              <Clock size={12} />
+              <span>Baaki / Due ({summaryStats.dueCount})</span>
+            </button>
           </div>
 
           {/* View Mode Toggle: Cards vs List */}
@@ -194,7 +380,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
           </div>
           <h3 className="text-base font-bold text-zinc-900">No Bookings Found</h3>
           <p className="text-xs text-zinc-500 max-w-sm mx-auto">
-            No tour bookings match your search. Use the header "+ Booking" button to create a new booking!
+            No tour bookings match your filter. Use the header "+ Booking" button to create a new booking!
           </p>
         </div>
       ) : viewMode === 'card' ? (
@@ -211,28 +397,64 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               : 'NOV';
             const yearNum = isValid ? d.getFullYear() : b.tourDate.split('-')[0] || '2026';
 
+            const total = Number(b.totalAmount || 0);
+            const adv = Number(b.advancePaid || 0);
+            const due = Math.max(0, total - adv);
+            const isFullPaid = due === 0 && total > 0;
+            const paidPct = total > 0 ? Math.min(100, Math.round((adv / total) * 100)) : 0;
+            const historyCount = Array.isArray(b.paymentHistory) ? b.paymentHistory.length : (adv > 0 ? 1 : 0);
+            const latestPayment =
+              Array.isArray(b.paymentHistory) && b.paymentHistory.length > 1
+                ? b.paymentHistory[b.paymentHistory.length - 1]
+                : null;
+
             return (
               <div
                 key={b.id}
-                className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group"
+                className={`bg-white text-zinc-950 rounded-2xl border-2 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group ${
+                  isFullPaid ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-900'
+                }`}
               >
                 <div>
-                  {/* Top Header / Booking No & Status */}
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2">
+                  {/* Top Header / Booking No & Payment Status Badge */}
+                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2 gap-1">
                     <span className="text-[10px] font-mono font-black text-zinc-950 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300 truncate max-w-[120px]">
                       {b.bookingNumber}
                     </span>
-                    <span
-                      className={`text-[9px] font-black px-2 py-0.5 rounded border ${
-                        b.paymentStatus === 'Paid'
-                          ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
-                          : b.paymentStatus === 'Partial'
-                          ? 'bg-amber-50 text-amber-900 border-amber-400'
-                          : 'bg-rose-50 text-rose-800 border-rose-400'
-                      }`}
-                    >
-                      {b.paymentStatus === 'Partial' ? 'Advance' : b.paymentStatus}
-                    </span>
+
+                    <div className="flex items-center gap-1">
+                      {historyCount > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentModalBooking(b)}
+                          className="text-[9px] font-black px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-300 cursor-pointer hover:bg-blue-100"
+                          title="Click to view payment installments history"
+                        >
+                          💵 {historyCount} Inst.
+                        </button>
+                      )}
+                      <span
+                        onClick={() => setPaymentModalBooking(b)}
+                        className={`text-[9px] font-black px-2 py-0.5 rounded border cursor-pointer flex items-center gap-1 ${
+                          isFullPaid
+                            ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                            : adv > 0
+                            ? 'bg-amber-50 text-amber-900 border-amber-400'
+                            : 'bg-rose-50 text-rose-800 border-rose-400'
+                        }`}
+                      >
+                        {isFullPaid ? (
+                          <>
+                            <CheckCircle2 size={10} className="stroke-[3]" />
+                            <span>FULL PAID</span>
+                          </>
+                        ) : adv > 0 ? (
+                          `Adv (${paidPct}%)`
+                        ) : (
+                          'Due'
+                        )}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Big Date Highlight & Customer Info */}
@@ -293,28 +515,120 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </div>
                   </div>
 
-                  {/* Money Summary: Total, Advance, Due */}
-                  <div className="grid grid-cols-3 gap-1 bg-zinc-50 rounded-xl p-2 text-center text-[10px] font-medium border border-zinc-200">
-                    <div>
-                      <span className="text-zinc-500 block text-[9px] font-bold uppercase">Total</span>
-                      <strong className="text-zinc-950 font-black text-xs">{formatCurrency(b.totalAmount)}</strong>
+                  {/* Money Summary + Visual Progress Bar (Clickable to open Receive Payment Modal) */}
+                  <div
+                    onClick={() => setPaymentModalBooking(b)}
+                    title="Click to Receive Payment or View Installment History"
+                    className={`rounded-xl p-2.5 border cursor-pointer transition-all space-y-1.5 ${
+                      isFullPaid
+                        ? 'bg-emerald-50/80 border-emerald-400 hover:bg-emerald-100/70'
+                        : 'bg-zinc-50 border-zinc-200 hover:border-zinc-400'
+                    }`}
+                  >
+                    <div className="grid grid-cols-3 gap-1 text-center text-[10px] font-medium">
+                      <div>
+                        <span className="text-zinc-500 block text-[9px] font-bold uppercase">Total</span>
+                        <strong className="text-zinc-950 font-black text-xs">{formatCurrency(total)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-emerald-700 block text-[9px] font-bold uppercase">Received</span>
+                        <strong className="text-emerald-700 font-black text-xs">{formatCurrency(adv)}</strong>
+                      </div>
+                      <div>
+                        <span
+                          className={`block text-[9px] font-bold uppercase ${
+                            isFullPaid ? 'text-emerald-700' : 'text-rose-600'
+                          }`}
+                        >
+                          {isFullPaid ? 'Status' : 'Baaki Due'}
+                        </span>
+                        <strong
+                          className={`font-black text-xs ${
+                            isFullPaid ? 'text-emerald-700' : 'text-rose-600'
+                          }`}
+                        >
+                          {isFullPaid ? '✅ Paid' : formatCurrency(due)}
+                        </strong>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-emerald-700 block text-[9px] font-bold uppercase">Advance</span>
-                      <strong className="text-emerald-700 font-black text-xs">{formatCurrency(b.advancePaid)}</strong>
+
+                    {/* Progress bar */}
+                    <div className="w-full h-1.5 bg-zinc-200 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full transition-all duration-300 ${
+                          isFullPaid ? 'bg-emerald-600' : 'bg-emerald-500'
+                        }`}
+                        style={{ width: `${paidPct}%` }}
+                      />
                     </div>
-                    <div>
-                      <span className="text-rose-600 block text-[9px] font-bold uppercase">Due</span>
-                      <strong className="text-rose-600 font-black text-xs">
-                        {formatCurrency(b.balanceDue ?? b.pendingAmount ?? 0)}
-                      </strong>
-                    </div>
+
+                    {/* Received Account & Payment Mode Info */}
+                    {adv > 0 && (
+                      <div className="pt-1 border-t border-zinc-200/70 flex items-center justify-between gap-1 text-[9px] font-bold text-zinc-700 flex-wrap">
+                        <span className="truncate">
+                          💳 Account:{' '}
+                          <strong className="text-zinc-950">
+                            {Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0
+                              ? Array.from(
+                                  new Set(
+                                    b.paymentHistory.map((p) =>
+                                      (p.walletName || b.walletName || 'Rizwan').replace(' (Tour)', '')
+                                    )
+                                  )
+                                ).join(' + ')
+                              : (b.walletName || 'Rizwan').replace(' (Tour)', '')}
+                          </strong>
+                        </span>
+                        <span className="px-1.5 py-0.2 rounded bg-white border border-zinc-300 text-emerald-800 font-black">
+                          {Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0
+                            ? Array.from(
+                                new Set(b.paymentHistory.map((p) => p.paymentMode || b.paymentMode || 'UPI'))
+                              ).join(' / ')
+                            : b.paymentMode || 'UPI'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Latest Installment Info if any */}
+                    {latestPayment && (
+                      <div className="text-[9px] font-bold text-emerald-800 flex items-center justify-between">
+                        <span>
+                          🕒 Last: +{formatCurrency(latestPayment.amount)} ({formatShortDate(latestPayment.date)})
+                        </span>
+                        <span className="text-zinc-600">
+                          {latestPayment.walletName.replace(' (Tour)', '')} • {latestPayment.paymentMode}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Actions Footer */}
-                <div className="pt-2 mt-2 border-t border-zinc-200 flex items-center justify-between gap-1">
+                <div className="pt-2.5 mt-2 border-t border-zinc-200 flex items-center justify-between gap-1">
                   <div className="flex items-center gap-1.5">
+                    {/* Prominent Receive Payment / Paid History Button */}
+                    {!isFullPaid ? (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModalBooking(b)}
+                        title="Receive Remaining Baaki Payment"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] flex items-center gap-1 shadow-xs transition-all cursor-pointer active:scale-95"
+                      >
+                        <ArrowDownLeft size={12} className="stroke-[3]" />
+                        <span>+ Receive</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModalBooking(b)}
+                        title="View Full Payment History"
+                        className="px-2 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-black text-[10px] flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <CheckCircle2 size={12} className="text-emerald-700" />
+                        <span>Paid Info</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => openEditTourBookingModal(b)}
@@ -365,7 +679,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
             <div className="col-span-3">Customer &amp; Phone</div>
             <div className="col-span-2">Tour Destination</div>
             <div className="col-span-1 text-center">Pax</div>
-            <div className="col-span-2 text-right">Amounts (₹)</div>
+            <div className="col-span-2 text-right">Payment Status (₹)</div>
             <div className="col-span-2 text-right">Actions</div>
           </div>
 
@@ -378,10 +692,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                 ? d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                 : b.tourDate;
 
+              const total = Number(b.totalAmount || 0);
+              const adv = Number(b.advancePaid || 0);
+              const due = Math.max(0, total - adv);
+              const isFullPaid = due === 0 && total > 0;
+              const historyCount = Array.isArray(b.paymentHistory) ? b.paymentHistory.length : (adv > 0 ? 1 : 0);
+
               return (
                 <div
                   key={b.id}
-                  className="p-3.5 sm:p-4 hover:bg-zinc-50 transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:items-center"
+                  className={`p-3.5 sm:p-4 hover:bg-zinc-50 transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:items-center ${
+                    isFullPaid ? 'bg-emerald-50/20' : ''
+                  }`}
                 >
                   {/* Date & Booking Number */}
                   <div className="col-span-2 flex items-center justify-between lg:block">
@@ -397,34 +719,40 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     {/* Status Badge (visible on mobile row top right) */}
                     <div className="lg:hidden">
                       <span
-                        className={`text-[9px] font-black px-2 py-0.5 rounded border ${
-                          b.paymentStatus === 'Paid'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
-                            : b.paymentStatus === 'Partial'
-                            ? 'bg-amber-50 text-amber-900 border-amber-400'
-                            : 'bg-rose-50 text-rose-800 border-rose-400'
+                        onClick={() => setPaymentModalBooking(b)}
+                        className={`text-[9px] font-black px-2 py-0.5 rounded border cursor-pointer ${
+                          isFullPaid
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-amber-50 text-amber-900 border-amber-400'
                         }`}
                       >
-                        {b.paymentStatus === 'Partial' ? 'Advance' : b.paymentStatus}
+                        {isFullPaid ? '✅ FULL PAID' : `Baaki: ${formatCurrency(due)}`}
                       </span>
                     </div>
                   </div>
 
                   {/* Customer Info */}
                   <div className="col-span-3">
-                    <h4 className="text-sm font-black text-zinc-950 tracking-tight flex items-center gap-1.5">
+                    <h4 className="text-sm font-black text-zinc-950 tracking-tight flex items-center gap-1.5 flex-wrap">
                       <span>{b.customerName}</span>
                       <span
-                        className={`hidden lg:inline-block text-[9px] font-black px-1.5 py-0.2 rounded border ${
-                          b.paymentStatus === 'Paid'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
-                            : b.paymentStatus === 'Partial'
-                            ? 'bg-amber-50 text-amber-900 border-amber-400'
-                            : 'bg-rose-50 text-rose-800 border-rose-400'
+                        onClick={() => setPaymentModalBooking(b)}
+                        className={`hidden lg:inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.2 rounded border cursor-pointer ${
+                          isFullPaid
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-amber-50 text-amber-900 border-amber-400'
                         }`}
                       >
-                        {b.paymentStatus === 'Partial' ? 'Advance' : b.paymentStatus}
+                        {isFullPaid ? '✅ FULL PAID' : 'Advance'}
                       </span>
+                      {historyCount > 1 && (
+                        <span
+                          onClick={() => setPaymentModalBooking(b)}
+                          className="text-[9px] font-black px-1.5 py-0.2 rounded bg-blue-50 text-blue-800 border border-blue-300 cursor-pointer"
+                        >
+                          💵 {historyCount} Inst.
+                        </span>
+                      )}
                     </h4>
                     <div className="flex items-center gap-2 flex-wrap text-xs text-zinc-600 mt-0.5">
                       <a
@@ -470,21 +798,28 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </p>
                   </div>
 
-                  {/* Financials (Total, Advance, Due) */}
-                  <div className="col-span-2 flex items-center justify-between lg:block lg:text-right bg-zinc-50 lg:bg-transparent p-2 lg:p-0 rounded-xl">
+                  {/* Financials (Total, Received, Due) */}
+                  <div
+                    onClick={() => setPaymentModalBooking(b)}
+                    className="col-span-2 flex items-center justify-between lg:block lg:text-right bg-zinc-50 lg:bg-transparent p-2 lg:p-0 rounded-xl cursor-pointer"
+                  >
                     <div>
-                      <span className="text-[10px] text-zinc-500 block uppercase font-bold lg:hidden">Amounts:</span>
+                      <span className="text-[10px] text-zinc-500 block uppercase font-bold lg:hidden">Total:</span>
                       <div className="text-xs font-black text-zinc-950">
-                        {formatCurrency(b.totalAmount)}
+                        {formatCurrency(total)}
                       </div>
                     </div>
                     <div className="text-right">
                       <div className="text-[11px] font-bold text-emerald-700">
-                        Adv: {formatCurrency(b.advancePaid)}
+                        Recd: {formatCurrency(adv)}
                       </div>
-                      {(Number(b.balanceDue ?? b.pendingAmount ?? 0) > 0) && (
-                        <div className="text-[10px] font-bold text-rose-600">
-                          Due: {formatCurrency(b.balanceDue ?? b.pendingAmount)}
+                      {isFullPaid ? (
+                        <div className="text-[10px] font-black text-emerald-700">
+                          ✅ Full Paid
+                        </div>
+                      ) : (
+                        <div className="text-[10px] font-black text-rose-600">
+                          Due: {formatCurrency(due)}
                         </div>
                       )}
                     </div>
@@ -492,6 +827,28 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
 
                   {/* Action Buttons */}
                   <div className="col-span-2 flex items-center justify-end gap-1.5 pt-1 lg:pt-0 border-t lg:border-t-0 border-zinc-100">
+                    {!isFullPaid ? (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModalBooking(b)}
+                        title="Receive Remaining Due Payment"
+                        className="px-2.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-black text-[11px] flex items-center gap-1 shadow-xs transition-all cursor-pointer"
+                      >
+                        <ArrowDownLeft size={12} className="stroke-[3]" />
+                        <span>+ Receive</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setPaymentModalBooking(b)}
+                        title="View Payment History"
+                        className="px-2 py-1.5 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 font-black text-[10px] flex items-center gap-1 transition-all cursor-pointer"
+                      >
+                        <CheckCircle2 size={11} />
+                        <span>History</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => openEditTourBookingModal(b)}
@@ -531,6 +888,21 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
           </div>
         </div>
       )}
+
+      {/* Receive Payment & Installment History Modal */}
+      <ReceiveTourPaymentModal
+        isOpen={Boolean(paymentModalBooking)}
+        onClose={() => setPaymentModalBooking(null)}
+        booking={paymentModalBooking}
+      />
+
+      {/* Custom PDF Export Options Modal */}
+      <TourPDFExportModal
+        isOpen={isPDFModalOpen}
+        onClose={() => setIsPDFModalOpen(false)}
+        initialBatchId={selectedBatchId}
+        initialPaymentFilter={statusFilter}
+      />
     </div>
   );
 };

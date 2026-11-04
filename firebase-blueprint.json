@@ -235,6 +235,31 @@
         "updatedAt": { "type": "string" }
       },
       "required": ["businessName", "currency", "dateFormat", "updatedAt"]
+    },
+    "ConfirmedBooking": {
+      "title": "ConfirmedBooking",
+      "description": "Top-level confirmed tour booking records for customer and admin portals",
+      "type": "object",
+      "properties": {
+        "bookingId": { "type": "string", "maxLength": 100 },
+        "customerName": { "type": "string", "maxLength": 150 },
+        "customerPhone": { "type": "string", "maxLength": 40 },
+        "customerEmail": { "type": "string", "maxLength": 150 },
+        "destination": { "type": "string", "maxLength": 150 },
+        "packageName": { "type": "string", "maxLength": 150 },
+        "travelDate": { "type": "string", "maxLength": 50 },
+        "numPassengers": { "type": "number" },
+        "totalAmount": { "type": "number" },
+        "advancePaid": { "type": "number" },
+        "pendingAmount": { "type": "number" },
+        "paymentStatus": { "type": "string", "enum": ["PARTIALLY_PAID", "FULLY_PAID"] },
+        "bookingStatus": { "type": "string", "enum": ["CONFIRMED"] },
+        "paymentMode": { "type": "string", "enum": ["UPI", "NetBanking", "Cash"] },
+        "transactionId": { "type": "string", "maxLength": 128 },
+        "notes": { "type": "string", "maxLength": 1000 },
+        "createdAt": { "type": "number" }
+      },
+      "required": ["bookingId", "customerName", "customerPhone", "destination", "packageName", "travelDate", "numPassengers", "totalAmount", "advancePaid", "pendingAmount", "paymentStatus", "bookingStatus", "paymentMode", "createdAt"]
     }
   },
   "firestore": {
@@ -289,6 +314,10 @@
     "/settings/{settingId}": {
       "schema": { "$ref": "#/entities/Settings" },
       "description": "Store configuration and preferences"
+    },
+    "/confirmed_bookings/{bookingId}": {
+      "schema": { "$ref": "#/entities/ConfirmedBooking" },
+      "description": "Real-time confirmed tour bookings collection for Sanzari Tourism Admin App"
     }
   }
 }

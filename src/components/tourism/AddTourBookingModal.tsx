@@ -108,6 +108,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   // Primary Customer Details
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const [customerEmail, setCustomerEmail] = useState('');
   const [city, setCity] = useState('Bhuj');
 
   // Travel Class & Package Category

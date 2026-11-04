@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Luggage,
   Calendar,
@@ -9,10 +9,12 @@ import {
   MapPin,
   AlertCircle,
   Wallet,
+  CheckCircle2,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBatch, TourBooking } from '../../types';
 import { TourismDashboardSkeleton } from '../common/Skeleton';
+import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 
 interface TourismDashboardProps {
   onNavigateTab: (tab: any) => void;
@@ -48,6 +50,8 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
     setIsPackageExplainerOpen,
     openInquiryPdf,
   } = useData();
+
+  const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
 
   if (loading) {
     return <TourismDashboardSkeleton />;
@@ -477,67 +481,105 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         <div className="space-y-2.5">
-          {recentBookings.map((b) => (
-            <div
-              key={b.id}
-              className="bg-white hover:bg-zinc-50 p-3.5 sm:p-4 rounded-2xl border-2 border-zinc-900 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs"
-            >
-              <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[10px] font-black font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-900 border border-zinc-300">
-                    {b.bookingNumber}
-                  </span>
-                  <span
-                    className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      b.paymentStatus === 'Paid'
-                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-300'
-                        : 'bg-amber-50 text-amber-900 border border-amber-300'
-                    }`}
-                  >
-                    {b.paymentStatus === 'Paid' ? 'Paid' : `Advance: ₹${b.advancePaid}`}
-                  </span>
-                  <span className="text-[10px] bg-zinc-100 text-zinc-800 border border-zinc-300 px-2 py-0.5 rounded font-semibold">
-                    {b.travelClass}
-                  </span>
-                </div>
+          {recentBookings.map((b) => {
+            const total = Number(b.totalAmount || 0);
+            const adv = Number(b.advancePaid || 0);
+            const due = Math.max(0, total - adv);
+            const isFullPaid = due === 0 && total > 0;
 
-                <div className="flex items-center gap-2">
-                  <h3 className="text-sm font-bold text-zinc-900">{b.customerName}</h3>
-                  <span className="text-xs text-zinc-500 font-medium">
-                    ({b.membersCount} Pax • {b.destination})
-                  </span>
-                </div>
-
-                <div className="text-[11px] text-zinc-500 flex items-center gap-3">
-                  <span>🗓️ Departure: {formatDate(b.tourDate)}</span>
-                  {b.pendingAmount > 0 && (
-                    <span className="text-rose-600 font-bold">
-                      Pending: {formatCurrency(b.pendingAmount)}
+            return (
+              <div
+                key={b.id}
+                className={`bg-white hover:bg-zinc-50 p-3.5 sm:p-4 rounded-2xl border-2 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs ${
+                  isFullPaid ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-900'
+                }`}
+              >
+                <div className="space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[10px] font-black font-mono px-2 py-0.5 rounded bg-zinc-100 text-zinc-900 border border-zinc-300">
+                      {b.bookingNumber}
                     </span>
+                    <span
+                      onClick={() => setPaymentModalBooking(b)}
+                      className={`text-[10px] font-bold px-2 py-0.5 rounded-full cursor-pointer ${
+                        isFullPaid
+                          ? 'bg-emerald-600 text-white border border-emerald-700'
+                          : 'bg-amber-50 text-amber-900 border border-amber-300'
+                      }`}
+                    >
+                      {isFullPaid ? '✅ FULL PAID' : `Received: ₹${adv.toLocaleString('en-IN')}`}
+                    </span>
+                    <span className="text-[10px] bg-zinc-100 text-zinc-800 border border-zinc-300 px-2 py-0.5 rounded font-semibold">
+                      {b.travelClass}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm font-bold text-zinc-900">{b.customerName}</h3>
+                    <span className="text-xs text-zinc-500 font-medium">
+                      ({b.membersCount} Pax • {b.destination})
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-zinc-500 flex items-center gap-3">
+                    <span>🗓️ Departure: {formatDate(b.tourDate)}</span>
+                    {isFullPaid ? (
+                      <span className="text-emerald-700 font-bold">✅ 100% Payment Aagaya</span>
+                    ) : (
+                      <span className="text-rose-600 font-bold">
+                        Baaki Due: {formatCurrency(due)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-center">
+                  <div className="text-right mr-1">
+                    <span className="text-[10px] text-zinc-400 block uppercase font-bold">Total</span>
+                    <span className="text-sm font-black text-zinc-900 font-mono">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+
+                  {!isFullPaid ? (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalBooking(b)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+                      title="Receive Remaining Baaki Payment"
+                    >
+                      <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" /> + Receive
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalBooking(b)}
+                      className="px-2.5 py-1.5 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                      title="View Payment History"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5" /> History
+                    </button>
                   )}
+
+                  <button
+                    onClick={() => handleShareBooking(b)}
+                    className="px-3 py-1.5 bg-zinc-900 hover:bg-black text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1 transition-colors cursor-pointer"
+                    title="WhatsApp Confirmation Slip"
+                  >
+                    <Share2 className="w-3.5 h-3.5" /> Slip
+                  </button>
                 </div>
               </div>
-
-              <div className="flex items-center gap-3 self-end sm:self-center">
-                <div className="text-right">
-                  <span className="text-[10px] text-zinc-400 block uppercase font-bold">Total</span>
-                  <span className="text-sm font-black text-zinc-900 font-mono">
-                    {formatCurrency(b.totalAmount)}
-                  </span>
-                </div>
-
-                <button
-                  onClick={() => handleShareBooking(b)}
-                  className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow-sm flex items-center gap-1 transition-colors"
-                  title="WhatsApp Confirmation Slip"
-                >
-                  <Share2 className="w-3.5 h-3.5" /> Slip
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </div>
+
+      <ReceiveTourPaymentModal
+        isOpen={Boolean(paymentModalBooking)}
+        onClose={() => setPaymentModalBooking(null)}
+        booking={paymentModalBooking}
+      />
     </div>
   );
 };

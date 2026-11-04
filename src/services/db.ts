@@ -34,6 +34,7 @@ import {
   StoreSettings,
   TourBatch,
   TourBooking,
+  ConfirmedBookingDocument,
   TourExpense,
   TourInquiry,
   CustomTourPackage,
@@ -356,6 +357,20 @@ export async function initializeStoreDataIfEmpty(): Promise<boolean> {
         }));
       }
       await batch.commit();
+    }
+
+    // Ensure all existing tourBookings are synced to confirmed_bookings collection for Sanzari Tourism Admin App
+    try {
+      const bookingsSnap = await getDocs(collection(db, 'tourBookings'));
+      const confirmedSnap = await getDocs(collection(db, 'confirmed_bookings'));
+      if (confirmedSnap.size < bookingsSnap.size) {
+        for (const docSnap of bookingsSnap.docs) {
+          const bData = docSnap.data() as TourBooking;
+          await syncConfirmedBookingToFirestore({ ...bData, id: docSnap.id });
+        }
+      }
+    } catch (cbErr) {
+      console.warn('confirmed_bookings backfill error:', cbErr);
     }
 
     // Mark store initialized locally
@@ -1992,6 +2007,109 @@ export function subscribeTourBookings(callback: (bookings: TourBooking[]) => voi
   );
 }
 
+// ----------------------------------------------------
+// TOP-LEVEL CONFIRMED BOOKINGS COLLECTION (For Sanzari Tourism Admin App Real-Time Listeners)
+// ----------------------------------------------------
+export function subscribeConfirmedBookings(callback: (bookings: ConfirmedBookingDocument[]) => void) {
+  const q = query(collection(db, 'confirmed_bookings'));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const list: ConfirmedBookingDocument[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<ConfirmedBookingDocument, 'id'>),
+      }));
+      list.sort((a, b) => (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0));
+      callback(list);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'confirmed_bookings');
+    }
+  );
+}
+
+export async function syncConfirmedBookingToFirestore(
+  booking: Partial<TourBooking> & { id?: string }
+): Promise<string> {
+  try {
+    // Generate/Normalize bookingId e.g. "BK-" + auto-generated ID or timestamp
+    let bookingId = '';
+    if (booking.bookingNumber) {
+      if (booking.bookingNumber.startsWith('BK-')) {
+        bookingId = booking.bookingNumber;
+      } else {
+        bookingId = `BK-${booking.bookingNumber.replace(/^SZ-TOUR-/, '')}`;
+      }
+    } else {
+      bookingId = `BK-${Date.now().toString().slice(-6)}`;
+    }
+
+    // Customer phone with country code (e.g. +91...)
+    let phone = (booking.customerPhone || '').trim();
+    if (phone && !phone.startsWith('+')) {
+      const cleanDigits = phone.replace(/[^0-9]/g, '');
+      if (cleanDigits.length === 10) {
+        phone = `+91${cleanDigits}`;
+      } else if (cleanDigits.length > 10) {
+        phone = `+${cleanDigits}`;
+      }
+    }
+
+    const totalAmount = Number(booking.totalAmount || 0);
+    const advancePaid = Number(booking.advancePaid || 0);
+    const pendingAmount = Math.max(0, totalAmount - advancePaid);
+    const paymentStatus: 'PARTIALLY_PAID' | 'FULLY_PAID' = pendingAmount === 0 ? 'FULLY_PAID' : 'PARTIALLY_PAID';
+
+    // Payment Mode: "UPI" | "NetBanking" | "Cash"
+    let pMode: 'UPI' | 'NetBanking' | 'Cash' = 'UPI';
+    const rawMode = (booking.paymentMode || booking.paymentMethod || '').toLowerCase();
+    if (rawMode.includes('cash') || rawMode === 'offline') {
+      pMode = 'Cash';
+    } else if (rawMode.includes('bank') || rawMode.includes('netbanking')) {
+      pMode = 'NetBanking';
+    } else {
+      pMode = 'UPI';
+    }
+
+    // Milliseconds timestamp for createdAt as required
+    let createdAtMs = Date.now();
+    if (booking.createdAt) {
+      const parsed = typeof booking.createdAt === 'number' ? booking.createdAt : new Date(booking.createdAt).getTime();
+      if (!isNaN(parsed) && parsed > 0) createdAtMs = parsed;
+    }
+
+    const docId = booking.id || bookingId;
+    const confirmedRef = doc(db, 'confirmed_bookings', docId);
+
+    const payload: ConfirmedBookingDocument = {
+      bookingId,
+      customerName: booking.customerName || 'Customer',
+      customerPhone: phone || '+910000000000',
+      customerEmail: booking.customerEmail || '',
+      destination: booking.destination || 'Kashmir',
+      packageName: booking.tourBatchTitle || booking.tourTitle || `${booking.destination || 'Kashmir'} Deluxe Tour`,
+      travelDate: booking.tourDate || new Date().toISOString().split('T')[0],
+      numPassengers: Number(booking.membersCount || booking.members?.length || 1),
+      totalAmount,
+      advancePaid,
+      pendingAmount,
+      paymentStatus,
+      bookingStatus: 'CONFIRMED',
+      paymentMode: pMode,
+      transactionId: booking.transactionId || `TXN-${bookingId}-${Date.now().toString().slice(-4)}`,
+      notes: booking.specialNotes || '',
+      createdAt: createdAtMs,
+      updatedAt: new Date().toISOString(),
+    };
+
+    await setDoc(confirmedRef, sanitizeForFirestore(payload), { merge: true });
+    return docId;
+  } catch (error) {
+    console.warn('syncConfirmedBookingToFirestore error:', error);
+    return '';
+  }
+}
+
 export async function addTourBooking(
   bookingData: Omit<TourBooking, 'id' | 'createdAt' | 'updatedAt' | 'pendingAmount' | 'paymentStatus'> & { bookingNumber?: string; balanceDue?: number },
   userEmail: string
@@ -2001,7 +2119,7 @@ export async function addTourBooking(
     const bookingNumber = bookingData.bookingNumber || `SZ-TOUR-${Math.floor(1000 + Math.random() * 9000)}`;
     const pendingAmount = Math.max(0, Number(bookingData.totalAmount) - Number(bookingData.advancePaid || 0));
     const balanceDue = pendingAmount;
-    const paymentStatus =
+    const paymentStatus: PaymentStatus | 'Due' =
       pendingAmount === 0 ? 'Paid' : Number(bookingData.advancePaid) > 0 ? 'Partial' : 'Due';
     const monthKey = getMonthKey(bookingData.tourDate);
 
@@ -2019,6 +2137,24 @@ export async function addTourBooking(
       }
     }
 
+    const initialHistory =
+      bookingData.paymentHistory && bookingData.paymentHistory.length > 0
+        ? bookingData.paymentHistory
+        : Number(bookingData.advancePaid || 0) > 0
+        ? [
+            {
+              id: `adv-${Date.now()}`,
+              amount: Number(bookingData.advancePaid),
+              date: new Date().toISOString(),
+              walletName: bookingData.walletName || 'Rizwan (Tour)',
+              paymentMode: bookingData.paymentMode || 'Online',
+              paymentMethod: bookingData.paymentMethod || 'UPI',
+              notes: 'Initial Booking Advance',
+              receivedBy: bookingData.bookedBy || 'Office Staff',
+            },
+          ]
+        : [];
+
     const cleanPayload = sanitizeForFirestore({
       ...bookingData,
       bookingNumber,
@@ -2026,6 +2162,8 @@ export async function addTourBooking(
       pendingAmount,
       balanceDue,
       paymentStatus,
+      paymentHistory: initialHistory,
+      lastPaymentDate: Number(bookingData.advancePaid || 0) > 0 ? new Date().toISOString() : undefined,
       bookingStatus: bookingData.bookingStatus || 'Confirmed',
       packageCategory: bookingData.packageCategory || 'Deluxe',
       createdAt: new Date().toISOString(),
@@ -2105,6 +2243,13 @@ export async function addTourBooking(
       }
     }
 
+    // Sync into top-level confirmed_bookings collection for Sanzari Tourism Admin App
+    syncConfirmedBookingToFirestore({
+      ...cleanPayload,
+      id: bookingRef.id,
+      bookingNumber,
+    }).catch((e) => console.warn('confirmed_bookings sync error:', e));
+
     // Audit log
     await addDoc(collection(db, 'auditLogs'), {
       userEmail,
@@ -2129,6 +2274,8 @@ export async function recordTourBookingPayment(params: {
   paymentMethod: PaymentMethod;
   paymentMode: TourPaymentMode;
   notes?: string;
+  receivedBy?: string;
+  paymentDate?: string;
   userEmail: string;
 }): Promise<void> {
   try {
@@ -2145,6 +2292,8 @@ export async function recordTourBookingPayment(params: {
       }
     }
 
+    const payTimestamp = params.paymentDate || new Date().toISOString();
+
     await runTransaction(db, async (transaction) => {
       // READS FIRST
       const bookingRef = doc(db, 'tourBookings', params.bookingId);
@@ -2160,14 +2309,53 @@ export async function recordTourBookingPayment(params: {
 
       // WRITES SECOND
       const bData = bSnap.data() as TourBooking;
-      const newAdvance = Number(bData.advancePaid || 0) + Number(params.amount);
+      const oldAdvance = Number(bData.advancePaid || 0);
+      const newAdvance = oldAdvance + Number(params.amount);
       const newPending = Math.max(0, Number(bData.totalAmount || 0) - newAdvance);
       const newPaymentStatus = newPending === 0 ? 'Paid' : 'Partial';
+
+      // Build paymentHistory array preserving initial advance if not yet tracked
+      const existingHistory = Array.isArray(bData.paymentHistory) && bData.paymentHistory.length > 0
+        ? [...bData.paymentHistory]
+        : oldAdvance > 0
+        ? [
+            {
+              id: 'init-adv',
+              amount: oldAdvance,
+              date: bData.createdAt || new Date().toISOString(),
+              walletName: bData.walletName || params.walletName,
+              paymentMode: bData.paymentMode || 'Online',
+              paymentMethod: bData.paymentMethod || 'UPI',
+              notes: 'Initial Booking Advance',
+              receivedBy: bData.bookedBy || 'Office Staff',
+            },
+          ]
+        : [];
+
+      const newEntry = sanitizeForFirestore({
+        id: `pay-${Date.now()}`,
+        amount: Number(params.amount),
+        date: payTimestamp,
+        walletName: params.walletName,
+        paymentMode: params.paymentMode,
+        paymentMethod: params.paymentMethod,
+        notes:
+          params.notes?.trim() ||
+          (newPending === 0
+            ? 'Full & Final Balance Received'
+            : `Installment #${existingHistory.length + 1} Received`),
+        receivedBy: params.receivedBy || 'Office Staff',
+      });
+
+      const updatedHistory = [...existingHistory, newEntry];
 
       transaction.update(bookingRef, {
         advancePaid: newAdvance,
         pendingAmount: newPending,
+        balanceDue: newPending,
         paymentStatus: newPaymentStatus,
+        paymentHistory: updatedHistory,
+        lastPaymentDate: payTimestamp,
         updatedAt: new Date().toISOString(),
       });
 
@@ -2179,6 +2367,20 @@ export async function recordTourBookingPayment(params: {
         });
       }
     });
+
+    // Sync updated payment into top-level confirmed_bookings collection
+    try {
+      const updatedSnap = await getDoc(doc(db, 'tourBookings', params.bookingId));
+      if (updatedSnap.exists()) {
+        await syncConfirmedBookingToFirestore({
+          ...(updatedSnap.data() as TourBooking),
+          id: params.bookingId,
+          transactionId: params.notes || `TXN-PAY-${Date.now().toString().slice(-4)}`,
+        });
+      }
+    } catch (e) {
+      console.warn('confirmed_bookings sync error on payment:', e);
+    }
 
     await addDoc(collection(db, 'auditLogs'), {
       userEmail: params.userEmail,
@@ -2212,7 +2414,7 @@ export async function updateTourBooking(
     const advancePaid =
       bookingData.advancePaid !== undefined ? Number(bookingData.advancePaid) : Number(existing.advancePaid || 0);
     const pendingAmount = Math.max(0, totalAmount - advancePaid);
-    const paymentStatus = pendingAmount === 0 ? 'Paid' : advancePaid > 0 ? 'Partial' : 'Pending';
+    const paymentStatus: PaymentStatus | 'Due' = pendingAmount === 0 ? 'Paid' : advancePaid > 0 ? 'Partial' : 'Pending';
 
     const oldAdvance = Number(existing.advancePaid || 0);
     const diffAdvance = advancePaid - oldAdvance;
@@ -2307,6 +2509,13 @@ export async function updateTourBooking(
         await updateDoc(bookingRef, cleanPayload);
       }
 
+      // Sync update into top-level confirmed_bookings collection for Sanzari Tourism Admin App
+      syncConfirmedBookingToFirestore({
+        ...existing,
+        ...cleanPayload,
+        id,
+      }).catch((e) => console.warn('confirmed_bookings update sync error:', e));
+
       await addDoc(collection(db, 'auditLogs'), {
         userEmail,
         action: 'UPDATE_TOUR_BOOKING',
@@ -2374,6 +2583,13 @@ export async function deleteTourBooking(id: string, userEmail: string): Promise<
     // 3. Delete booking document directly
     await deleteDoc(bookingRef);
 
+    // Also remove from top-level confirmed_bookings collection
+    try {
+      await deleteDoc(doc(db, 'confirmed_bookings', id));
+    } catch (e) {
+      console.warn('confirmed_bookings delete error:', e);
+    }
+
     // 4. Audit Log (best effort)
     try {
       await addDoc(collection(db, 'auditLogs'), {
@@ -2421,33 +2637,49 @@ export async function addTourExpense(
     const expenseRef = doc(collection(db, 'tourExpenses'));
     const monthKey = getMonthKey(expenseData.date);
 
-    await runTransaction(db, async (transaction) => {
-      // Deduct from wallet
-      if (expenseData.walletName) {
+    let targetWalletRef = null;
+    if (expenseData.walletName) {
+      try {
         const walletsSnap = await getDocs(collection(db, 'wallets'));
         const targetWallet = walletsSnap.docs.find(
           (w) => (w.data().name || '').toLowerCase() === (expenseData.walletName || '').toLowerCase()
         );
         if (targetWallet) {
-          const wRef = doc(db, 'wallets', targetWallet.id);
-          const wSnap = await transaction.get(wRef);
-          if (wSnap.exists()) {
-            const currentBal = Number(wSnap.data().currentBalance || 0);
-            transaction.update(wRef, {
-              currentBalance: currentBal - Number(expenseData.amount),
-              updatedAt: new Date().toISOString(),
-            });
-          }
+          targetWalletRef = doc(db, 'wallets', targetWallet.id);
         }
+      } catch {
+        // Fallback if wallets query fails
       }
+    }
 
-      transaction.set(expenseRef, sanitizeForFirestore({
-        ...expenseData,
-        monthKey,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      }));
+    const cleanExpensePayload = sanitizeForFirestore({
+      ...expenseData,
+      monthKey,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     });
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        let wSnap = null;
+        if (targetWalletRef) {
+          wSnap = await transaction.get(targetWalletRef);
+        }
+
+        if (targetWalletRef && wSnap && wSnap.exists()) {
+          const currentBal = Number(wSnap.data().currentBalance || 0);
+          transaction.update(targetWalletRef, {
+            currentBalance: currentBal - Number(expenseData.amount || 0),
+            updatedAt: new Date().toISOString(),
+          });
+        }
+
+        transaction.set(expenseRef, cleanExpensePayload);
+      });
+    } catch (txErr) {
+      console.warn('Transaction addTourExpense fallback:', txErr);
+      await setDoc(expenseRef, cleanExpensePayload);
+    }
 
     await addDoc(collection(db, 'auditLogs'), {
       userEmail,
@@ -2467,7 +2699,31 @@ export async function addTourExpense(
 
 export async function deleteTourExpense(id: string, userEmail: string): Promise<void> {
   try {
-    await deleteDoc(doc(db, 'tourExpenses', id));
+    const expRef = doc(db, 'tourExpenses', id);
+    const expSnap = await getDoc(expRef);
+
+    if (expSnap.exists()) {
+      const expData = expSnap.data() as TourExpense;
+      if (expData.walletName && Number(expData.amount || 0) > 0) {
+        try {
+          const walletsSnap = await getDocs(collection(db, 'wallets'));
+          const targetWallet = walletsSnap.docs.find(
+            (w) => (w.data().name || '').toLowerCase() === (expData.walletName || '').toLowerCase()
+          );
+          if (targetWallet) {
+            const currentBal = Number(targetWallet.data().currentBalance || 0);
+            await updateDoc(doc(db, 'wallets', targetWallet.id), {
+              currentBalance: currentBal + Number(expData.amount || 0),
+              updatedAt: new Date().toISOString(),
+            });
+          }
+        } catch {
+          // Best-effort wallet refund
+        }
+      }
+    }
+
+    await deleteDoc(expRef);
     await addDoc(collection(db, 'auditLogs'), {
       userEmail,
       action: 'DELETE_TOUR_EXPENSE',

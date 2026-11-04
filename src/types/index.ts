@@ -63,6 +63,17 @@ export interface TourBatch {
   updatedAt?: string;
 }
 
+export interface TourPaymentEntry {
+  id: string;
+  amount: number;
+  date: string; // ISO or YYYY-MM-DD
+  walletName: string;
+  paymentMode: TourPaymentMode;
+  paymentMethod: PaymentMethod;
+  notes?: string;
+  receivedBy?: string;
+}
+
 export interface TourBooking {
   id: string;
   bookingNumber: string; // e.g. "SZ-TOUR-2518"
@@ -102,14 +113,39 @@ export interface TourBooking {
   paymentMethod: PaymentMethod; // 'UPI' | 'Cash' | 'Bank' | 'Other'
   walletId?: string;
   walletName: string; // e.g. "Rizwan (Tour)", "Sahil (Tour)"
+  paymentHistory?: TourPaymentEntry[];
+  lastPaymentDate?: string;
   
   // Additional Notes & Status
   bookingStatus: TourBookingStatus;
   bookedBy?: string;
+  transactionId?: string;
   specialNotes?: string;
   
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface ConfirmedBookingDocument {
+  id?: string;
+  bookingId: string; // "BK-" + auto-generated ID or timestamp
+  customerName: string;
+  customerPhone: string;
+  customerEmail: string;
+  destination: string;
+  packageName: string;
+  travelDate: string;
+  numPassengers: number;
+  totalAmount: number;
+  advancePaid: number;
+  pendingAmount: number;
+  paymentStatus: 'PARTIALLY_PAID' | 'FULLY_PAID';
+  bookingStatus: 'CONFIRMED';
+  paymentMode: 'UPI' | 'NetBanking' | 'Cash';
+  transactionId: string;
+  notes: string;
+  createdAt: number; // timestamp or milliseconds
+  updatedAt?: string | number;
 }
 
 export interface TourExpense {
@@ -121,6 +157,7 @@ export interface TourExpense {
   amount: number;
   walletId?: string;
   walletName: string;
+  paymentMode?: TourPaymentMode;
   date: string;
   monthKey: string;
   description: string;

@@ -1,7 +1,12 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Grant full read and write access for Sanzari Store database documents
+    // Top-level Confirmed Bookings collection for Sanzari Tourism Admin App real-time listening
+    match /confirmed_bookings/{bookingId} {
+      allow read, write: if true;
+    }
+
+    // Grant full read and write access for Sanzari Store & Tourism database documents
     match /{document=**} {
       allow read, write: if true;
     }

@@ -1,16 +1,16 @@
 import React, { useState, useMemo } from 'react';
 import {
   Folder,
-  Calendar,
   MapPin,
-  Users,
   Search,
   ChevronRight,
   Trash2,
+  FileDown,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBatch } from '../../types';
 import { BatchesSkeleton } from '../common/Skeleton';
+import { TourPDFExportModal } from './TourPDFExportModal';
 
 interface TourBatchesViewProps {
   onSelectBatch?: (batchId: string) => void;
@@ -25,11 +25,23 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     tourBatches,
     tourBookings,
     formatCurrency,
-    setIsAddTourBatchOpen,
     deleteTourBatchById,
   } = useData();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [pdfModalBatchId, setPdfModalBatchId] = useState<string | null>(null);
+
+  // Filtered Tour Batches (must be above early return to follow Rules of Hooks)
+  const filteredBatches = useMemo(() => {
+    return tourBatches.filter((b) => {
+      const q = searchQuery.toLowerCase();
+      return (
+        b.title.toLowerCase().includes(q) ||
+        b.destination.toLowerCase().includes(q) ||
+        b.departureDate.includes(q)
+      );
+    });
+  }, [tourBatches, searchQuery]);
 
   if (loading) {
     return <BatchesSkeleton />;
@@ -46,17 +58,10 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     }
   };
 
-  // Filtered Tour Batches
-  const filteredBatches = useMemo(() => {
-    return tourBatches.filter((b) => {
-      const q = searchQuery.toLowerCase();
-      return (
-        b.title.toLowerCase().includes(q) ||
-        b.destination.toLowerCase().includes(q) ||
-        b.departureDate.includes(q)
-      );
-    });
-  }, [tourBatches, searchQuery]);
+  const handleExportBatchPDF = (e: React.MouseEvent, batch: TourBatch) => {
+    e.stopPropagation();
+    setPdfModalBatchId(batch.id);
+  };
 
   // Calculate stats for a given batch
   const getBatchStats = (batchId: string) => {
@@ -64,7 +69,10 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     const totalPassengers = bookings.reduce((sum, bk) => sum + (bk.membersCount || 1), 0);
     const totalRevenue = bookings.reduce((sum, bk) => sum + (bk.totalAmount || 0), 0);
     const totalAdvance = bookings.reduce((sum, bk) => sum + (bk.advancePaid || 0), 0);
-    const totalPending = bookings.reduce((sum, bk) => sum + (bk.pendingAmount || 0), 0);
+    const totalPending = bookings.reduce(
+      (sum, bk) => sum + Math.max(0, (bk.totalAmount || 0) - (bk.advancePaid || 0)),
+      0
+    );
     return { bookingsCount: bookings.length, totalPassengers, totalRevenue, totalAdvance, totalPending };
   };
 
@@ -114,12 +122,23 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                 className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-3 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group cursor-pointer"
               >
                 <div>
-                  {/* Folder Top Header - White Background, Black Border & Direct Delete Option */}
+                  {/* Folder Top Header - White Background, Black Border & Direct PDF/Delete Option */}
                   <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2.5">
                     <span className="text-[10px] font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
                       <span>📂</span> Folder
                     </span>
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1">
+                      {stats.bookingsCount > 0 && (
+                        <button
+                          type="button"
+                          onClick={(e) => handleExportBatchPDF(e, b)}
+                          title="Download Group Bookings & Payment PDF"
+                          className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+                        >
+                          <FileDown size={10} />
+                          <span>PDF</span>
+                        </button>
+                      )}
                       <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-300 truncate max-w-[70px]">
                         {b.tourType}
                       </span>
@@ -188,12 +207,12 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                       <strong className="text-zinc-950 font-bold text-xs">{stats.bookingsCount}</strong>
                     </div>
                     <div>
-                      <span className="text-zinc-500 block text-[9px]">Travelers</span>
-                      <strong className="text-zinc-950 font-bold text-xs">{stats.totalPassengers}</strong>
-                    </div>
-                    <div>
                       <span className="text-zinc-500 block text-[9px]">Advance</span>
                       <strong className="text-emerald-700 font-bold text-xs">{formatCurrency(stats.totalAdvance)}</strong>
+                    </div>
+                    <div>
+                      <span className="text-zinc-500 block text-[9px]">Baaki Due</span>
+                      <strong className="text-rose-600 font-bold text-xs">{formatCurrency(stats.totalPending)}</strong>
                     </div>
                   </div>
                 </div>
@@ -204,7 +223,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                     {stats.totalPassengers} Passengers
                   </span>
                   <div className="text-[10px] font-bold text-zinc-900 group-hover:text-black flex items-center gap-0.5 transition-colors">
-                    <span>View Folder</span>
+                    <span>Open &amp; PDF</span>
                     <ChevronRight size={12} className="text-zinc-500" />
                   </div>
                 </div>
@@ -213,6 +232,13 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
           })}
         </div>
       )}
+
+      <TourPDFExportModal
+        isOpen={Boolean(pdfModalBatchId)}
+        onClose={() => setPdfModalBatchId(null)}
+        initialBatchId={pdfModalBatchId || 'ALL'}
+      />
     </div>
   );
 };
+
