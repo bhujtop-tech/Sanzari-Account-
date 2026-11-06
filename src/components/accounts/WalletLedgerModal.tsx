@@ -2,13 +2,11 @@ import React, { useMemo } from 'react';
 import { useData } from '../../context/DataContext';
 import { BottomSheet } from '../common/BottomSheet';
 import { Wallet } from '../../types';
+import { buildTourWalletLedger } from '../../utils/tourWalletLedger';
 import {
-  TrendingUp,
-  TrendingDown,
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRightLeft,
-  Calendar,
 } from 'lucide-react';
 
 export const WalletLedgerModal: React.FC = () => {
@@ -52,15 +50,40 @@ export const WalletLedgerModal: React.FC = () => {
   const ledgerItems = useMemo(() => {
     if (!selectedWalletId || !wallet) return [];
 
+    // For Tour Wallets (Sahil (Tour), Rizwan (Tour), Bus (Tour)), use unified tourWalletLedger
+    // which includes BOTH initial booking advances AND all +Receive installments in paymentHistory
+    if (isTourWallet) {
+      const tourLedger = buildTourWalletLedger({
+        wallet,
+        tourBookings,
+        tourExpenses,
+        transfers,
+        formatDate,
+      });
+      return tourLedger.items;
+    }
+
     const list: Array<{
       id: string;
       date: string;
       rawDate: string;
-      type: 'sale' | 'payment' | 'expense' | 'transfer_in' | 'transfer_out' | 'purchase' | 'tour_booking' | 'tour_expense';
+      type:
+        | 'sale'
+        | 'payment'
+        | 'expense'
+        | 'transfer_in'
+        | 'transfer_out'
+        | 'purchase'
+        | 'tour_booking'
+        | 'tour_payment'
+        | 'tour_expense';
       title: string;
       subtitle: string;
       amount: number;
       isPositive: boolean;
+      isCrossAccount?: boolean;
+      bookingWalletName?: string;
+      paymentMode?: string;
       refId?: string;
     }> = [];
 
@@ -72,107 +95,73 @@ export const WalletLedgerModal: React.FC = () => {
       return false;
     };
 
-    if (isTourWallet) {
-      // Tour Bookings advance paid into this wallet
-      tourBookings.forEach((tb) => {
-        if (matchesWallet(tb.walletId, tb.walletName) && tb.advancePaid > 0) {
-          list.push({
-            id: `tb-${tb.id}`,
-            date: formatDate(tb.tourDate),
-            rawDate: tb.tourDate || tb.createdAt || '',
-            type: 'tour_booking',
-            title: `Tour Advance • ${tb.tourTitle}`,
-            subtitle: `${tb.customerName} (${tb.membersCount} Pax)`,
-            amount: tb.advancePaid,
-            isPositive: true,
-          });
-        }
-      });
+    // Dry Fruit Store Ledger
+    // Sales paid into this wallet
+    sales.forEach((s) => {
+      if (matchesWallet(s.walletId, s.walletName, s.salesPerson) && s.paidAmount > 0) {
+        list.push({
+          id: `sale-${s.id}`,
+          date: formatDate(s.date),
+          rawDate: s.date || s.createdAt || '',
+          type: 'sale',
+          title: `Sale • ${s.saleNumber}`,
+          subtitle: s.customerName || 'Customer',
+          amount: s.paidAmount,
+          isPositive: true,
+          refId: s.id,
+        });
+      }
+    });
 
-      // Tour Expenses paid from this wallet
-      tourExpenses.forEach((te) => {
-        if (matchesWallet(te.walletId, te.walletName) && te.amount > 0) {
-          list.push({
-            id: `te-${te.id}`,
-            date: formatDate(te.date),
-            rawDate: te.date || te.createdAt || '',
-            type: 'tour_expense',
-            title: `Tour Exp • ${te.category}`,
-            subtitle: te.description || te.tourTitle || 'Tour Expense',
-            amount: te.amount,
-            isPositive: false,
-          });
-        }
-      });
-    } else {
-      // Dry Fruit Store Ledger
-      // Sales paid into this wallet
-      sales.forEach((s) => {
-        if (matchesWallet(s.walletId, s.walletName, s.salesPerson) && s.paidAmount > 0) {
-          list.push({
-            id: `sale-${s.id}`,
-            date: formatDate(s.date),
-            rawDate: s.date || s.createdAt || '',
-            type: 'sale',
-            title: `Sale • ${s.saleNumber}`,
-            subtitle: s.customerName || 'Customer',
-            amount: s.paidAmount,
-            isPositive: true,
-            refId: s.id,
-          });
-        }
-      });
+    // Payments received in this wallet
+    payments.forEach((p) => {
+      if (matchesWallet(p.walletId) && !p.notes?.includes('Payment for SALE-')) {
+        list.push({
+          id: `pay-${p.id}`,
+          date: formatDate(p.date),
+          rawDate: p.date || p.createdAt || '',
+          type: 'payment',
+          title: 'Payment Received',
+          subtitle: p.customerName || 'Customer',
+          amount: p.amount,
+          isPositive: true,
+        });
+      }
+    });
 
-      // Payments received in this wallet
-      payments.forEach((p) => {
-        if (matchesWallet(p.walletId) && !p.notes?.includes('Payment for SALE-')) {
-          list.push({
-            id: `pay-${p.id}`,
-            date: formatDate(p.date),
-            rawDate: p.date || p.createdAt || '',
-            type: 'payment',
-            title: 'Payment Received',
-            subtitle: p.customerName || 'Customer',
-            amount: p.amount,
-            isPositive: true,
-          });
-        }
-      });
+    // Expenses paid from this wallet
+    expenses.forEach((e) => {
+      if (matchesWallet(e.walletId, e.walletName)) {
+        list.push({
+          id: `exp-${e.id}`,
+          date: formatDate(e.date),
+          rawDate: e.date || e.createdAt || '',
+          type: 'expense',
+          title: `Expense • ${e.category}`,
+          subtitle: e.description || e.category,
+          amount: e.amount,
+          isPositive: false,
+        });
+      }
+    });
 
-      // Expenses paid from this wallet
-      expenses.forEach((e) => {
-        if (matchesWallet(e.walletId, e.walletName)) {
-          list.push({
-            id: `exp-${e.id}`,
-            date: formatDate(e.date),
-            rawDate: e.date || e.createdAt || '',
-            type: 'expense',
-            title: `Expense • ${e.category}`,
-            subtitle: e.description || e.category,
-            amount: e.amount,
-            isPositive: false,
-          });
-        }
-      });
+    // Purchases
+    purchases.forEach((p) => {
+      if (matchesWallet(p.walletId, p.walletName) && p.paymentStatus === 'Paid') {
+        list.push({
+          id: `pur-${p.id}`,
+          date: formatDate(p.date),
+          rawDate: p.date || p.createdAt || '',
+          type: 'purchase',
+          title: `Purchase • ${p.productName}`,
+          subtitle: p.vendorName || 'Vendor',
+          amount: p.totalCost,
+          isPositive: false,
+        });
+      }
+    });
 
-      // Purchases
-      purchases.forEach((p) => {
-        if (matchesWallet(p.walletId, p.walletName)) {
-          list.push({
-            id: `pur-${p.id}`,
-            date: formatDate(p.date),
-            rawDate: p.date || p.createdAt || '',
-            type: 'purchase',
-            title: `Purchase • ${p.productName}`,
-            subtitle: p.vendorName || 'Vendor',
-            amount: p.totalCost,
-            isPositive: false,
-          });
-        }
-      });
-    }
-
-    // Transfers In
+    // Transfers In / Out
     transfers.forEach((t) => {
       if (matchesWallet(t.toWalletId, t.toWalletName)) {
         const reasonStr = t.notes ? `Reason: ${t.notes}` : 'Reason: Internal Transfer';
@@ -204,38 +193,38 @@ export const WalletLedgerModal: React.FC = () => {
       }
     });
 
-    // Purchases paid from this wallet
-    purchases.forEach((pur) => {
-      if (pur.walletId === selectedWalletId && pur.paymentStatus === 'Paid') {
-        list.push({
-          id: `pur-${pur.id}`,
-          date: formatDate(pur.date),
-          rawDate: pur.date || pur.createdAt || '',
-          type: 'purchase',
-          title: `Purchase • ${pur.productName}`,
-          subtitle: pur.vendorName,
-          amount: pur.totalCost,
-          isPositive: false,
-        });
-      }
-    });
-
     return list.sort((a, b) => (b.rawDate > a.rawDate ? 1 : b.rawDate < a.rawDate ? -1 : 0));
-  }, [selectedWalletId, wallet, sales, payments, expenses, transfers, purchases, tourBookings, tourExpenses]);
+  }, [
+    selectedWalletId,
+    wallet,
+    isTourWallet,
+    sales,
+    payments,
+    expenses,
+    transfers,
+    purchases,
+    tourBookings,
+    tourExpenses,
+    formatDate,
+  ]);
 
   const moneyIn = useMemo(() => {
     return ledgerItems
       .filter((i) => i.isPositive)
-      .reduce((sum, i) => sum + i.amount, 0);
+      .reduce((sum, i) => sum + Number(i.amount || 0), 0);
   }, [ledgerItems]);
 
   const moneyOut = useMemo(() => {
     return ledgerItems
       .filter((i) => !i.isPositive)
-      .reduce((sum, i) => sum + i.amount, 0);
+      .reduce((sum, i) => sum + Number(i.amount || 0), 0);
   }, [ledgerItems]);
 
   if (!wallet) return null;
+
+  const displayBalance = isTourWallet
+    ? Number(wallet.openingBalance || 0) + moneyIn - moneyOut
+    : Number(wallet.currentBalance || 0);
 
   return (
     <BottomSheet
@@ -251,7 +240,7 @@ export const WalletLedgerModal: React.FC = () => {
             Current Available Balance
           </span>
           <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
-            {formatCurrency(wallet.currentBalance)}
+            {formatCurrency(displayBalance)}
           </div>
 
           <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-zinc-800 text-center">
@@ -297,12 +286,12 @@ export const WalletLedgerModal: React.FC = () => {
                     }
                   }}
                   className={`p-3.5 rounded-2xl bg-white border border-zinc-200/80 shadow-2xs flex items-center justify-between transition-all ${
-                    item.refId ? 'hover:border-zinc-300 cursor-pointer' : ''
+                    item.refId && item.type === 'sale' ? 'hover:border-zinc-300 cursor-pointer' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-3 min-w-0 pr-2">
                     <div
-                      className={`w-8 h-8 rounded-xl flex items-center justify-center ${
+                      className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                         item.isPositive
                           ? 'bg-emerald-50 text-emerald-600'
                           : 'bg-rose-50 text-rose-600'
@@ -310,15 +299,23 @@ export const WalletLedgerModal: React.FC = () => {
                     >
                       {item.isPositive ? <ArrowDownLeft size={15} /> : <ArrowUpRight size={15} />}
                     </div>
-                    <div>
-                      <h5 className="text-xs font-bold text-zinc-900">{item.title}</h5>
-                      <p className="text-[11px] text-zinc-500">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h5 className="text-xs font-bold text-zinc-900">{item.title}</h5>
+                        {item.isCrossAccount && item.bookingWalletName && (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[9px] font-black">
+                            <ArrowRightLeft size={9} />
+                            {item.bookingWalletName.replace(' (Tour)', '')} ➔ {wallet.name.replace(' (Tour)', '')}
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-[11px] text-zinc-500 truncate">
                         {item.subtitle} • {item.date}
                       </p>
                     </div>
                   </div>
 
-                  <div className="text-right">
+                  <div className="text-right shrink-0">
                     <div
                       className={`text-xs font-extrabold tracking-tight ${
                         item.isPositive ? 'text-emerald-600' : 'text-rose-600'
@@ -327,7 +324,11 @@ export const WalletLedgerModal: React.FC = () => {
                       {item.isPositive ? '+' : '-'}
                       {formatCurrency(item.amount)}
                     </div>
-                    <span className="text-[10px] text-zinc-600 capitalize">{item.type.replace('_', ' ')}</span>
+                    <span className="text-[10px] text-zinc-600 capitalize">
+                      {item.type === 'tour_payment'
+                        ? 'Payment Received'
+                        : item.type.replace('_', ' ')}
+                    </span>
                   </div>
                 </div>
               ))}

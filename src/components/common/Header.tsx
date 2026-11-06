@@ -1,27 +1,33 @@
 import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { SlideMenu } from './SlideMenu';
 import { ProfileModalCard } from './ProfileModalCard';
-import { Menu, Sparkles, Store, Plus, Receipt, ArrowDownLeft, Share2, Check, User, Luggage, FolderPlus } from 'lucide-react';
+import { Menu, Sparkles, Store, Plus, Receipt, ArrowDownLeft, Share2, Check, FolderPlus } from 'lucide-react';
 
-export const Header: React.FC = () => {
+interface HeaderProps {
+  isSidebarOpen?: boolean;
+  onToggleSidebar?: () => void;
+  onOpenMobileSidebar?: () => void;
+}
+
+export const Header: React.FC<HeaderProps> = ({
+  isSidebarOpen = true,
+  onToggleSidebar,
+  onOpenMobileSidebar,
+}) => {
   const {
     settings,
     businessMode,
-    setBusinessMode,
     setIsAiAssistantOpen,
     setIsAddSaleOpen,
     setIsAddExpenseOpen,
     setIsAddPaymentOpen,
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
-    setIsAddTourExpenseOpen,
     setIsAddTourInquiryOpen,
     setIsPackageExplainerOpen,
   } = useData();
   const { currentUserProfile, userPermissions } = useAuth();
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [copiedShareLink, setCopiedShareLink] = useState(false);
 
@@ -42,15 +48,29 @@ export const Header: React.FC = () => {
   return (
     <>
       <header className="sticky top-0 z-30 bg-[#f8f9fa]/95 backdrop-blur-md border-b border-zinc-200/60 px-3 sm:px-8 py-2.5 flex items-center justify-between transition-all">
-        {/* Left: Slide Menu Toggle & Brand & Mode Badge */}
+        {/* Left: Sidebar Toggle (shown on mobile, or on desktop when Sidebar is hidden) & Brand */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Mobile Side Menu Button */}
           <button
-            onClick={() => setIsMenuOpen(true)}
-            aria-label="Open Slide Menu"
-            className="w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center hover:bg-black transition-transform active:scale-95 cursor-pointer shadow-xs shrink-0"
+            onClick={onOpenMobileSidebar}
+            aria-label="Open Side Menu"
+            title="Open Side Menu"
+            className="md:hidden w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center hover:bg-black transition-transform active:scale-95 cursor-pointer shadow-xs shrink-0"
           >
             <Menu size={18} className="stroke-[2.5]" />
           </button>
+
+          {/* Desktop Show Side Menu Button (only shown when Side Menu is hidden) */}
+          {!isSidebarOpen && (
+            <button
+              onClick={onToggleSidebar}
+              aria-label="Show Side Menu"
+              title="Show Side Menu"
+              className="hidden md:flex w-9 h-9 rounded-xl bg-zinc-950 text-white items-center justify-center hover:bg-black transition-transform active:scale-95 cursor-pointer shadow-xs shrink-0"
+            >
+              <Menu size={18} className="stroke-[2.5]" />
+            </button>
+          )}
 
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
@@ -171,9 +191,6 @@ export const Header: React.FC = () => {
           </button>
         </div>
       </header>
-
-      {/* iOS Slide Drawer Menu */}
-      <SlideMenu isOpen={isMenuOpen} onClose={() => setIsMenuOpen(false)} />
 
       {/* Profile & Switch Account Card Popup */}
       <ProfileModalCard isOpen={isProfileOpen} onClose={() => setIsProfileOpen(false)} />

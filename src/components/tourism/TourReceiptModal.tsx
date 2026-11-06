@@ -62,7 +62,7 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white">
+    <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white">
       <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden my-auto max-h-[92vh] flex flex-col print:border-none print:shadow-none print:max-h-none">
         {/* Modal Controls (Hidden during print) */}
         <div className="bg-zinc-950 px-6 py-3.5 text-white flex items-center justify-between shrink-0 print:hidden">

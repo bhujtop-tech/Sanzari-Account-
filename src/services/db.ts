@@ -1516,36 +1516,49 @@ export async function createTransfer(params: {
     const monthKey = getMonthKey(params.transfer.date);
     let newTransferId = '';
 
+    const resolvedFrom = await getOrResolveWalletDoc(
+      params.transfer.fromWalletId,
+      params.transfer.fromWalletName
+    );
+    const resolvedTo = await getOrResolveWalletDoc(
+      params.transfer.toWalletId,
+      params.transfer.toWalletName
+    );
+
     await runTransaction(db, async (transaction) => {
-      const fromRef = doc(db, 'wallets', params.transfer.fromWalletId);
-      const toRef = doc(db, 'wallets', params.transfer.toWalletId);
+      const fromRef = doc(db, 'wallets', resolvedFrom.id);
+      const toRef = doc(db, 'wallets', resolvedTo.id);
 
       const fromSnap = await transaction.get(fromRef);
       const toSnap = await transaction.get(toRef);
 
-      if (!fromSnap.exists() || !toSnap.exists()) {
-        throw new Error('One or both wallets were not found');
-      }
-
-      const fromBal = fromSnap.data().currentBalance || 0;
-      const toBal = toSnap.data().currentBalance || 0;
+      const fromBal = fromSnap.exists() ? Number(fromSnap.data().currentBalance || 0) : 0;
+      const toBal = toSnap.exists() ? Number(toSnap.data().currentBalance || 0) : 0;
 
       // Transfer decreases fromWallet, increases toWallet
       // Total business balance remains identical!
-      transaction.update(fromRef, {
-        currentBalance: fromBal - params.transfer.amount,
-        updatedAt: new Date().toISOString(),
-      });
+      if (fromSnap.exists()) {
+        transaction.update(fromRef, {
+          currentBalance: fromBal - params.transfer.amount,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
-      transaction.update(toRef, {
-        currentBalance: toBal + params.transfer.amount,
-        updatedAt: new Date().toISOString(),
-      });
+      if (toSnap.exists()) {
+        transaction.update(toRef, {
+          currentBalance: toBal + params.transfer.amount,
+          updatedAt: new Date().toISOString(),
+        });
+      }
 
       const transferRef = doc(collection(db, 'transfers'));
       newTransferId = transferRef.id;
       transaction.set(transferRef, {
         ...params.transfer,
+        fromWalletId: resolvedFrom.id,
+        fromWalletName: resolvedFrom.name || params.transfer.fromWalletName,
+        toWalletId: resolvedTo.id,
+        toWalletName: resolvedTo.name || params.transfer.toWalletName,
         monthKey,
         createdBy: params.userEmail || 'system',
         userEmail: params.userEmail || '',
@@ -2256,7 +2269,15 @@ export async function addTourBooking(
       action: 'CREATE_TOUR_BOOKING',
       recordType: 'tourBookings',
       recordId: bookingRef.id,
-      newValue: JSON.stringify({ bookingNumber, customer: bookingData.customerName, total: bookingData.totalAmount }),
+      newValue: JSON.stringify({
+        bookingNumber,
+        customerName: bookingData.customerName,
+        tourBatchTitle: bookingData.tourBatchTitle,
+        membersCount: bookingData.membersCount,
+        totalAmount: bookingData.totalAmount,
+        advancePaid: bookingData.advancePaid,
+        walletName: bookingData.walletName,
+      }),
       timestamp: new Date().toISOString(),
     });
 
@@ -2387,7 +2408,12 @@ export async function recordTourBookingPayment(params: {
       action: 'TOUR_PAYMENT_COLLECTED',
       recordType: 'tourBookings',
       recordId: params.bookingId,
-      newValue: JSON.stringify({ amount: params.amount, wallet: params.walletName }),
+      newValue: JSON.stringify({
+        amount: params.amount,
+        wallet: params.walletName,
+        paymentMode: params.paymentMode,
+        notes: params.notes,
+      }),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
@@ -2443,8 +2469,26 @@ export async function updateTourBooking(
     const oldBatchRef = oldBatchId ? doc(db, 'tourBatches', oldBatchId) : null;
     const newBatchRef = newBatchId && newBatchId !== oldBatchId ? doc(db, 'tourBatches', newBatchId) : null;
 
+      let updatedHistory = bookingData.paymentHistory ?? existing.paymentHistory;
+      if (
+        !bookingData.paymentHistory &&
+        Array.isArray(existing.paymentHistory) &&
+        existing.paymentHistory.length === 1 &&
+        !existing.paymentHistory[0].id?.startsWith('pay-')
+      ) {
+        updatedHistory = [
+          {
+            ...existing.paymentHistory[0],
+            amount: advancePaid,
+            walletName: bookingData.walletName || existing.walletName || existing.paymentHistory[0].walletName,
+            paymentMode: bookingData.paymentMode || existing.paymentMode || existing.paymentHistory[0].paymentMode,
+          },
+        ];
+      }
+
       const cleanPayload = sanitizeForFirestore({
         ...bookingData,
+        ...(updatedHistory ? { paymentHistory: updatedHistory } : {}),
         pendingAmount,
         balanceDue: pendingAmount,
         paymentStatus,
@@ -2521,7 +2565,24 @@ export async function updateTourBooking(
         action: 'UPDATE_TOUR_BOOKING',
         recordType: 'tourBookings',
         recordId: id,
-        newValue: JSON.stringify(bookingData),
+        oldValue: JSON.stringify({
+          bookingNumber: existing.bookingNumber,
+          customerName: existing.customerName,
+          totalAmount: existing.totalAmount,
+          advancePaid: existing.advancePaid,
+          membersCount: existing.membersCount,
+          walletName: existing.walletName,
+          tourBatchTitle: existing.tourBatchTitle,
+        }),
+        newValue: JSON.stringify({
+          bookingNumber: bookingData.bookingNumber || existing.bookingNumber,
+          customerName: bookingData.customerName || existing.customerName,
+          totalAmount,
+          advancePaid,
+          membersCount: newMembers,
+          walletName: bookingData.walletName || existing.walletName,
+          tourBatchTitle: bookingData.tourBatchTitle || existing.tourBatchTitle,
+        }),
         timestamp: new Date().toISOString(),
       });
     } catch (error) {
@@ -3123,4 +3184,25 @@ export async function deleteCustomTourPackage(id: string, userEmail: string): Pr
     throw error;
   }
 }
+
+// ----------------------------------------------------
+// AUDIT LOGS REAL-TIME SUBSCRIPTION
+// ----------------------------------------------------
+export function subscribeAuditLogs(callback: (logs: AuditLog[]) => void) {
+  const q = query(collection(db, 'auditLogs'), orderBy('timestamp', 'desc'), limit(400));
+  return onSnapshot(
+    q,
+    (snap) => {
+      const logs: AuditLog[] = snap.docs.map((d) => ({
+        id: d.id,
+        ...(d.data() as Omit<AuditLog, 'id'>),
+      }));
+      callback(logs);
+    },
+    (error) => {
+      console.warn('subscribeAuditLogs warning:', error);
+    }
+  );
+}
+
 

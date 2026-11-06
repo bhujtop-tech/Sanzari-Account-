@@ -1,17 +1,14 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Users,
   Search,
   RefreshCw,
   CheckCircle2,
   Phone,
-  User,
   Sparkles,
   ChevronDown,
   ChevronUp,
   X,
   AlertCircle,
-  ExternalLink,
 } from 'lucide-react';
 import {
   GoogleContactItem,
@@ -20,7 +17,12 @@ import {
   searchGoogleContactsApi,
   getCachedContactsToken,
   getCachedContactsEmail,
+  getLocalSavedContacts,
+  isGoogleContactsPermanentlyConnected,
+  loadPermanentContactsFromFirestore,
+  persistContactsCache,
 } from '../../services/googleContacts';
+import { useData } from '../../context/DataContext';
 
 interface GoogleContactsAutofillProps {
   onSelectContact: (contact: { name: string; phoneNumber: string }) => void;
@@ -33,16 +35,16 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
   selectedName,
   selectedPhone,
 }) => {
+  const { tourBookings, tourInquiries, customers } = useData();
+
   const [accessToken, setAccessToken] = useState<string | null>(() => getCachedContactsToken());
-  const [googleEmail, setGoogleEmail] = useState<string | null>(() => getCachedContactsEmail());
-  const [contacts, setContacts] = useState<GoogleContactItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('sz_cached_contacts');
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [isConnected, setIsConnected] = useState<boolean>(() =>
+    isGoogleContactsPermanentlyConnected()
+  );
+  const [googleEmail, setGoogleEmail] = useState<string | null>(
+    () => getCachedContactsEmail() || 'sanzaritourism@gmail.com'
+  );
+  const [contacts, setContacts] = useState<GoogleContactItem[]>(() => getLocalSavedContacts());
 
   const [isLoading, setIsLoading] = useState(false);
   const [isAuthenticating, setIsAuthenticating] = useState(false);
@@ -53,14 +55,99 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [autofilledContact, setAutofilledContact] = useState<string | null>(null);
 
-  // Load contacts if token is available
+  // Load permanently saved Google Contacts from Firestore + local cache on mount
   useEffect(() => {
     const token = getCachedContactsToken();
     if (token && !accessToken) {
       setAccessToken(token);
-      setGoogleEmail(getCachedContactsEmail() || 'sanzaritourism@gmail.com');
+      setIsConnected(true);
     }
+
+    let mounted = true;
+    loadPermanentContactsFromFirestore().then((res) => {
+      if (!mounted) return;
+      if (res.contacts.length > 0) {
+        setContacts(res.contacts);
+        setIsConnected(true);
+      } else if (res.connected) {
+        setIsConnected(true);
+      }
+      if (res.email) {
+        setGoogleEmail(res.email);
+      }
+    });
+
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  // Combine saved Google contacts with app customers/bookings/inquiries so no saved number is ever missed
+  const allSavedContacts = useMemo(() => {
+    const map = new Map<string, GoogleContactItem>();
+
+    const makeKey = (name: string, phone: string) => {
+      const digits = (phone || '').replace(/[^0-9]/g, '').slice(-10);
+      const n = (name || '').toLowerCase().trim();
+      return digits ? `${digits}__${n}` : n;
+    };
+
+    // 1. Google Contacts first
+    contacts.forEach((c) => {
+      const k = makeKey(c.name, c.phoneNumber);
+      if (k && !map.has(k)) {
+        map.set(k, c);
+      }
+    });
+
+    // 2. Confirmed Tour Bookings customers
+    tourBookings.forEach((b) => {
+      if (b.customerName || b.customerPhone) {
+        const k = makeKey(b.customerName, b.customerPhone);
+        if (k && !map.has(k)) {
+          map.set(k, {
+            id: `tb_${b.id}`,
+            name: b.customerName || 'Traveler',
+            phoneNumber: b.customerPhone || '',
+            email: b.customerEmail,
+            updatedAt: b.createdAt,
+          });
+        }
+      }
+    });
+
+    // 3. Tour Inquiries leads
+    tourInquiries.forEach((inq) => {
+      if (inq.customerName || inq.customerPhone) {
+        const k = makeKey(inq.customerName, inq.customerPhone);
+        if (k && !map.has(k)) {
+          map.set(k, {
+            id: `inq_${inq.id}`,
+            name: inq.customerName || 'Lead',
+            phoneNumber: inq.customerPhone || '',
+            updatedAt: inq.createdAt,
+          });
+        }
+      }
+    });
+
+    // 4. General Store / Tour Customers
+    customers.forEach((cust) => {
+      if (cust.name || cust.phone) {
+        const k = makeKey(cust.name, cust.phone);
+        if (k && !map.has(k)) {
+          map.set(k, {
+            id: `cust_${cust.id}`,
+            name: cust.name || 'Customer',
+            phoneNumber: cust.phone || '',
+            updatedAt: cust.createdAt,
+          });
+        }
+      }
+    });
+
+    return Array.from(map.values());
+  }, [contacts, tourBookings, tourInquiries, customers]);
 
   const handleConnect = async () => {
     setIsAuthenticating(true);
@@ -69,7 +156,8 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
       const res = await signInForGoogleContacts();
       setAccessToken(res.accessToken);
       setGoogleEmail(res.email);
-      await loadContacts(res.accessToken);
+      setIsConnected(true);
+      await loadContacts(res.accessToken, res.email);
       setIsExpanded(true);
     } catch (err: any) {
       console.error('Failed to connect Google Contacts:', err);
@@ -79,22 +167,22 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
     }
   };
 
-  const loadContacts = async (token: string) => {
+  const loadContacts = async (token: string, emailOverride?: string) => {
     setIsLoading(true);
     setErrorMsg(null);
     try {
       const list = await fetchGoogleContacts(token, 1000);
       setContacts(list);
-      try {
-        localStorage.setItem('sz_cached_contacts', JSON.stringify(list));
-      } catch {
-        // ignore quota
-      }
+      setIsConnected(true);
+      await persistContactsCache(list, emailOverride || googleEmail);
     } catch (err: any) {
       console.error('Fetch contacts error:', err);
       if (err?.message?.includes('expired') || err?.message?.includes('401')) {
         setAccessToken(null);
-        setErrorMsg('Session expired. Please reconnect Google Contacts.');
+        // Keep isConnected true if we already have saved contacts so user never loses access
+        if (allSavedContacts.length === 0) {
+          setErrorMsg('Session expired. Please click Sync to refresh Google Contacts.');
+        }
       } else {
         setErrorMsg(err?.message || 'Could not fetch contacts.');
       }
@@ -105,36 +193,37 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
 
   const handleRefresh = async () => {
     if (!accessToken) {
-      handleConnect();
+      await handleConnect();
       return;
     }
     await loadContacts(accessToken);
   };
 
-  // Live search: match local contacts across name, phone, digits, email, and word tokens
+  // Live search: match contacts across name, phone, digits, email, and word tokens
   const filteredLocalContacts = useMemo(() => {
-    if (!searchQuery.trim()) return contacts;
+    if (!searchQuery.trim()) return allSavedContacts;
     const normalizedQuery = searchQuery.toLowerCase().trim().replace(/\s+/g, ' ');
     const tokens = normalizedQuery.split(' ').filter(Boolean);
     const qDigits = normalizedQuery.replace(/[^0-9]/g, '');
 
-    return contacts.filter((c) => {
-      const name = c.name.toLowerCase();
+    return allSavedContacts.filter((c) => {
+      const name = (c.name || '').toLowerCase();
       const email = (c.email || '').toLowerCase();
-      const phone = c.phoneNumber.toLowerCase();
-      const phoneDigits = c.phoneNumber.replace(/[^0-9]/g, '');
+      const phone = (c.phoneNumber || '').toLowerCase();
+      const phoneDigits = (c.phoneNumber || '').replace(/[^0-9]/g, '');
 
-      // Direct string includes
-      if (name.includes(normalizedQuery) || email.includes(normalizedQuery) || phone.includes(normalizedQuery)) {
+      if (
+        name.includes(normalizedQuery) ||
+        email.includes(normalizedQuery) ||
+        phone.includes(normalizedQuery)
+      ) {
         return true;
       }
 
-      // Digits match
       if (qDigits.length > 0 && phoneDigits.includes(qDigits)) {
         return true;
       }
 
-      // Token-by-token match (all typed tokens must match somewhere in name, email, or phone)
       if (tokens.length > 1) {
         const matchesAll = tokens.every((token) => {
           const tokenDigits = token.replace(/[^0-9]/g, '');
@@ -150,9 +239,9 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
 
       return false;
     });
-  }, [contacts, searchQuery]);
+  }, [allSavedContacts, searchQuery]);
 
-  // If local search has few results and query length >= 3, query Google API
+  // If local search has few results and live token is active, query Google People API
   useEffect(() => {
     if (!accessToken || searchQuery.trim().length < 3) {
       setApiSearchResults([]);
@@ -169,6 +258,9 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
       try {
         const results = await searchGoogleContactsApi(accessToken, searchQuery.trim());
         setApiSearchResults(results);
+        if (results.length > 0) {
+          persistContactsCache(results, googleEmail).catch(() => {});
+        }
       } catch (err) {
         console.warn('API search error:', err);
       } finally {
@@ -177,18 +269,22 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [accessToken, searchQuery, filteredLocalContacts.length]);
+  }, [accessToken, searchQuery, filteredLocalContacts.length, googleEmail]);
 
   const displayedContacts = useMemo(() => {
-    if (!searchQuery.trim()) return contacts.slice(0, 100);
+    if (!searchQuery.trim()) return allSavedContacts.slice(0, 120);
     const combined = [...filteredLocalContacts];
     for (const apiC of apiSearchResults) {
-      if (!combined.some((c) => (c.phoneNumber && c.phoneNumber === apiC.phoneNumber) || c.name === apiC.name)) {
+      if (
+        !combined.some(
+          (c) => (c.phoneNumber && c.phoneNumber === apiC.phoneNumber) || c.name === apiC.name
+        )
+      ) {
         combined.push(apiC);
       }
     }
     return combined;
-  }, [contacts, filteredLocalContacts, apiSearchResults, searchQuery]);
+  }, [allSavedContacts, filteredLocalContacts, apiSearchResults, searchQuery]);
 
   const handleSelect = (contact: GoogleContactItem) => {
     onSelectContact({
@@ -198,6 +294,8 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
     setAutofilledContact(contact.name);
     setIsExpanded(false);
   };
+
+  const hasSavedOrConnected = isConnected || allSavedContacts.length > 0;
 
   return (
     <div className="bg-zinc-50 border-2 border-zinc-900 rounded-2xl p-3 sm:p-3.5 space-y-2.5 transition-all">
@@ -217,7 +315,7 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
               />
               <path
                 fill="#FBBC05"
-                d="M5.28 14.29c-.25-.72-.38-1.49-.38-2.29s.13-1.57.38-2.29V6.58H1.24C.45 8.15 0 9.99 0 12s.45 3.85 1.24 5.42l4.04-3.13z"
+                d="M5.28 14.29c-.25-.72-.38-1.49-.38-1.29s.13-1.57.38-2.29V6.58H1.24C.45 8.15 0 9.99 0 12s.45 3.85 1.24 5.42l4.04-3.13z"
               />
               <path
                 fill="#EA4335"
@@ -226,41 +324,45 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
             </svg>
           </div>
           <div>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 flex-wrap">
               <h4 className="text-xs font-black text-zinc-950 tracking-tight">
                 Google Contacts Auto-Fill
               </h4>
-              {accessToken ? (
+              {hasSavedOrConnected ? (
                 <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-full">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Connected
+                  Saved &amp; Connected ({allSavedContacts.length})
                 </span>
               ) : (
                 <span className="text-[10px] font-bold text-zinc-500">
-                  (sanzaritourism@gmail.com)
+                  (One-Time Connect)
                 </span>
               )}
             </div>
             <p className="text-[11px] text-zinc-600">
-              {accessToken
-                ? `Latest saved contacts from ${googleEmail || 'sanzaritourism@gmail.com'}`
-                : 'Connect to autofill latest saved customer names & phone numbers'}
+              {hasSavedOrConnected
+                ? `Saved contacts ready from ${googleEmail || 'sanzaritourism@gmail.com'}`
+                : 'Connect once to permanently save customer names & phone numbers'}
             </p>
           </div>
         </div>
 
         {/* Action Toggle or Connect */}
-        <div className="flex items-center gap-1.5">
-          {accessToken ? (
+        <div className="flex items-center gap-1.5 shrink-0">
+          {hasSavedOrConnected ? (
             <>
               <button
                 type="button"
                 onClick={handleRefresh}
-                disabled={isLoading}
-                title="Refresh latest contacts from Google"
-                className="p-1.5 rounded-lg bg-white hover:bg-zinc-200 border border-zinc-300 text-zinc-700 hover:text-black transition-colors cursor-pointer text-xs disabled:opacity-50"
+                disabled={isLoading || isAuthenticating}
+                title="Sync new contacts from Google"
+                className="px-2 py-1.5 rounded-lg bg-white hover:bg-zinc-200 border border-zinc-300 text-zinc-700 hover:text-black transition-colors cursor-pointer text-[11px] font-bold flex items-center gap-1 disabled:opacity-50"
               >
-                <RefreshCw size={13} className={isLoading ? 'animate-spin' : ''} />
+                <RefreshCw
+                  size={12}
+                  className={isLoading || isAuthenticating ? 'animate-spin' : ''}
+                />
+                <span className="hidden sm:inline">Sync</span>
               </button>
               <button
                 type="button"
@@ -283,21 +385,11 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
               ) : (
                 <Sparkles size={13} className="text-amber-300" />
               )}
-              <span>{isAuthenticating ? 'Connecting...' : 'Connect Google'}</span>
+              <span>{isAuthenticating ? 'Connecting...' : 'Connect Once'}</span>
             </button>
           )}
         </div>
       </div>
-
-      {/* Tip for unverified app screen */}
-      {!accessToken && (
-        <div className="text-[11px] text-zinc-500 bg-amber-50/80 border border-amber-200/70 rounded-xl p-2 flex items-start gap-1.5">
-          <span className="text-amber-600 font-bold">ℹ️ Note:</span>
-          <span>
-            Agar Google popup me <strong>&ldquo;Google hasn&rsquo;t verified this app&rdquo;</strong> aaye, to bas <strong>&ldquo;Continue&rdquo;</strong> par click karein.
-          </span>
-        </div>
-      )}
 
       {errorMsg && (
         <div className="p-2.5 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs flex items-center gap-2">
@@ -308,7 +400,7 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
             onClick={handleConnect}
             className="text-[11px] font-black underline hover:text-rose-900 cursor-pointer"
           >
-            Reconnect
+            Sync Now
           </button>
         </div>
       )}
@@ -331,14 +423,14 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
       )}
 
       {/* Expanded Contacts Selector & Search Box */}
-      {accessToken && isExpanded && (
+      {hasSavedOrConnected && isExpanded && (
         <div className="pt-2 border-t border-zinc-200 space-y-2.5">
           {/* Search Bar */}
           <div className="relative">
             <Search size={14} className="absolute left-3 top-2.5 text-zinc-400" />
             <input
               type="text"
-              placeholder="Search latest contacts by name or mobile number..."
+              placeholder="Search saved contacts by name or mobile number..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full text-xs font-medium pl-8 pr-8 py-2 bg-white border border-zinc-300 rounded-xl focus:outline-none focus:border-zinc-900"
@@ -359,7 +451,7 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
             <span>
               {searchQuery
                 ? `Search results (${displayedContacts.length})`
-                : `Latest Saved Contacts (${contacts.length})`}
+                : `Saved Contacts (${allSavedContacts.length})`}
             </span>
             {isSearchingApi && (
               <span className="flex items-center gap-1 text-[10px] text-zinc-500">
@@ -374,20 +466,21 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
             {isLoading ? (
               <div className="py-6 text-center text-xs text-zinc-500 flex flex-col items-center justify-center gap-2">
                 <RefreshCw size={16} className="animate-spin text-zinc-900" />
-                <span>Loading latest Google Contacts...</span>
+                <span>Syncing Google Contacts...</span>
               </div>
             ) : displayedContacts.length === 0 ? (
               <div className="py-5 text-center bg-white rounded-xl border border-dashed border-zinc-300 p-3">
                 <p className="text-xs font-bold text-zinc-700">No contacts found</p>
                 <p className="text-[11px] text-zinc-500 mt-0.5">
-                  Try searching with a different name or number, or click Refresh.
+                  Try searching with a different name or number, or click Sync to pull new contacts from Google.
                 </p>
               </div>
             ) : (
               displayedContacts.map((contact) => {
                 const isCurrent =
                   selectedPhone &&
-                  contact.phoneNumber.replace(/[^0-9]/g, '') === selectedPhone.replace(/[^0-9]/g, '');
+                  contact.phoneNumber.replace(/[^0-9]/g, '') ===
+                    selectedPhone.replace(/[^0-9]/g, '');
 
                 return (
                   <button

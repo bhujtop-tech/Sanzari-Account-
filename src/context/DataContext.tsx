@@ -23,7 +23,9 @@ import {
   CustomTourPackage,
   TourPricingSettings,
   DEFAULT_TOUR_PRICING,
+  AuditLog,
 } from '../types';
+import { buildTourWalletLedger } from '../utils/tourWalletLedger';
 import {
   initializeStoreDataIfEmpty,
   subscribeWallets,
@@ -49,6 +51,7 @@ import {
   deleteTourBatch,
   deleteTourInquiry,
   deleteCustomTourPackage,
+  subscribeAuditLogs,
 } from '../services/db';
 import {
   INITIAL_WALLETS,
@@ -174,6 +177,9 @@ interface DataContextType {
   setIsPackageExplainerOpen: (open: boolean) => void;
   isTourCalculatorOpen: boolean;
   setIsTourCalculatorOpen: (open: boolean) => void;
+  isLogsModalOpen: boolean;
+  setIsLogsModalOpen: (open: boolean) => void;
+  auditLogs: AuditLog[];
 
   // Selected items for modal view
   selectedWalletId: string | null;
@@ -414,6 +420,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isPdfCustomizerOpen, setIsPdfCustomizerOpen] = useState(false);
   const [isPackageExplainerOpen, setIsPackageExplainerOpen] = useState(false);
   const [isTourCalculatorOpen, setIsTourCalculatorOpen] = useState(false);
+  const [isLogsModalOpen, setIsLogsModalOpen] = useState(false);
+  const [auditLogs, setAuditLogs] = useState<AuditLog[]>(() => getCache('sz_audit_logs', []));
 
   // Selections
   const [selectedWalletId, setSelectedWalletId] = useState<string | null>(null);
@@ -552,6 +560,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
+    const unsubAuditLogs = subscribeAuditLogs((logs) => {
+      setAuditLogs(logs);
+      localStorage.setItem('sz_audit_logs', JSON.stringify(logs));
+    });
+
     return () => {
       clearTimeout(safetyTimer);
       unsubWallets();
@@ -572,6 +585,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubTourInquiries();
       unsubCustomPackages();
       unsubTourPricing();
+      unsubAuditLogs();
     };
   }, [user]);
 
@@ -625,8 +639,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       res.push({ id: 'def-bus-tour', name: 'Bus (Tour)', partnerKey: 'bus', scope: 'tourism', openingBalance: 0, currentBalance: 0, color: '#f59e0b' });
     }
 
-    return res;
-  }, [wallets]);
+    return res.map((w) => {
+      const ledger = buildTourWalletLedger({
+        wallet: w,
+        tourBookings,
+        tourExpenses,
+        transfers,
+        formatDate: (d) => d || '',
+      });
+      return {
+        ...w,
+        currentBalance: ledger.liveBalance,
+      };
+    });
+  }, [wallets, tourBookings, tourExpenses, transfers]);
 
   // Compute Total Wallet Balance strictly based on active businessMode
   const totalBalance = useMemo(() => {
@@ -691,13 +717,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return tourBookings.reduce((sum, b) => sum + (Number(b.totalAmount) || 0), 0);
   }, [tourBookings]);
 
-  // Total Advance in Tour: takes from both Sahil & Rizwan tour wallets (and all tour wallets)
+  // Total Advance in Tour: exact sum of advancePaid across all confirmed bookings
   const totalTourAdvance = useMemo(() => {
-    const walletsSum = tourWallets.reduce((sum, w) => sum + (Number(w.currentBalance) || 0), 0);
-    const bookingsSum = tourBookings.reduce((sum, b) => sum + (Number(b.advancePaid) || 0), 0);
-    // Combines both Sahil and Rizwan tour wallets
-    return Math.max(walletsSum, bookingsSum);
-  }, [tourWallets, tourBookings]);
+    return tourBookings.reduce((sum, b) => sum + (Number(b.advancePaid) || 0), 0);
+  }, [tourBookings]);
 
   const totalTourPending = useMemo(() => {
     return Math.max(0, totalTourRevenue - totalTourAdvance);
@@ -1003,6 +1026,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsPackageExplainerOpen,
         isTourCalculatorOpen,
         setIsTourCalculatorOpen,
+        isLogsModalOpen,
+        setIsLogsModalOpen,
+        auditLogs,
         selectedWalletId,
         setSelectedWalletId,
         selectedCustomerId,

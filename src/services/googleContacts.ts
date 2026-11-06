@@ -1,5 +1,6 @@
-import { auth, googleProvider, signInWithPopup } from '../firebase/config';
+import { auth, db, googleProvider, signInWithPopup } from '../firebase/config';
 import { GoogleAuthProvider, onAuthStateChanged } from 'firebase/auth';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 export interface GoogleContactItem {
   id: string;
@@ -10,6 +11,11 @@ export interface GoogleContactItem {
   updatedAt?: string;
 }
 
+const LOCAL_CONTACTS_KEY = 'sz_cached_contacts';
+const LOCAL_META_KEY = 'sz_google_contacts_meta';
+const FIRESTORE_CACHE_DOC = 'google_contacts_cache';
+
+// In-memory access token cache (never stored in localStorage)
 let cachedAccessToken: string | null = null;
 let cachedEmail: string | null = null;
 
@@ -17,12 +23,196 @@ let cachedEmail: string | null = null;
 onAuthStateChanged(auth, (user) => {
   if (!user) {
     cachedAccessToken = null;
-    cachedEmail = null;
+  } else if (user.email) {
+    cachedEmail = user.email;
   }
 });
 
 export const getCachedContactsToken = () => cachedAccessToken;
-export const getCachedContactsEmail = () => cachedEmail;
+
+export const getCachedContactsEmail = (): string | null => {
+  if (cachedEmail) return cachedEmail;
+  try {
+    const meta = localStorage.getItem(LOCAL_META_KEY);
+    if (meta) {
+      const parsed = JSON.parse(meta);
+      if (parsed?.email) return parsed.email;
+    }
+  } catch {
+    // ignore
+  }
+  return auth.currentUser?.email || null;
+};
+
+export const isGoogleContactsPermanentlyConnected = (): boolean => {
+  if (cachedAccessToken) return true;
+  try {
+    const meta = localStorage.getItem(LOCAL_META_KEY);
+    if (meta) {
+      const parsed = JSON.parse(meta);
+      if (parsed?.connected) return true;
+    }
+    const saved = localStorage.getItem(LOCAL_CONTACTS_KEY);
+    if (saved) {
+      const list = JSON.parse(saved);
+      if (Array.isArray(list) && list.length > 0) return true;
+    }
+  } catch {
+    // ignore
+  }
+  return false;
+};
+
+export const getLocalSavedContacts = (): GoogleContactItem[] => {
+  try {
+    const saved = localStorage.getItem(LOCAL_CONTACTS_KEY);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+};
+
+/**
+ * Persists contacts list and connection state to both localStorage and Firestore
+ * so the user only needs to connect Google Contacts ONE time.
+ */
+export const persistContactsCache = async (
+  contacts: GoogleContactItem[],
+  email?: string | null
+): Promise<void> => {
+  const effectiveEmail = email || getCachedContactsEmail() || 'sanzaritourism@gmail.com';
+  const now = new Date().toISOString();
+
+  // Merge with any existing saved contacts so we never lose contacts
+  const existing = getLocalSavedContacts();
+  const mergedMap = new Map<string, GoogleContactItem>();
+
+  const makeKey = (c: GoogleContactItem) => {
+    const digits = (c.phoneNumber || '').replace(/[^0-9]/g, '').slice(-10);
+    const nameKey = (c.name || '').toLowerCase().trim();
+    return digits ? `${digits}__${nameKey}` : c.id || nameKey;
+  };
+
+  contacts.forEach((c) => {
+    if (c.name || c.phoneNumber) {
+      mergedMap.set(makeKey(c), c);
+    }
+  });
+  existing.forEach((c) => {
+    const k = makeKey(c);
+    if (!mergedMap.has(k) && (c.name || c.phoneNumber)) {
+      mergedMap.set(k, c);
+    }
+  });
+
+  const mergedList = Array.from(mergedMap.values()).slice(0, 1500);
+
+  try {
+    localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(mergedList));
+    localStorage.setItem(
+      LOCAL_META_KEY,
+      JSON.stringify({
+        connected: true,
+        email: effectiveEmail,
+        lastSyncedAt: now,
+        count: mergedList.length,
+      })
+    );
+  } catch {
+    // ignore storage quota errors
+  }
+
+  // Also save compact list to Firestore settings/google_contacts_cache (under 1MB limit)
+  try {
+    const compactContacts = mergedList.slice(0, 800).map((c) => ({
+      id: c.id,
+      name: c.name,
+      phoneNumber: c.phoneNumber,
+      ...(c.email ? { email: c.email } : {}),
+      ...(c.updatedAt ? { updatedAt: c.updatedAt } : {}),
+    }));
+    await setDoc(
+      doc(db, 'settings', FIRESTORE_CACHE_DOC),
+      {
+        connected: true,
+        email: effectiveEmail,
+        lastSyncedAt: now,
+        contacts: compactContacts,
+      },
+      { merge: true }
+    );
+  } catch (err) {
+    console.warn('Could not sync contacts cache to Firestore:', err);
+  }
+};
+
+/**
+ * Loads permanently saved Google Contacts from Firestore if local cache is empty
+ */
+export const loadPermanentContactsFromFirestore = async (): Promise<{
+  connected: boolean;
+  email: string | null;
+  contacts: GoogleContactItem[];
+}> => {
+  try {
+    const snap = await getDoc(doc(db, 'settings', FIRESTORE_CACHE_DOC));
+    if (snap.exists()) {
+      const data = snap.data();
+      const cloudContacts: GoogleContactItem[] = Array.isArray(data.contacts) ? data.contacts : [];
+      const email = data.email || 'sanzaritourism@gmail.com';
+      if (cloudContacts.length > 0 || data.connected) {
+        try {
+          const local = getLocalSavedContacts();
+          const combined = cloudContacts.length >= local.length ? cloudContacts : local;
+          localStorage.setItem(LOCAL_CONTACTS_KEY, JSON.stringify(combined));
+          localStorage.setItem(
+            LOCAL_META_KEY,
+            JSON.stringify({
+              connected: true,
+              email,
+              lastSyncedAt: data.lastSyncedAt || new Date().toISOString(),
+              count: combined.length,
+            })
+          );
+          return { connected: true, email, contacts: combined };
+        } catch {
+          return { connected: true, email, contacts: cloudContacts };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('Failed to read contacts cache from Firestore:', err);
+  }
+  const local = getLocalSavedContacts();
+  return {
+    connected: isGoogleContactsPermanentlyConnected(),
+    email: getCachedContactsEmail(),
+    contacts: local,
+  };
+};
+
+/**
+ * Adds a newly booked / inquired customer to the saved contacts cache automatically
+ */
+export const saveCustomerToContactsCache = async (customer: {
+  name: string;
+  phoneNumber: string;
+  email?: string;
+}): Promise<void> => {
+  if (!customer.name && !customer.phoneNumber) return;
+  const item: GoogleContactItem = {
+    id: `cust_${Date.now()}`,
+    name: customer.name.trim(),
+    phoneNumber: cleanPhoneNumber(customer.phoneNumber),
+    email: customer.email?.trim(),
+    updatedAt: new Date().toISOString(),
+  };
+  await persistContactsCache([item]);
+};
 
 /**
  * Sign in with Google to obtain OAuth Access Token with contacts.readonly scope
@@ -36,6 +226,18 @@ export const signInForGoogleContacts = async (): Promise<{ accessToken: string; 
     }
     cachedAccessToken = credential.accessToken;
     cachedEmail = result.user.email || 'sanzaritourism@gmail.com';
+    try {
+      localStorage.setItem(
+        LOCAL_META_KEY,
+        JSON.stringify({
+          connected: true,
+          email: cachedEmail,
+          lastSyncedAt: new Date().toISOString(),
+        })
+      );
+    } catch {
+      // ignore
+    }
     return {
       accessToken: credential.accessToken,
       email: cachedEmail,
@@ -54,7 +256,7 @@ export const cleanPhoneNumber = (raw: string): string => {
 };
 
 /**
- * Fetches latest saved contacts from Google People API
+ * Fetches latest saved contacts from Google People API and saves them permanently
  */
 export const fetchGoogleContacts = async (
   accessToken: string,
@@ -62,7 +264,7 @@ export const fetchGoogleContacts = async (
 ): Promise<GoogleContactItem[]> => {
   try {
     const url = `https://people.googleapis.com/v1/people/me/connections?personFields=names,phoneNumbers,emailAddresses,photos,metadata&pageSize=${pageSize}&sortOrder=LAST_MODIFIED_DESCENDING`;
-    
+
     let response: Response;
     try {
       response = await fetch(url, {
@@ -74,27 +276,18 @@ export const fetchGoogleContacts = async (
       });
     } catch (netErr) {
       console.warn('Network error during Google Contacts fetch:', netErr);
-      // Fallback to local storage contacts if network request failed
-      try {
-        const saved = localStorage.getItem('sz_cached_contacts');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-      return [];
+      return getLocalSavedContacts();
     }
 
     if (response.status === 401) {
       cachedAccessToken = null;
-      throw new Error('Google session expired. Please reconnect Google Contacts.');
+      throw new Error('Google session expired. Click Sync to refresh from Google.');
     }
 
     if (!response.ok) {
       const err = await response.text();
       console.warn(`Google Contacts API error: ${err}`);
-      try {
-        const saved = localStorage.getItem('sz_cached_contacts');
-        if (saved) return JSON.parse(saved);
-      } catch {}
-      return [];
+      return getLocalSavedContacts();
     }
 
     const data = await response.json();
@@ -142,14 +335,11 @@ export const fetchGoogleContacts = async (
       return tB - tA;
     });
 
+    await persistContactsCache(contacts, cachedEmail);
     return contacts;
   } catch (err: any) {
     console.error('Failed to fetch Google Contacts:', err);
-    try {
-      const saved = localStorage.getItem('sz_cached_contacts');
-      if (saved) return JSON.parse(saved);
-    } catch {}
-    return [];
+    return getLocalSavedContacts();
   }
 };
 
@@ -177,11 +367,10 @@ export const searchGoogleContactsApi = async (
 
     if (response.status === 401) {
       cachedAccessToken = null;
-      throw new Error('Google session expired. Please reconnect.');
+      return [];
     }
 
     if (!response.ok) {
-      // Fallback: searchContacts might return 400 if indexing is in progress; return empty
       return [];
     }
 

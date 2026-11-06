@@ -57,6 +57,7 @@ import { GoogleSheetsSyncModal } from './components/sheets/GoogleSheetsSyncModal
 import { PdfCustomizerModal } from './components/pdf/PdfCustomizerModal';
 import { TransactionDetailModal } from './components/common/TransactionDetailModal';
 import { AllActivityModal } from './components/common/AllActivityModal';
+import { ActivityLogsModal } from './components/common/ActivityLogsModal';
 
 const MainAppContent: React.FC = () => {
   const { user, isUnlocked, loading: authLoading } = useAuth();
@@ -93,6 +94,8 @@ const MainAppContent: React.FC = () => {
   } = useData();
 
   const [selectedBatchForBooking, setSelectedBatchForBooking] = useState<string>('');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Check if public share URL is being accessed
   const searchParams = new URLSearchParams(window.location.search);
@@ -126,13 +129,22 @@ const MainAppContent: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex flex-col md:flex-row text-zinc-900">
-      {/* Desktop Sidebar */}
-      <Sidebar />
+      {/* Unified Side Menu (Collapsible on Desktop, Slide-Over on Mobile) */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onToggle={() => setIsSidebarOpen((prev) => !prev)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+      />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0">
         {/* Header with Business Mode Switcher */}
-        <Header />
+        <Header
+          isSidebarOpen={isSidebarOpen}
+          onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
+          onOpenMobileSidebar={() => setIsMobileSidebarOpen(true)}
+        />
 
         {/* View Router (Dynamically routed for Dry Fruits vs Tourism mode) */}
         <main className="flex-1 px-3 sm:px-8 pt-4 sm:pt-5 pb-48 md:pb-12 overflow-y-auto">
@@ -216,6 +228,7 @@ const MainAppContent: React.FC = () => {
       {/* Global Transaction History Modals */}
       <TransactionDetailModal />
       <AllActivityModal />
+      <ActivityLogsModal />
 
       {/* Dryfruit Modals */}
       <AddSaleModal />
@@ -227,6 +240,15 @@ const MainAppContent: React.FC = () => {
       <PdfCustomizerModal isOpen={isPdfCustomizerOpen} onClose={() => setIsPdfCustomizerOpen(false)} />
 
       {/* Tourism Modals */}
+      <TourBatchDetailModal
+        isOpen={!!selectedTourBatchId}
+        onClose={() => setSelectedTourBatchId(null)}
+        batchId={selectedTourBatchId}
+        onAddBookingToBatch={(batchId) => {
+          setSelectedBatchForBooking(batchId);
+          setIsAddTourBookingOpen(true);
+        }}
+      />
       <AddTourBookingModal
         isOpen={isAddTourBookingOpen}
         onClose={() => {
@@ -247,16 +269,6 @@ const MainAppContent: React.FC = () => {
         isOpen={isTourReceiptOpen}
         onClose={() => setIsTourReceiptOpen(false)}
         booking={tourReceiptBooking}
-      />
-      <TourBatchDetailModal
-        isOpen={!!selectedTourBatchId}
-        onClose={() => setSelectedTourBatchId(null)}
-        batchId={selectedTourBatchId}
-        onAddBookingToBatch={(batchId) => {
-          setSelectedTourBatchId(null);
-          setSelectedBatchForBooking(batchId);
-          setIsAddTourBookingOpen(true);
-        }}
       />
       <AddTourInquiryModal
         isOpen={isAddTourInquiryOpen}
