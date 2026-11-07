@@ -61,6 +61,18 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
+  const [copiedName, setCopiedName] = useState<string | null>(null);
+
+  const copyNameToClipboard = (e: React.MouseEvent, rawName?: string) => {
+    e.stopPropagation();
+    const clean = String(rawName || '').trim();
+    if (!clean) return;
+    navigator.clipboard.writeText(clean).catch(() => {});
+    setCopiedName(clean);
+    window.setTimeout(() => {
+      setCopiedName((prev) => (prev === clean ? null : prev));
+    }, 1600);
+  };
 
   // Simple Cash Out Form State
   const [expDescription, setExpDescription] = useState('');
@@ -537,7 +549,16 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                                 <span className="text-xs font-mono font-bold text-zinc-400">
                                   #{idx + 1}
                                 </span>
-                                <span className="font-black text-sm text-zinc-950">
+                                <span
+                                  onClick={(e) => copyNameToClipboard(e, b.customerName)}
+                                  onDoubleClick={(e) => copyNameToClipboard(e, b.customerName)}
+                                  title="Click or Double-click to copy name"
+                                  className={`font-black text-sm cursor-pointer select-none transition-colors ${
+                                    copiedName === String(b.customerName || '').trim()
+                                      ? 'text-emerald-600'
+                                      : 'text-zinc-950 hover:text-emerald-700'
+                                  }`}
+                                >
                                   {b.customerName}
                                 </span>
                                 <span className="px-2 py-0.5 rounded-lg bg-zinc-900 text-white text-[10px] font-black">
@@ -869,7 +890,16 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               {b.bookingNumber}
                             </span>
 
-                            <span className="text-sm sm:text-base font-black text-zinc-950">
+                            <span
+                              onClick={(e) => copyNameToClipboard(e, b.customerName)}
+                              onDoubleClick={(e) => copyNameToClipboard(e, b.customerName)}
+                              title="Click or Double-click to copy name"
+                              className={`text-sm sm:text-base font-black cursor-pointer select-none transition-colors ${
+                                copiedName === String(b.customerName || '').trim()
+                                  ? 'text-emerald-600'
+                                  : 'text-zinc-950 hover:text-emerald-700'
+                              }`}
+                            >
                               {b.customerName}
                             </span>
 
@@ -1074,23 +1104,44 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               </div>
 
                               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
-                                {b.members.map((m, mi) => (
-                                  <div
-                                    key={mi}
-                                    className="bg-zinc-50 p-2.5 rounded-lg border border-zinc-200 flex justify-between items-center"
-                                  >
-                                    <span className="font-bold text-zinc-950">
-                                      {mi + 1}. {m.name} ({m.gender})
-                                    </span>
-                                    <span className="text-zinc-600 font-mono font-semibold text-[11px]">
-                                      Age: {m.age || 'Adult'}
-                                      {m.seatBerthPreference &&
-                                      m.seatBerthPreference !== 'No Preference'
-                                        ? ` • ${m.seatBerthPreference}`
-                                        : ''}
-                                    </span>
-                                  </div>
-                                ))}
+                                {b.members.map((m, mi) => {
+                                  const isMemberCopied =
+                                    copiedName === String(m.name || '').trim();
+                                  return (
+                                    <div
+                                      key={mi}
+                                      onClick={(e) => copyNameToClipboard(e, m.name)}
+                                      onDoubleClick={(e) => copyNameToClipboard(e, m.name)}
+                                      title="Click or Double-click to copy passenger name"
+                                      className={`p-2.5 rounded-lg border flex justify-between items-center cursor-pointer select-none transition-colors ${
+                                        isMemberCopied
+                                          ? 'bg-emerald-50 border-emerald-400'
+                                          : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100/80'
+                                      }`}
+                                    >
+                                      <span className="font-bold text-zinc-950">
+                                        {mi + 1}.{' '}
+                                        <span
+                                          className={
+                                            isMemberCopied
+                                              ? 'text-emerald-700 underline decoration-emerald-500'
+                                              : 'hover:text-emerald-700'
+                                          }
+                                        >
+                                          {m.name}
+                                        </span>{' '}
+                                        ({m.gender})
+                                      </span>
+                                      <span className="text-zinc-600 font-mono font-semibold text-[11px]">
+                                        Age: {m.age || 'Adult'}
+                                        {m.seatBerthPreference &&
+                                        m.seatBerthPreference !== 'No Preference'
+                                          ? ` • ${m.seatBerthPreference}`
+                                          : ''}
+                                      </span>
+                                    </div>
+                                  );
+                                })}
                               </div>
 
                               {b.specialNotes && (
@@ -1166,6 +1217,13 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
         onClose={() => setIsPDFModalOpen(false)}
         initialBatchId={batch.id}
       />
+
+      {copiedName && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2 rounded-full bg-zinc-950 text-white text-xs font-black shadow-xl border border-emerald-500/60 flex items-center gap-2 pointer-events-none animate-fade-in">
+          <span className="text-emerald-400">✓ Copied:</span>
+          <span>{copiedName}</span>
+        </div>
+      )}
     </div>
   );
 };

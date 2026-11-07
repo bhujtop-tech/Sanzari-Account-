@@ -9,6 +9,18 @@ export const TourPassengersView: React.FC = () => {
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
+  const [copiedName, setCopiedName] = useState<string | null>(null);
+
+  const copyNameToClipboard = (e: React.MouseEvent, rawName?: string) => {
+    e.stopPropagation();
+    const clean = String(rawName || '').trim();
+    if (!clean) return;
+    navigator.clipboard.writeText(clean).catch(() => {});
+    setCopiedName(clean);
+    window.setTimeout(() => {
+      setCopiedName((prev) => (prev === clean ? null : prev));
+    }, 1600);
+  };
 
   const filteredBookings = useMemo(() => {
     if (selectedBatchId === 'ALL') return tourBookings;
@@ -173,7 +185,16 @@ export const TourPassengersView: React.FC = () => {
                       </span>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-bold text-xs text-zinc-950 truncate">
+                          <span
+                            onClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                            onDoubleClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                            title="Click or Double-click to copy name"
+                            className={`font-bold text-xs truncate cursor-pointer select-none transition-colors ${
+                              copiedName === String(p.passengerName || '').trim()
+                                ? 'text-emerald-600'
+                                : 'text-zinc-950 hover:text-emerald-700'
+                            }`}
+                          >
                             {p.passengerName}
                           </span>
                           {p.age && (
@@ -186,7 +207,15 @@ export const TourPassengersView: React.FC = () => {
                           </span>
                         </div>
                         <div className="text-[10px] text-zinc-500 font-medium truncate">
-                          📍 {p.destination} • {p.customerName}
+                          📍 {p.destination} •{' '}
+                          <span
+                            onClick={(e) => copyNameToClipboard(e, p.customerName)}
+                            onDoubleClick={(e) => copyNameToClipboard(e, p.customerName)}
+                            title="Click or Double-click to copy name"
+                            className="hover:text-emerald-700 cursor-pointer select-none"
+                          >
+                            {p.customerName}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -278,11 +307,35 @@ export const TourPassengersView: React.FC = () => {
                   return (
                     <tr key={`${p.bookingId}-${idx}`} className="hover:bg-zinc-50/80 transition-colors">
                       <td className="p-3.5 text-center text-zinc-400 font-mono text-[11px]">{idx + 1}</td>
-                      <td className="p-3.5 font-bold text-zinc-950">{p.passengerName}</td>
+                      <td className="p-3.5 font-bold text-zinc-950">
+                        <span
+                          onClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                          onDoubleClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                          title="Click or Double-click to copy passenger name"
+                          className={`cursor-pointer select-none transition-colors ${
+                            copiedName === String(p.passengerName || '').trim()
+                              ? 'text-emerald-600'
+                              : 'hover:text-emerald-700'
+                          }`}
+                        >
+                          {p.passengerName}
+                        </span>
+                      </td>
                       <td className="p-3.5 font-mono text-zinc-700">{p.age ? `${p.age} yrs` : '-'}</td>
                       <td className="p-3.5">
                         <div className="font-bold text-zinc-900">
-                          {p.customerName}{' '}
+                          <span
+                            onClick={(e) => copyNameToClipboard(e, p.customerName)}
+                            onDoubleClick={(e) => copyNameToClipboard(e, p.customerName)}
+                            title="Click or Double-click to copy customer name"
+                            className={`cursor-pointer select-none transition-colors ${
+                              copiedName === String(p.customerName || '').trim()
+                                ? 'text-emerald-600'
+                                : 'hover:text-emerald-700'
+                            }`}
+                          >
+                            {p.customerName}
+                          </span>{' '}
                           <span className="text-[10px] font-mono text-zinc-500">({p.bookingNumber})</span>
                         </div>
                         <a href={`tel:${p.customerPhone}`} className="text-[11px] text-zinc-500 hover:text-zinc-900">
@@ -324,6 +377,13 @@ export const TourPassengersView: React.FC = () => {
         onClose={() => setIsPDFModalOpen(false)}
         initialBatchId={selectedBatchId}
       />
+
+      {copiedName && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2 rounded-full bg-zinc-950 text-white text-xs font-black shadow-xl border border-emerald-500/60 flex items-center gap-2 pointer-events-none animate-fade-in">
+          <span className="text-emerald-400">✓ Copied:</span>
+          <span>{copiedName}</span>
+        </div>
+      )}
     </div>
   );
 };

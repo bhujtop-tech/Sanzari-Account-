@@ -49,6 +49,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   });
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
+  const [copiedName, setCopiedName] = useState<string | null>(null);
+
+  const copyNameToClipboard = (e: React.MouseEvent, rawName?: string) => {
+    e.stopPropagation();
+    const clean = String(rawName || '').trim();
+    if (!clean) return;
+    navigator.clipboard.writeText(clean).catch(() => {});
+    setCopiedName(clean);
+    window.setTimeout(() => {
+      setCopiedName((prev) => (prev === clean ? null : prev));
+    }, 1600);
+  };
 
   const toggleViewMode = (mode: 'card' | 'list') => {
     setViewMode(mode);
@@ -527,7 +539,16 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <h3 className="text-sm sm:text-base font-black text-zinc-950 truncate tracking-tight">
+                      <h3
+                        onClick={(e) => copyNameToClipboard(e, b.customerName)}
+                        onDoubleClick={(e) => copyNameToClipboard(e, b.customerName)}
+                        title="Click or Double-click to copy customer name"
+                        className={`text-sm sm:text-base font-black truncate tracking-tight cursor-pointer select-none transition-colors ${
+                          copiedName === String(b.customerName || '').trim()
+                            ? 'text-emerald-600'
+                            : 'text-zinc-950 hover:text-emerald-700'
+                        }`}
+                      >
                         {b.customerName}
                       </h3>
                       <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
@@ -801,7 +822,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                   {/* Customer Info */}
                   <div className="col-span-3">
                     <h4 className="text-sm font-black text-zinc-950 tracking-tight flex items-center gap-1.5 flex-wrap">
-                      <span>{b.customerName}</span>
+                      <span
+                        onClick={(e) => copyNameToClipboard(e, b.customerName)}
+                        onDoubleClick={(e) => copyNameToClipboard(e, b.customerName)}
+                        title="Click or Double-click to copy customer name"
+                        className={`cursor-pointer select-none transition-colors ${
+                          copiedName === String(b.customerName || '').trim()
+                            ? 'text-emerald-600'
+                            : 'hover:text-emerald-700'
+                        }`}
+                      >
+                        {b.customerName}
+                      </span>
                       <span
                         className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${
                           resolveBookedBy(b).toLowerCase().includes('mustak')
@@ -991,6 +1023,13 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         initialBatchId={selectedBatchId}
         initialPaymentFilter={statusFilter}
       />
+
+      {copiedName && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[80] px-4 py-2 rounded-full bg-zinc-950 text-white text-xs font-black shadow-xl border border-emerald-500/60 flex items-center gap-2 pointer-events-none animate-fade-in">
+          <span className="text-emerald-400">✓ Copied:</span>
+          <span>{copiedName}</span>
+        </div>
+      )}
     </div>
   );
 };
