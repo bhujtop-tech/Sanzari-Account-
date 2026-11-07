@@ -24,6 +24,7 @@ import {
   TourPricingSettings,
   DEFAULT_TOUR_PRICING,
   AuditLog,
+  MissedCall,
 } from '../types';
 import { buildTourWalletLedger } from '../utils/tourWalletLedger';
 import {
@@ -52,6 +53,7 @@ import {
   deleteTourInquiry,
   deleteCustomTourPackage,
   subscribeAuditLogs,
+  subscribeMissedCalls,
 } from '../services/db';
 import {
   INITIAL_WALLETS,
@@ -133,6 +135,16 @@ interface DataContextType {
   setEditingTourInquiry: (inquiry: TourInquiry | null) => void;
   openEditTourInquiryModal: (inquiry: TourInquiry) => void;
   deleteTourInquiryById: (id: string) => Promise<void>;
+  prefilledInquiryName: string;
+  setPrefilledInquiryName: (name: string) => void;
+  prefilledInquiryPhone: string;
+  setPrefilledInquiryPhone: (phone: string) => void;
+  prefilledInquiryNotes: string;
+  setPrefilledInquiryNotes: (notes: string) => void;
+
+  // Missed Calls (Android Call Detection)
+  missedCalls: MissedCall[];
+  setMissedCalls: React.Dispatch<React.SetStateAction<MissedCall[]>>;
 
   isCustomPackageModalOpen: boolean;
   setIsCustomPackageModalOpen: (open: boolean) => void;
@@ -275,6 +287,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [tourExpenses, setTourExpenses] = useState<TourExpense[]>(() => getCache('sz_tour_expenses', []));
   const [tourInquiries, setTourInquiries] = useState<TourInquiry[]>(() => getCache('sz_tour_inquiries', []));
   const [customTourPackages, setCustomTourPackages] = useState<CustomTourPackage[]>(() => getCache('sz_custom_tour_packages', []));
+  const [missedCalls, setMissedCalls] = useState<MissedCall[]>(() => getCache('sz_missed_calls', []));
+  const [prefilledInquiryName, setPrefilledInquiryName] = useState<string>('');
+  const [prefilledInquiryPhone, setPrefilledInquiryPhone] = useState<string>('');
+  const [prefilledInquiryNotes, setPrefilledInquiryNotes] = useState<string>('');
   
   const [selectedTourBatchId, setSelectedTourBatchId] = useState<string | null>(null);
   const [selectedTourBookingId, setSelectedTourBookingId] = useState<string | null>(null);
@@ -565,6 +581,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       localStorage.setItem('sz_audit_logs', JSON.stringify(logs));
     });
 
+    const unsubMissedCalls = subscribeMissedCalls((calls) => {
+      setMissedCalls(calls);
+      localStorage.setItem('sz_missed_calls', JSON.stringify(calls));
+    });
+
     return () => {
       clearTimeout(safetyTimer);
       unsubWallets();
@@ -586,6 +607,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       unsubCustomPackages();
       unsubTourPricing();
       unsubAuditLogs();
+      unsubMissedCalls();
     };
   }, [user]);
 
@@ -983,6 +1005,14 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setEditingTourInquiry,
         openEditTourInquiryModal,
         deleteTourInquiryById,
+        prefilledInquiryName,
+        setPrefilledInquiryName,
+        prefilledInquiryPhone,
+        setPrefilledInquiryPhone,
+        prefilledInquiryNotes,
+        setPrefilledInquiryNotes,
+        missedCalls,
+        setMissedCalls,
         isCustomPackageModalOpen,
         setIsCustomPackageModalOpen,
         editingCustomPackage,

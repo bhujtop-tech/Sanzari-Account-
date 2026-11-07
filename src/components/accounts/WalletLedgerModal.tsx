@@ -26,6 +26,8 @@ export const WalletLedgerModal: React.FC = () => {
     formatCurrency,
     formatDate,
     setSelectedSaleId,
+    setIsAddExpenseOpen,
+    setIsAddTourExpenseOpen,
   } = useData();
 
   const allWallets = useMemo(() => {
@@ -267,9 +269,25 @@ export const WalletLedgerModal: React.FC = () => {
 
         {/* Ledger Entries List */}
         <div>
-          <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2.5">
-            Statement Records ({ledgerItems.length})
-          </h4>
+          <div className="flex items-center justify-between mb-2.5">
+            <h4 className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+              Statement Records ({ledgerItems.length})
+            </h4>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedWalletId(null);
+                if (isTourWallet) {
+                  setIsAddTourExpenseOpen(true);
+                } else {
+                  setIsAddExpenseOpen(true);
+                }
+              }}
+              className="px-3 py-1 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] font-black shadow-2xs cursor-pointer transition-colors"
+            >
+              + Add Expense
+            </button>
+          </div>
 
           {ledgerItems.length === 0 ? (
             <div className="p-8 text-center rounded-2xl bg-zinc-50 border border-dashed border-zinc-200 text-xs text-zinc-500">

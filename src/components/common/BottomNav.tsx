@@ -23,6 +23,7 @@ import {
   Store,
   X,
   FileText,
+  PhoneMissed,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -34,8 +35,13 @@ export const BottomNav: React.FC = () => {
     setActiveMoreSection,
     setIsAiAssistantOpen,
     businessMode,
+    missedCalls,
   } = useData();
   const [isMoreMenuOpen, setIsMoreMenuOpen] = useState(false);
+
+  const pendingMissedCount = missedCalls.filter(
+    (c) => (c.status || 'PENDING').toUpperCase() === 'PENDING'
+  ).length;
 
   const dryFruitTabs: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'home', label: 'Home', icon: LayoutDashboard },
@@ -69,8 +75,15 @@ export const BottomNav: React.FC = () => {
 
   const tourismMoreItems: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }>; desc: string }[] = [
     { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText, desc: 'Instagram, WhatsApp & Call leads' },
+    {
+      id: 'missed_calls',
+      label: pendingMissedCount > 0 ? `📞 Missed Calls (${pendingMissedCount})` : '📞 Missed Calls',
+      icon: PhoneMissed,
+      desc: 'Android unknown missed calls',
+    },
     { id: 'packages', label: 'Tour Packages & PDF', icon: Package, desc: 'Custom packages & Gujarati PDF' },
     { id: 'customers', label: 'Passengers Manifest', icon: Users, desc: 'Traveler list & contacts' },
+    { id: 'commission', label: 'Mustak Commission', icon: WalletCards, desc: 'Pax commission & payouts' },
     { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3, desc: 'Profit & revenue analytics' },
     { id: 'settings', label: 'Settings', icon: Settings, desc: 'App & Data Controls' },
   ];

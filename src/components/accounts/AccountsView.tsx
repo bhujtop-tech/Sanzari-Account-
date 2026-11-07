@@ -32,6 +32,8 @@ export const AccountsView: React.FC = () => {
     formatDate,
     setSelectedWalletId,
     setIsTransferOpen,
+    setIsAddExpenseOpen,
+    setIsAddTourExpenseOpen,
     sales,
     expenses,
     transfers,
@@ -181,6 +183,7 @@ export const AccountsView: React.FC = () => {
       const amt = Number(te.amount || 0);
       if (amt <= 0) return;
       const targetW = findMatchingWallet(te.walletId, te.walletName);
+      const catLabel = te.category ? `[${te.category}] ` : '';
       list.push({
         id: `te-${te.id}`,
         kind: 'expense_out',
@@ -190,8 +193,8 @@ export const AccountsView: React.FC = () => {
         isPositive: false,
         walletId: targetW.id,
         walletName: targetW.name,
-        title: `Tour Expense • ${te.description || te.category || 'Expense'}`,
-        subtitle: `${te.tourTitle || te.destination || 'Tour Folder'}${te.paymentMode ? ` • ${te.paymentMode}` : ''}`,
+        title: `${catLabel}${te.description || te.category || 'Expense'}`,
+        subtitle: `${te.tourTitle || te.destination || 'Office / General Expense'}${te.paymentMode ? ` • ${te.paymentMode}` : ''}`,
         paymentMode: te.paymentMode,
         badgeText: `Paid from ${targetW.name.replace(' (Tour)', '')}`,
       });
@@ -289,9 +292,9 @@ export const AccountsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-36 md:pb-12 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between pt-1">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
             <span>{isTourism ? '🚌 Tour Accounts & Wallets' : '🛒 Dry Fruit Store Accounts'}</span>
           </h2>
           <p className="text-xs text-zinc-600 font-medium">
@@ -301,16 +304,27 @@ export const AccountsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
+            type="button"
+            onClick={() => (isTourism ? setIsAddTourExpenseOpen(true) : setIsAddExpenseOpen(true))}
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer"
+          >
+            <Plus size={14} className="stroke-[3]" />
+            <span>+ Add Expense</span>
+          </button>
+
+          <button
+            type="button"
             onClick={() => setIsAddWalletOpen(true)}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 border-2 border-zinc-900 text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer"
           >
             <Plus size={14} className="stroke-[3]" />
-            <span>+ Add Account</span>
+            <span>+ Account</span>
           </button>
 
           <button
+            type="button"
             onClick={() => setIsTransferOpen(true)}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
           >

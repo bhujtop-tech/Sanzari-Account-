@@ -7,12 +7,14 @@ import { ExpenseCategory } from '../../types';
 import { createExpense, getCurrentDateString } from '../../services/db';
 
 const EXPENSE_CATEGORIES: ExpenseCategory[] = [
+  'Salary',
+  'Rent',
+  'Electricity Bill',
+  'Commission',
   'Courier',
   'Packaging',
   'Advertising',
   'Travel',
-  'Salary',
-  'Commission',
   'Office',
   'Vendor',
   'Other',

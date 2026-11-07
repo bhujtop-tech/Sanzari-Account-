@@ -44,6 +44,8 @@ import {
   TourPaymentMode,
   TourPricingSettings,
   DEFAULT_TOUR_PRICING,
+  MissedCall,
+  MissedCallStatus,
 } from '../types';
 import {
   INITIAL_WALLETS,
@@ -2699,11 +2701,13 @@ export async function addTourExpense(
     const monthKey = getMonthKey(expenseData.date);
 
     let targetWalletRef = null;
-    if (expenseData.walletName) {
+    if (expenseData.walletId || expenseData.walletName) {
       try {
         const walletsSnap = await getDocs(collection(db, 'wallets'));
         const targetWallet = walletsSnap.docs.find(
-          (w) => (w.data().name || '').toLowerCase() === (expenseData.walletName || '').toLowerCase()
+          (w) =>
+            (expenseData.walletId && w.id === expenseData.walletId) ||
+            (w.data().name || '').toLowerCase().trim() === (expenseData.walletName || '').toLowerCase().trim()
         );
         if (targetWallet) {
           targetWalletRef = doc(db, 'wallets', targetWallet.id);
@@ -2765,11 +2769,13 @@ export async function deleteTourExpense(id: string, userEmail: string): Promise<
 
     if (expSnap.exists()) {
       const expData = expSnap.data() as TourExpense;
-      if (expData.walletName && Number(expData.amount || 0) > 0) {
+      if ((expData.walletId || expData.walletName) && Number(expData.amount || 0) > 0) {
         try {
           const walletsSnap = await getDocs(collection(db, 'wallets'));
           const targetWallet = walletsSnap.docs.find(
-            (w) => (w.data().name || '').toLowerCase() === (expData.walletName || '').toLowerCase()
+            (w) =>
+              (expData.walletId && w.id === expData.walletId) ||
+              (w.data().name || '').toLowerCase().trim() === (expData.walletName || '').toLowerCase().trim()
           );
           if (targetWallet) {
             const currentBal = Number(targetWallet.data().currentBalance || 0);
@@ -3204,5 +3210,397 @@ export function subscribeAuditLogs(callback: (logs: AuditLog[]) => void) {
     }
   );
 }
+
+// ----------------------------------------------------
+// MISSED CALLS (ANDROID CALL DETECTION) REAL-TIME SYNC
+// ----------------------------------------------------
+export function formatMissedCallDateDDMMYY(rawDate?: string, callTimestamp?: number): string {
+  const str = String(rawDate || '').trim();
+  if (str) {
+    // Match YYYY-MM-DD or YYYY/MM/DD
+    const ymdMatch = str.match(/^(\d{4})[-/](\d{1,2})[-/](\d{1,2})$/);
+    if (ymdMatch) {
+      const yy = ymdMatch[1].slice(-2);
+      const mm = ymdMatch[2].padStart(2, '0');
+      const dd = ymdMatch[3].padStart(2, '0');
+      return `${dd}-${mm}-${yy}`;
+    }
+
+    // Match DD-MM-YYYY or DD/MM/YYYY
+    const dmy4Match = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/);
+    if (dmy4Match) {
+      const dd = dmy4Match[1].padStart(2, '0');
+      const mm = dmy4Match[2].padStart(2, '0');
+      const yy = dmy4Match[3].slice(-2);
+      return `${dd}-${mm}-${yy}`;
+    }
+
+    // Match DD-MM-YY or DD/MM/YY
+    const dmy2Match = str.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{2})$/);
+    if (dmy2Match) {
+      const dd = dmy2Match[1].padStart(2, '0');
+      const mm = dmy2Match[2].padStart(2, '0');
+      const yy = dmy2Match[3];
+      return `${dd}-${mm}-${yy}`;
+    }
+  }
+
+  if (callTimestamp && callTimestamp > 0) {
+    const dt = new Date(callTimestamp);
+    if (!isNaN(dt.getTime())) {
+      const dd = String(dt.getDate()).padStart(2, '0');
+      const mm = String(dt.getMonth() + 1).padStart(2, '0');
+      const yy = String(dt.getFullYear()).slice(-2);
+      return `${dd}-${mm}-${yy}`;
+    }
+  }
+
+  return str;
+}
+
+export function formatMissedCallTime12Hr(rawTime?: string, callTimestamp?: number): string {
+  const str = String(rawTime || '').trim();
+  if (str) {
+    // Check if already in 12-hour AM/PM format (e.g. "04:39 PM", "4:39 pm", "04:39:10 PM")
+    const ampmMatch = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*(AM|PM)$/i);
+    if (ampmMatch) {
+      const hh = ampmMatch[1].padStart(2, '0');
+      const mm = ampmMatch[2];
+      const period = ampmMatch[3].toUpperCase();
+      return `${hh}:${mm} ${period}`;
+    }
+
+    // Check if in 24-hour format (e.g. "16:39:44" or "16:39")
+    const h24Match = str.match(/^(\d{1,2}):(\d{2})(?::\d{2})?$/);
+    if (h24Match) {
+      const hours24 = parseInt(h24Match[1], 10);
+      const mm = h24Match[2];
+      if (!isNaN(hours24) && hours24 >= 0 && hours24 < 24) {
+        const period = hours24 >= 12 ? 'PM' : 'AM';
+        const hours12 = hours24 % 12 || 12;
+        const hh = String(hours12).padStart(2, '0');
+        return `${hh}:${mm} ${period}`;
+      }
+    }
+  }
+
+  if (callTimestamp && callTimestamp > 0) {
+    const dt = new Date(callTimestamp);
+    if (!isNaN(dt.getTime())) {
+      const hours24 = dt.getHours();
+      const mm = String(dt.getMinutes()).padStart(2, '0');
+      const period = hours24 >= 12 ? 'PM' : 'AM';
+      const hours12 = hours24 % 12 || 12;
+      const hh = String(hours12).padStart(2, '0');
+      return `${hh}:${mm} ${period}`;
+    }
+  }
+
+  return str;
+}
+
+export function parseDDMMYYToSortableMs(dateStr: string, fallbackTs = 0): number {
+  const clean = String(dateStr || '').trim();
+  const dmyMatch = clean.match(/^(\d{2})-(\d{2})-(\d{2,4})$/);
+  if (dmyMatch) {
+    const dd = parseInt(dmyMatch[1], 10);
+    const mm = parseInt(dmyMatch[2], 10) - 1;
+    const yrRaw = parseInt(dmyMatch[3], 10);
+    const yyyy = yrRaw < 100 ? 2000 + yrRaw : yrRaw;
+    const ms = new Date(yyyy, mm, dd).getTime();
+    if (!isNaN(ms)) return ms;
+  }
+  const ymdMatch = clean.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (ymdMatch) {
+    const ms = new Date(
+      parseInt(ymdMatch[1], 10),
+      parseInt(ymdMatch[2], 10) - 1,
+      parseInt(ymdMatch[3], 10)
+    ).getTime();
+    if (!isNaN(ms)) return ms;
+  }
+  return fallbackTs;
+}
+
+function isSavedNameValue(name?: string): boolean {
+  const clean = String(name || '').trim();
+  if (!clean) return false;
+  const lower = clean.toLowerCase();
+  return lower !== 'unknown caller' && !lower.startsWith('unknown caller');
+}
+
+export function groupAndFormatMissedCalls(rawCalls: MissedCall[]): MissedCall[] {
+  // First sort raw calls newest first by callTimestamp DESC
+  const sortedRaw = [...rawCalls].sort(
+    (a, b) => (Number(b.callTimestamp) || 0) - (Number(a.callTimestamp) || 0)
+  );
+
+  const groupedMap = new Map<string, MissedCall>();
+
+  for (const call of sortedRaw) {
+    const formattedDate = formatMissedCallDateDDMMYY(call.callDate, call.callTimestamp);
+    const formattedTime = formatMissedCallTime12Hr(call.callTime, call.callTimestamp);
+    const cleanPhoneKey =
+      String(call.phoneNumber || '').replace(/\D/g, '').slice(-10) ||
+      String(call.phoneNumber || '').trim();
+    const groupKey = `${cleanPhoneKey}__${formattedDate}`;
+    const docId = call.id || call.uniqueCallId;
+    const itemCount = Math.max(1, Number(call.callCount || 1));
+
+    const existing = groupedMap.get(groupKey);
+    if (!existing) {
+      groupedMap.set(groupKey, {
+        ...call,
+        callDate: formattedDate,
+        callTime: formattedTime,
+        callCount: itemCount,
+        mergedDocIds: docId ? [docId] : [],
+      });
+    } else {
+      // Merge with existing entry for same phoneNumber + same callDate
+      const isNewer = (Number(call.callTimestamp) || 0) > (Number(existing.callTimestamp) || 0);
+      const totalCallCount = (Number(existing.callCount) || 1) + itemCount;
+      const mergedIds = Array.from(
+        new Set([...(existing.mergedDocIds || []), ...(docId ? [docId] : [])])
+      );
+
+      // Prefer a real saved callerName if any doc in the group has one
+      const bestCallerName = isSavedNameValue(existing.callerName)
+        ? existing.callerName
+        : isSavedNameValue(call.callerName)
+        ? call.callerName
+        : isNewer
+        ? call.callerName
+        : existing.callerName;
+
+      // Prefer non-PENDING status if any doc in the group was already actioned
+      const bestStatus: MissedCallStatus =
+        existing.status !== 'PENDING'
+          ? existing.status
+          : call.status !== 'PENDING'
+          ? call.status
+          : 'PENDING';
+
+      const bestNotes = existing.notes?.trim() ? existing.notes : call.notes || '';
+
+      groupedMap.set(groupKey, {
+        ...(isNewer ? call : existing),
+        callDate: formattedDate,
+        callTime: isNewer ? formattedTime : existing.callTime,
+        callTimestamp: Math.max(Number(existing.callTimestamp) || 0, Number(call.callTimestamp) || 0),
+        callCount: totalCallCount,
+        callerName: bestCallerName,
+        status: bestStatus,
+        notes: bestNotes,
+        mergedDocIds: mergedIds,
+      });
+    }
+  }
+
+  const groupedList = Array.from(groupedMap.values());
+
+  // Sort by callTimestamp DESC (newest first)
+  groupedList.sort((a, b) => {
+    const tsDiff = (Number(b.callTimestamp) || 0) - (Number(a.callTimestamp) || 0);
+    if (tsDiff !== 0) return tsDiff;
+    return parseDDMMYYToSortableMs(b.callDate) - parseDDMMYYToSortableMs(a.callDate);
+  });
+
+  return groupedList;
+}
+
+export function subscribeMissedCalls(callback: (calls: MissedCall[]) => void) {
+  const colRef = collection(db, 'missed_calls');
+  return onSnapshot(
+    colRef,
+    (snap) => {
+      const rawCalls: MissedCall[] = snap.docs.map((d) => {
+        const raw = d.data() || {};
+        const rawStatus = String(raw.status || 'PENDING').toUpperCase().trim();
+        const validStatus: MissedCallStatus =
+          rawStatus === 'CALLED BACK' ||
+          rawStatus === 'CONVERTED' ||
+          rawStatus === 'NOT INTERESTED'
+            ? (rawStatus as MissedCallStatus)
+            : 'PENDING';
+
+        const ts = Number(raw.callTimestamp || 0);
+        return {
+          id: d.id,
+          uniqueCallId: String(raw.uniqueCallId || d.id),
+          phoneNumber: String(raw.phoneNumber || ''),
+          callerName: String(raw.callerName || 'Unknown Caller'),
+          callTimestamp: ts,
+          callDate: formatMissedCallDateDDMMYY(raw.callDate, ts),
+          callTime: formatMissedCallTime12Hr(raw.callTime, ts),
+          callCount: Math.max(1, Number(raw.callCount || 1)),
+          deviceName: String(raw.deviceName || 'Rizwan Phone (Android)'),
+          employeeName: String(raw.employeeName || 'Rizwan'),
+          status: validStatus,
+          source: String(raw.source || 'ANDROID_CALL_DETECTION'),
+          createdAt: String(raw.createdAt || ''),
+          notes: String(raw.notes || ''),
+          updatedAt: raw.updatedAt ? String(raw.updatedAt) : undefined,
+        };
+      });
+
+      const groupedCalls = groupAndFormatMissedCalls(rawCalls);
+      callback(groupedCalls);
+    },
+    (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'missed_calls');
+    }
+  );
+}
+
+export async function updateMissedCallCallerName(
+  uniqueCallId: string,
+  callerName: string,
+  currentStatus?: MissedCallStatus,
+  userEmail?: string,
+  mergedDocIds?: string[]
+): Promise<MissedCallStatus> {
+  try {
+    const now = new Date().toISOString();
+    const trimmedName = callerName.trim() || 'Unknown Caller';
+    const isSavedName =
+      trimmedName.toLowerCase() !== 'unknown caller' &&
+      !trimmedName.toLowerCase().startsWith('unknown caller');
+
+    const nextStatus: MissedCallStatus =
+      isSavedName && (!currentStatus || currentStatus === 'PENDING')
+        ? 'CALLED BACK'
+        : currentStatus || 'PENDING';
+
+    const targetIds =
+      mergedDocIds && mergedDocIds.length > 0 ? mergedDocIds : [uniqueCallId];
+
+    await Promise.all(
+      targetIds.map((id) =>
+        updateDoc(doc(db, 'missed_calls', id), {
+          callerName: trimmedName,
+          status: nextStatus,
+          updatedAt: now,
+        })
+      )
+    );
+
+    if (userEmail) {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'UPDATE_MISSED_CALL_NAME',
+        recordType: 'missed_calls',
+        recordId: uniqueCallId,
+        newValue: JSON.stringify({ callerName: trimmedName, status: nextStatus }),
+        timestamp: now,
+      });
+    }
+
+    return nextStatus;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `missed_calls/${uniqueCallId}`);
+    throw error;
+  }
+}
+
+export async function updateMissedCallStatus(
+  uniqueCallId: string,
+  status: MissedCallStatus,
+  userEmail?: string,
+  mergedDocIds?: string[]
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    const targetIds =
+      mergedDocIds && mergedDocIds.length > 0 ? mergedDocIds : [uniqueCallId];
+
+    await Promise.all(
+      targetIds.map((id) =>
+        updateDoc(doc(db, 'missed_calls', id), {
+          status,
+          updatedAt: now,
+        })
+      )
+    );
+
+    if (userEmail) {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'UPDATE_MISSED_CALL_STATUS',
+        recordType: 'missed_calls',
+        recordId: uniqueCallId,
+        newValue: JSON.stringify({ status }),
+        timestamp: now,
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `missed_calls/${uniqueCallId}`);
+    throw error;
+  }
+}
+
+export async function updateMissedCallNotes(
+  uniqueCallId: string,
+  notes: string,
+  userEmail?: string,
+  mergedDocIds?: string[]
+): Promise<void> {
+  try {
+    const now = new Date().toISOString();
+    const targetIds =
+      mergedDocIds && mergedDocIds.length > 0 ? mergedDocIds : [uniqueCallId];
+
+    await Promise.all(
+      targetIds.map((id) =>
+        updateDoc(doc(db, 'missed_calls', id), {
+          notes,
+          updatedAt: now,
+        })
+      )
+    );
+
+    if (userEmail) {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'UPDATE_MISSED_CALL_NOTES',
+        recordType: 'missed_calls',
+        recordId: uniqueCallId,
+        newValue: JSON.stringify({ notes }),
+        timestamp: now,
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `missed_calls/${uniqueCallId}`);
+    throw error;
+  }
+}
+
+export async function deleteMissedCall(
+  uniqueCallId: string,
+  userEmail?: string,
+  mergedDocIds?: string[]
+): Promise<void> {
+  try {
+    const targetIds =
+      mergedDocIds && mergedDocIds.length > 0 ? mergedDocIds : [uniqueCallId];
+
+    await Promise.all(targetIds.map((id) => deleteDoc(doc(db, 'missed_calls', id))));
+
+    if (userEmail) {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail,
+        action: 'DELETE_MISSED_CALL',
+        recordType: 'missed_calls',
+        recordId: uniqueCallId,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `missed_calls/${uniqueCallId}`);
+    throw error;
+  }
+}
+
+
 
 

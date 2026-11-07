@@ -27,6 +27,7 @@ import {
   Menu,
   PanelLeftClose,
   History,
+  PhoneMissed,
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -58,7 +59,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     setIsPackageExplainerOpen,
     setIsLogsModalOpen,
     businessMode,
+    missedCalls,
   } = useData();
+
+  const pendingMissedCallsCount = missedCalls.filter(
+    (c) => (c.status || 'PENDING').toUpperCase() === 'PENDING'
+  ).length;
 
   const dryFruitMainNav: { id: NavTab; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
     { id: 'home', label: 'Dashboard', icon: LayoutDashboard },
@@ -88,8 +94,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
-  const tourismManagementNav: { id: MoreSection; label: string; icon: React.FC<{ size?: number; className?: string }> }[] = [
-    { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText },
+  const tourismManagementNav: {
+    id: MoreSection;
+    label: string;
+    icon: React.FC<{ size?: number; className?: string }>;
+    badgeCount?: number;
+  }[] = [
     { id: 'packages', label: 'Tour Packages & PDF', icon: Package },
     { id: 'customers', label: 'Passengers Manifest', icon: Users },
     { id: 'commission', label: 'Mustak Commission', icon: WalletCards },
@@ -214,25 +224,100 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {mainNav.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === item.id;
+          const isMissedCallsActive =
+            activeTab === 'more' && activeMoreSection === 'missed_calls';
+          const isInquiriesActive =
+            activeTab === 'more' && activeMoreSection === 'inquiries';
 
           return (
-            <button
-              key={item.id}
-              onClick={() => {
-                setActiveTab(item.id);
-                onCloseMobile?.();
-              }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                isActive
-                  ? businessMode === 'tourism'
-                    ? 'bg-blue-50 text-blue-700 font-bold'
-                    : 'bg-zinc-100 text-zinc-950 font-bold'
-                  : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
-              }`}
-            >
-              <Icon size={16} className={isActive ? (businessMode === 'tourism' ? 'text-blue-600 stroke-[2.5]' : 'text-zinc-900 stroke-[2.5]') : 'text-zinc-400'} />
-              <span>{item.label}</span>
-            </button>
+            <React.Fragment key={item.id}>
+              <button
+                onClick={() => {
+                  setActiveTab(item.id);
+                  onCloseMobile?.();
+                }}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                  isActive
+                    ? businessMode === 'tourism'
+                      ? 'bg-blue-50 text-blue-700 font-bold'
+                      : 'bg-zinc-100 text-zinc-950 font-bold'
+                    : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                }`}
+              >
+                <Icon
+                  size={16}
+                  className={
+                    isActive
+                      ? businessMode === 'tourism'
+                        ? 'text-blue-600 stroke-[2.5]'
+                        : 'text-zinc-900 stroke-[2.5]'
+                      : 'text-zinc-400'
+                  }
+                />
+                <span>{item.label}</span>
+              </button>
+
+              {/* Render 📞 Missed Calls and Inquiries & Leads directly below Tours Dashboard */}
+              {businessMode === 'tourism' && item.id === 'home' && (
+                <>
+                  <button
+                    onClick={() => {
+                      setActiveTab('more');
+                      setActiveMoreSection('missed_calls');
+                      onCloseMobile?.();
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isMissedCallsActive
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3 truncate">
+                      <PhoneMissed
+                        size={16}
+                        className={
+                          isMissedCallsActive
+                            ? 'text-blue-600 stroke-[2.5]'
+                            : 'text-zinc-400'
+                        }
+                      />
+                      <span className="truncate">📞 Missed Calls</span>
+                    </span>
+
+                    {pendingMissedCallsCount > 0 && (
+                      <span className="px-2 py-0.5 rounded-full bg-amber-400 text-zinc-950 border border-amber-500 text-[10px] font-black shrink-0 shadow-2xs">
+                        {pendingMissedCallsCount}
+                      </span>
+                    )}
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      setActiveTab('more');
+                      setActiveMoreSection('inquiries');
+                      onCloseMobile?.();
+                    }}
+                    className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                      isInquiriesActive
+                        ? 'bg-blue-50 text-blue-700 font-bold'
+                        : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
+                    }`}
+                  >
+                    <span className="flex items-center gap-3 truncate">
+                      <FileText
+                        size={16}
+                        className={
+                          isInquiriesActive
+                            ? 'text-blue-600 stroke-[2.5]'
+                            : 'text-zinc-400'
+                        }
+                      />
+                      <span className="truncate">Inquiries &amp; Leads</span>
+                    </span>
+                  </button>
+                </>
+              )}
+            </React.Fragment>
           );
         })}
       </div>
@@ -245,6 +330,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         {managementNav.map((item) => {
           const Icon = item.icon;
           const isActive = activeTab === 'more' && activeMoreSection === item.id;
+          const badgeCount = (item as { badgeCount?: number }).badgeCount ?? 0;
 
           return (
             <button
@@ -254,7 +340,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 setActiveMoreSection(item.id);
                 onCloseMobile?.();
               }}
-              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+              className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 isActive
                   ? businessMode === 'tourism'
                     ? 'bg-blue-50 text-blue-700 font-bold'
@@ -262,8 +348,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
                   : 'text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900'
               }`}
             >
-              <Icon size={16} className={isActive ? (businessMode === 'tourism' ? 'text-blue-600 stroke-[2.5]' : 'text-zinc-900 stroke-[2.5]') : 'text-zinc-400'} />
-              <span>{item.label}</span>
+              <span className="flex items-center gap-3 truncate">
+                <Icon
+                  size={16}
+                  className={
+                    isActive
+                      ? businessMode === 'tourism'
+                        ? 'text-blue-600 stroke-[2.5]'
+                        : 'text-zinc-900 stroke-[2.5]'
+                      : 'text-zinc-400'
+                  }
+                />
+                <span className="truncate">{item.label}</span>
+              </span>
+
+              {badgeCount > 0 && (
+                <span className="px-2 py-0.5 rounded-full bg-amber-400 text-zinc-950 border border-amber-500 text-[10px] font-black shrink-0 shadow-2xs">
+                  {badgeCount}
+                </span>
+              )}
             </button>
           );
         })}

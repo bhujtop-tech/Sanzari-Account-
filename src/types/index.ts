@@ -148,16 +148,29 @@ export interface ConfirmedBookingDocument {
   updatedAt?: string | number;
 }
 
+export type TourExpenseCategory =
+  | 'Staff Salary'
+  | 'Office Rent'
+  | 'Electricity Bill'
+  | 'Mustak Commission'
+  | 'Hotel & Stay'
+  | 'Train & Transport'
+  | 'Food & Meals'
+  | 'Sightseeing & Entry'
+  | 'Guide & Staff'
+  | 'Other';
+
 export interface TourExpense {
   id: string;
   tourBatchId?: string;
   tourTitle?: string;
   destination?: string;
-  category: 'Hotel & Stay' | 'Train & Transport' | 'Food & Meals' | 'Sightseeing & Entry' | 'Guide & Staff' | 'Other';
+  category: TourExpenseCategory;
   amount: number;
   walletId?: string;
   walletName: string;
   paymentMode?: TourPaymentMode;
+  paidToPerson?: string;
   date: string;
   monthKey: string;
   description: string;
@@ -352,12 +365,14 @@ export interface Payment {
 }
 
 export type ExpenseCategory =
+  | 'Salary'
+  | 'Rent'
+  | 'Electricity Bill'
+  | 'Commission'
   | 'Courier'
   | 'Packaging'
   | 'Advertising'
   | 'Travel'
-  | 'Salary'
-  | 'Commission'
   | 'Office'
   | 'Vendor'
   | 'Other';
@@ -516,8 +531,44 @@ export interface AppUser {
   updatedAt?: string;
 }
 
+export type MissedCallStatus = 'PENDING' | 'CALLED BACK' | 'CONVERTED' | 'NOT INTERESTED';
+
+export interface MissedCall {
+  id: string; // Document ID: "{cleanPhoneNumber}_{callTimestamp}"
+  uniqueCallId: string;
+  phoneNumber: string; // e.g. "+919876543210"
+  callerName: string; // e.g. "Unknown Caller"
+  callTimestamp: number; // epoch milliseconds
+  callDate: string; // e.g. "07-11-26" or "2026-11-07"
+  callTime: string; // e.g. "04:39 PM" or "14:30:00"
+  callCount?: number; // number of missed calls (default 1)
+  mergedDocIds?: string[]; // if multiple docs for same phone + date were grouped
+  deviceName: string; // e.g. "Rizwan Phone (Android)"
+  employeeName: string; // e.g. "Rizwan"
+  status: MissedCallStatus;
+  source: string; // "ANDROID_CALL_DETECTION"
+  createdAt: string; // ISO timestamp
+  notes: string;
+  updatedAt?: string;
+}
+
 export type NavTab = 'home' | 'sales' | 'stock' | 'accounts' | 'more';
-export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 'vendors' | 'users' | 'reports' | 'monthly' | 'settings' | 'ai' | 'inquiries' | 'packages' | 'logs' | 'commission';
+export type MoreSection =
+  | 'customers'
+  | 'products'
+  | 'expenses'
+  | 'purchases'
+  | 'vendors'
+  | 'users'
+  | 'reports'
+  | 'monthly'
+  | 'settings'
+  | 'ai'
+  | 'inquiries'
+  | 'missed_calls'
+  | 'packages'
+  | 'logs'
+  | 'commission';
 
 export interface ActivityItem {
   id: string;

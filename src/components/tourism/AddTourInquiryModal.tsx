@@ -36,6 +36,12 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
     setEditingTourInquiry,
     deleteTourInquiryById,
     openInquiryPdf,
+    prefilledInquiryName,
+    setPrefilledInquiryName,
+    prefilledInquiryPhone,
+    setPrefilledInquiryPhone,
+    prefilledInquiryNotes,
+    setPrefilledInquiryNotes,
   } = useData();
 
   const isEditing = Boolean(editingTourInquiry);
@@ -85,13 +91,13 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
       setAssignedTo(editingTourInquiry.assignedTo || 'Rizwan');
       setLinkedPackageId(editingTourInquiry.linkedPackageId || '');
     } else {
-      // Defaults for new inquiry
-      setCustomerName('');
-      setCustomerPhone('');
+      // Defaults for new inquiry (or prefilled from Missed Calls conversion)
+      setCustomerName(prefilledInquiryName || '');
+      setCustomerPhone(prefilledInquiryPhone || '');
       setSource('Phone Call');
       setDestination('Kashmir');
       setFromCity('Vadodara');
-      setDiscussionSummary('');
+      setDiscussionSummary(prefilledInquiryNotes || '');
       setPaxAdults(2);
       setPaxChildren(0);
       setTravelMode('Train');
@@ -99,14 +105,14 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
       setPreferredDate('');
       setBudget('');
       setPackageCategory('Deluxe');
-      setNotes('');
+      setNotes(prefilledInquiryNotes ? `Converted from Missed Call (${prefilledInquiryPhone})` : '');
       setStatus('New');
       setFollowUpDate(new Date(Date.now() + 86400000 * 2).toISOString().split('T')[0]);
       setAssignedTo('Rizwan');
       setLinkedPackageId(customTourPackages[0]?.id || '');
     }
     setError('');
-  }, [editingTourInquiry, isOpen, customTourPackages]);
+  }, [editingTourInquiry, isOpen, customTourPackages, prefilledInquiryName, prefilledInquiryPhone, prefilledInquiryNotes]);
 
   if (!isOpen) return null;
 
@@ -184,6 +190,9 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
       }
 
       setEditingTourInquiry(null);
+      setPrefilledInquiryName('');
+      setPrefilledInquiryPhone('');
+      setPrefilledInquiryNotes('');
       onClose();
     } catch (err: any) {
       console.error('Failed to save inquiry:', err);
@@ -239,6 +248,9 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
             <button
               onClick={() => {
                 setEditingTourInquiry(null);
+                setPrefilledInquiryName('');
+                setPrefilledInquiryPhone('');
+                setPrefilledInquiryNotes('');
                 onClose();
               }}
               className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors"
@@ -513,6 +525,9 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
               type="button"
               onClick={() => {
                 setEditingTourInquiry(null);
+                setPrefilledInquiryName('');
+                setPrefilledInquiryPhone('');
+                setPrefilledInquiryNotes('');
                 onClose();
               }}
               className="px-4 py-2.5 rounded-xl border border-zinc-300 text-zinc-700 text-xs font-bold hover:bg-zinc-100 transition-colors"

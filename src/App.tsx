@@ -46,6 +46,7 @@ import { AddTourExpenseModal } from './components/tourism/AddTourExpenseModal';
 import { TourReceiptModal } from './components/tourism/TourReceiptModal';
 import { TourBatchDetailModal } from './components/tourism/TourBatchDetailModal';
 import { TourInquiriesView } from './components/tourism/TourInquiriesView';
+import { TourMissedCallsView } from './components/tourism/TourMissedCallsView';
 import { CustomTourPackagesView } from './components/tourism/CustomTourPackagesView';
 import { AddTourInquiryModal } from './components/tourism/AddTourInquiryModal';
 import { AddCustomPackageModal } from './components/tourism/AddCustomPackageModal';
@@ -174,6 +175,7 @@ const MainAppContent: React.FC = () => {
                 <>
                   {activeMoreSection === 'customers' && <TourPassengersView />}
                   {activeMoreSection === 'inquiries' && <TourInquiriesView />}
+                  {activeMoreSection === 'missed_calls' && <TourMissedCallsView />}
                   {activeMoreSection === 'packages' && <CustomTourPackagesView />}
                   {activeMoreSection === 'commission' && <TourCommissionView />}
                   {activeMoreSection === 'reports' && <TourReportsView />}

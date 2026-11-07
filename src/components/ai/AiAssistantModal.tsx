@@ -228,12 +228,32 @@ export const AiAssistantModal: React.FC = () => {
     setLoading(true);
 
     try {
-      const todayIso = new Date().toISOString().split('T')[0]; // YYYY-MM-DD (e.g. 2026-11-06)
+      const todayIso = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
       const todayFormatted = new Date().toLocaleDateString('en-IN', {
         day: '2-digit',
         month: 'long',
         year: 'numeric',
-      }); // e.g. "06 November 2026"
+      });
+
+      const safeDateStr = (val: any, fallback: string): string => {
+        if (!val) return fallback;
+        if (typeof val === 'string') return val.substring(0, 10);
+        if (typeof val === 'number') {
+          try {
+            return new Date(val).toISOString().substring(0, 10);
+          } catch {
+            return fallback;
+          }
+        }
+        if (typeof val === 'object' && typeof val.toDate === 'function') {
+          try {
+            return val.toDate().toISOString().substring(0, 10);
+          } catch {
+            return fallback;
+          }
+        }
+        return String(val).substring(0, 10);
+      };
 
       let contextText = '';
 
@@ -252,25 +272,39 @@ export const AiAssistantModal: React.FC = () => {
         const rate = tourPricingSettings?.commissionRatePerPax ?? 200;
 
         tourBookings.forEach((b) => {
-          const bBy = (b.bookedBy || b.specialNotes || '').toLowerCase();
+          const bBy = String(b.bookedBy || b.specialNotes || '').toLowerCase();
           if (bBy.includes('mustak')) {
             mustakBookings += 1;
-            const billableMembers = (b.members || []).filter((m) => {
-              const ageNum = m.age !== undefined && m.age !== '' ? Number(m.age) : 10;
-              return ageNum >= 5;
-            });
-            mustakPax += billableMembers.length;
-            mustakCommission += billableMembers.length * rate;
+            const membersArr = Array.isArray(b.members) ? b.members : [];
+            const billableMembers =
+              membersArr.length > 0
+                ? membersArr.filter((m) => {
+                    const ageNum = m.age !== undefined && m.age !== '' ? Number(m.age) : 10;
+                    return isNaN(ageNum) || ageNum >= 5;
+                  }).length
+                : Math.max(1, Number(b.membersCount || 1));
+            mustakPax += billableMembers;
+            mustakCommission += billableMembers * rate;
           }
         });
 
+        const mustakPaid = (tourExpenses || [])
+          .filter(
+            (e) =>
+              e.category === 'Mustak Commission' ||
+              String(e.paidToPerson || '').toLowerCase().includes('mustak') ||
+              String(e.description || '').toLowerCase().includes('mustak')
+          )
+          .reduce((s, e) => s + Number(e.amount || 0), 0);
+        const mustakPending = Math.max(0, mustakCommission - mustakPaid);
+
         // Wallets Current Balances
         const sahilWallet =
-          tourWallets.find((w) => w.name.toLowerCase().includes('sahil'))?.currentBalance || 0;
+          tourWallets.find((w) => String(w.name || '').toLowerCase().includes('sahil'))?.currentBalance || 0;
         const rizwanWallet =
-          tourWallets.find((w) => w.name.toLowerCase().includes('rizwan'))?.currentBalance || 0;
+          tourWallets.find((w) => String(w.name || '').toLowerCase().includes('rizwan'))?.currentBalance || 0;
         const busWallet =
-          tourWallets.find((w) => w.name.toLowerCase().includes('bus'))?.currentBalance || 0;
+          tourWallets.find((w) => String(w.name || '').toLowerCase().includes('bus'))?.currentBalance || 0;
 
         // Folders list
         const folderList = tourBatches
@@ -278,7 +312,7 @@ export const AiAssistantModal: React.FC = () => {
             const cnt = tourBookings.filter((b) => b.tourBatchId === f.id).length;
             const paxCnt = tourBookings
               .filter((b) => b.tourBatchId === f.id)
-              .reduce((s, b) => s + (b.membersCount || 1), 0);
+              .reduce((s, b) => s + Number(b.membersCount || 1), 0);
             return `• ${f.title} (${f.destination}): ${paxCnt}/${f.totalSeats || 30} Pax booked (${cnt} Bookings)`;
           })
           .join('\n');
@@ -286,8 +320,10 @@ export const AiAssistantModal: React.FC = () => {
         // Detailed Bookings List with exact creation/booking dates
         const detailedBookingsList = tourBookings
           .map((b) => {
-            const dateStr = b.createdAt ? b.createdAt.substring(0, 10) : b.tourDate || todayIso;
-            const bBy = b.bookedBy || (b.walletName?.toLowerCase().includes('mustak') ? 'Mustak' : 'Rizwan');
+            const dateStr = safeDateStr(b.createdAt, safeDateStr(b.tourDate, todayIso));
+            const bBy =
+              b.bookedBy ||
+              (String(b.walletName || '').toLowerCase().includes('mustak') ? 'Mustak' : 'Rizwan');
             return `• Date: ${dateStr} | Booking: ${b.bookingNumber} | Customer: ${b.customerName} (${b.customerPhone}) | Pax: ${b.membersCount} | BookedBy: ${bBy} | Wallet: ${b.walletName || 'Rizwan (Tour)'} | Total: ₹${b.totalAmount} | Adv: ₹${b.advancePaid} | Baaki: ₹${Math.max(0, Number(b.totalAmount || 0) - Number(b.advancePaid || 0))} | Tour: ${b.destination}`;
           })
           .join('\n');
@@ -296,12 +332,12 @@ export const AiAssistantModal: React.FC = () => {
         const walletTransactionsList: string[] = [];
 
         tourBookings.forEach((b) => {
-          const mainDate = b.createdAt ? b.createdAt.substring(0, 10) : b.tourDate || todayIso;
+          const mainDate = safeDateStr(b.createdAt, safeDateStr(b.tourDate, todayIso));
           const mainWallet = b.walletName || 'Rizwan (Tour)';
 
           if (Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0) {
             b.paymentHistory.forEach((ph, pIdx) => {
-              const pDate = ph.date ? ph.date.substring(0, 10) : mainDate;
+              const pDate = safeDateStr(ph.date, mainDate);
               const pWallet = ph.walletName || mainWallet;
               walletTransactionsList.push(
                 `• Date: ${pDate} | Wallet: ${pWallet} | Collection Amount: ₹${ph.amount} | Customer: ${b.customerName} (${b.bookingNumber}) | Mode: ${ph.paymentMode || 'UPI'} | Note: Installment #${pIdx + 1}`
@@ -316,7 +352,7 @@ export const AiAssistantModal: React.FC = () => {
 
         // Add Tour Expenses Cash-Out
         (tourExpenses || []).forEach((e) => {
-          const eDate = e.date ? e.date.substring(0, 10) : todayIso;
+          const eDate = safeDateStr(e.date, todayIso);
           const eWallet = e.walletName || 'Rizwan (Tour)';
           walletTransactionsList.push(
             `• Date: ${eDate} | Wallet: ${eWallet} | Expense Out: -₹${e.amount} | Description: ${e.description} (${e.category})`
@@ -328,7 +364,7 @@ export const AiAssistantModal: React.FC = () => {
           .slice(0, 20)
           .map(
             (log) =>
-              `• Date/Time: ${log.timestamp} | Action: ${log.action} | Record: ${log.recordType} (${log.recordId}) | Details: ${log.newValue || log.oldValue || ''} | By: ${log.userEmail}`
+              `• Date/Time: ${safeDateStr(log.timestamp, todayIso)} | Action: ${log.action} | Record: ${log.recordType} (${log.recordId}) | By: ${log.userEmail}`
           )
           .join('\n');
 
@@ -346,14 +382,16 @@ NOTE: 6 ko = 06 November 2026 (or 2026-11-06). If user asks "Sahil wallet me kit
   - Rate: ₹${rate}/pax (Age ≥ 5 yrs)
   - Mustak Bookings: ${mustakBookings}
   - Mustak Billable Pax: ${mustakPax} Pax
-  - Mustak Total Commission: ${formatCurrency(mustakCommission)}
+  - Mustak Total Commission Earned: ${formatCurrency(mustakCommission)}
+  - Mustak Commission Paid Out: ${formatCurrency(mustakPaid)}
+  - Mustak Pending Commission (Baaki): ${formatCurrency(mustakPending)}
 
 • TOUR WALLETS CURRENT LIVE BALANCES:
   - Sahil (Tour): ${formatCurrency(sahilWallet)}
   - Rizwan (Tour): ${formatCurrency(rizwanWallet)}
   - Bus (Tour): ${formatCurrency(busWallet)}
 
-• WALLET TRANSACTIONS & COLLECTIONS BREAKDOWN BY DATE (Use this for "Sahil wallet me kitna aaya", "Rizwan wallet collection" date queries):
+• WALLET TRANSACTIONS & COLLECTIONS BREAKDOWN BY DATE:
 ${walletTransactionsList.join('\n') || 'No wallet transactions recorded yet'}
 
 • DATE-WISE ALL TOUR BOOKINGS RECORDS:
@@ -405,7 +443,8 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
           return t;
         })
       );
-    } catch {
+    } catch (err) {
+      console.error('AI Assistant error:', err);
       setThreads((prevThreads) =>
         prevThreads.map((t) => {
           if (t.id === activeThreadId) {
@@ -416,7 +455,7 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
                 {
                   id: (Date.now() + 1).toString(),
                   sender: 'assistant',
-                  text: 'Bhai, response generate karne me issue aaya. Kripya dubara try karein.',
+                  text: `📊 **Sanzari Live Summary**:\n• Total Bookings: **${tourBookings.length}**\n• Tour Wallets Active: **${tourWallets.map((w) => `${w.name}: ${formatCurrency(w.currentBalance)}`).join(' | ')}**`,
                   timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
                 },
               ],
