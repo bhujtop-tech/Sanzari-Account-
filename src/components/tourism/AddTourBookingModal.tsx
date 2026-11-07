@@ -193,7 +193,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
     if (isSahil && sahilW) return sahilW.name;
     return rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)';
   });
-  const [bookedBy, setBookedBy] = useState<string>('Office Staff');
+  const [bookedBy, setBookedBy] = useState<string>('Rizwan');
   const [specialNotes, setSpecialNotes] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -319,7 +319,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
       setAdvancePaid(editingTourBooking.advancePaid ?? '');
       setPaymentMode(editingTourBooking.paymentMode || 'Online');
       setWalletName(editingTourBooking.walletName || 'Rizwan (Tour)');
-      setBookedBy(editingTourBooking.bookedBy || currentUserProfile?.name || 'Office Staff');
+      setBookedBy(editingTourBooking.bookedBy || 'Rizwan');
       setSpecialNotes(editingTourBooking.specialNotes || '');
       setIsManualPrice(true);
     } else {
@@ -370,7 +370,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
       const rizwanW = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan'));
       const defaultWallet = isSahil && sahilW ? sahilW.name : (rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)');
       setWalletName(defaultWallet);
-      setBookedBy(currentUserProfile?.name || user?.displayName || 'Office Staff');
+      setBookedBy('Rizwan');
       setSpecialNotes('');
       setIsManualPrice(false);
     }
@@ -683,19 +683,19 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2.5 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white text-zinc-950 rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white text-zinc-950 rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[98vh] sm:max-h-[94vh] flex flex-col">
         {/* Compact Header */}
-        <div className="bg-white px-5 py-3.5 border-b-2 border-zinc-900 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-sm shadow-xs">
+        <div className="bg-white px-3.5 py-3 sm:px-5 sm:py-3.5 border-b-2 border-zinc-900 flex items-center justify-between shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs shrink-0">
               {editingTourBooking ? <Edit2 className="w-4 h-4" /> : <Plus className="w-5 h-5 stroke-[3]" />}
             </div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-base font-black tracking-tight text-zinc-950">
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <h2 className="text-xs sm:text-base font-black tracking-tight text-zinc-950 truncate">
                 {editingTourBooking ? 'Edit Tour Booking' : 'New Tour Booking'}
               </h2>
-              <span className="text-[11px] font-mono font-black bg-blue-100 text-blue-900 px-2 py-0.5 rounded-lg border border-blue-300">
+              <span className="text-[10px] sm:text-[11px] font-mono font-black bg-blue-100 text-blue-900 px-1.5 py-0.5 sm:px-2 rounded-lg border border-blue-300 shrink-0">
                 {editingTourBooking?.bookingNumber || 'SZ-TOUR'}
               </span>
             </div>
@@ -703,7 +703,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
           <button
             onClick={handleModalClose}
-            className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer"
+            className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -711,7 +711,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="p-4 sm:p-5 overflow-y-auto space-y-3.5 text-xs flex-1 bg-zinc-50/50">
+          <div className="p-2.5 sm:p-5 overflow-y-auto space-y-3 text-xs flex-1 bg-zinc-50/50">
             {errorMsg && (
               <div className="p-2.5 bg-rose-50 border-2 border-rose-400 text-rose-900 rounded-xl text-xs font-bold">
                 ⚠️ {errorMsg}
@@ -1099,9 +1099,10 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   return (
                     <div
                       key={idx}
-                      className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-300 space-y-1.5"
+                      className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-300 space-y-2 sm:space-y-1.5"
                     >
-                      <div className="flex items-center gap-1.5">
+                      {/* DESKTOP LAYOUT (1-Line Flex - 100% Unchanged on PC) */}
+                      <div className="hidden sm:flex items-center gap-1.5">
                         <span className="w-6 h-6 rounded-lg bg-zinc-950 text-white flex items-center justify-center text-[11px] font-black shrink-0">
                           {idx + 1}
                         </span>
@@ -1149,8 +1150,76 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                         )}
                       </div>
 
-                      {/* Inline MM/YYYY Auto Age Input + Fare Badge */}
-                      <div className="flex items-center justify-between text-[10px] pl-7 gap-2 flex-wrap">
+                      {/* MOBILE LAYOUT (Spacious 2 Rows - Full Width Name Input) */}
+                      <div className="sm:hidden space-y-2">
+                        {/* Mobile Row 1: Index + Full-Width Name + Delete */}
+                        <div className="flex items-center gap-2">
+                          <span className="w-6 h-6 rounded-lg bg-zinc-950 text-white flex items-center justify-center text-[11px] font-black shrink-0">
+                            {idx + 1}
+                          </span>
+                          <input
+                            type="text"
+                            placeholder={`Passenger ${idx + 1} Full Name`}
+                            value={m.name}
+                            onChange={(e) => updateMember(idx, 'name', e.target.value)}
+                            className="flex-1 min-w-0 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold text-xs focus:outline-none"
+                          />
+                          {members.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeMemberRow(idx)}
+                              className="p-1.5 rounded-lg bg-white border border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                              title="Remove passenger"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Mobile Row 2: Age + Gender + DOB Input + Discount Badge */}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <div className="flex items-center gap-1">
+                            <span className="text-[10px] font-bold text-zinc-500">Age:</span>
+                            <input
+                              type="number"
+                              min={0}
+                              max={110}
+                              placeholder="Age"
+                              value={m.age}
+                              onChange={(e) => updateMember(idx, 'age', e.target.value)}
+                              className="w-12 bg-white border-2 border-zinc-900 rounded-lg px-1 py-1 text-center text-zinc-950 text-xs font-black font-mono focus:outline-none"
+                            />
+                          </div>
+
+                          <select
+                            value={m.gender}
+                            onChange={(e) => updateMember(idx, 'gender', e.target.value)}
+                            className="bg-white border border-zinc-300 rounded-lg px-1.5 py-1 text-zinc-950 text-xs font-bold focus:outline-none"
+                          >
+                            <option value="Male">Male</option>
+                            <option value="Female">Female</option>
+                            <option value="Child">Child</option>
+                          </select>
+
+                          <div className="flex items-center gap-1 min-w-0">
+                            <span className="text-[10px] font-bold text-zinc-500">DOB:</span>
+                            <input
+                              type="text"
+                              placeholder="10/2018"
+                              value={memberDobInputs[idx] || ''}
+                              onChange={(e) => handleMemberDobInputChange(idx, e.target.value)}
+                              className="w-20 bg-white border border-zinc-300 rounded-md px-1.5 py-0.5 text-xs font-bold text-zinc-900 font-mono focus:border-zinc-900 focus:outline-none"
+                            />
+                          </div>
+
+                          <span className={`px-2 py-0.5 rounded-md border font-black text-[10px] ${discountInfo.color}`}>
+                            {discountInfo.label}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Desktop Inline MM/YYYY Auto Age Input + Fare Badge */}
+                      <div className="hidden sm:flex items-center justify-between text-[10px] pl-7 gap-2 flex-wrap">
                         <div className="flex items-center gap-1.5 text-zinc-600 font-bold">
                           <span>🎂 DOB (MM/YYYY):</span>
                           <input
@@ -1266,7 +1335,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1">
                 <div>
                   <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase">
                     Mode
@@ -1298,6 +1367,43 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                       </option>
                     ))}
                   </select>
+                </div>
+
+                {/* Booked By Selection (Rizwan, Mustak or Custom Name Input) */}
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-[10px] text-zinc-600 font-bold uppercase">
+                      Booked By *
+                    </label>
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setBookedBy('Rizwan')}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
+                          bookedBy === 'Rizwan' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                        }`}
+                      >
+                        Rizwan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setBookedBy('Mustak')}
+                        className={`px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
+                          bookedBy === 'Mustak' ? 'bg-amber-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
+                        }`}
+                      >
+                        Mustak
+                      </button>
+                    </div>
+                  </div>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Rizwan / Mustak / Staff"
+                    value={bookedBy}
+                    onChange={(e) => setBookedBy(e.target.value)}
+                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold text-xs focus:border-zinc-900 focus:outline-none"
+                  />
                 </div>
 
                 <div>

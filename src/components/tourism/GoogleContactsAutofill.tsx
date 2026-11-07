@@ -300,9 +300,9 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
   return (
     <div className="bg-zinc-50 border-2 border-zinc-900 rounded-2xl p-3 sm:p-3.5 space-y-2.5 transition-all">
       {/* Top Header Row */}
-      <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <div className="w-7 h-7 rounded-lg bg-zinc-950 text-white flex items-center justify-center text-xs font-bold shadow-xs">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        <div className="flex items-center gap-2 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-zinc-950 text-white flex items-center justify-center text-xs font-bold shadow-xs shrink-0">
             {/* Google G Logo SVG */}
             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24">
               <path
@@ -323,23 +323,23 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
               />
             </svg>
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-1.5 flex-wrap">
-              <h4 className="text-xs font-black text-zinc-950 tracking-tight">
+              <h4 className="text-xs font-black text-zinc-950 tracking-tight truncate">
                 Google Contacts Auto-Fill
               </h4>
               {hasSavedOrConnected ? (
-                <span className="inline-flex items-center gap-1 text-[10px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-full">
+                <span className="inline-flex items-center gap-1 text-[9px] font-black text-emerald-800 bg-emerald-100 border border-emerald-300 px-1.5 py-0.2 rounded-full shrink-0">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                  Saved &amp; Connected ({allSavedContacts.length})
+                  Connected ({allSavedContacts.length})
                 </span>
               ) : (
-                <span className="text-[10px] font-bold text-zinc-500">
+                <span className="text-[9px] font-bold text-zinc-500 shrink-0">
                   (One-Time Connect)
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-zinc-600">
+            <p className="text-[10px] sm:text-[11px] text-zinc-600 truncate">
               {hasSavedOrConnected
                 ? `Saved contacts ready from ${googleEmail || 'sanzaritourism@gmail.com'}`
                 : 'Connect once to permanently save customer names & phone numbers'}
@@ -348,7 +348,7 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
         </div>
 
         {/* Action Toggle or Connect */}
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="flex items-center justify-end gap-1.5 shrink-0 self-end sm:self-auto">
           {hasSavedOrConnected ? (
             <>
               <button

@@ -87,6 +87,7 @@ export const SlideMenu: React.FC<SlideMenuProps> = ({ isOpen, onClose }) => {
     { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText },
     { id: 'packages', label: 'Tour Packages & PDF', icon: Package },
     { id: 'customers', label: 'Passengers Manifest', icon: Users },
+    { id: 'commission', label: 'Mustak Commission', icon: WalletCards },
     { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

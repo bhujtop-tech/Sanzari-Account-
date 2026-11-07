@@ -18,6 +18,7 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
   const [coupleRoomSurcharge, setCoupleRoomSurcharge] = useState<number | string>(tourPricingSettings?.coupleRoomSurcharge ?? 3000);
   const [child5To7Percent, setChild5To7Percent] = useState<number | string>(tourPricingSettings?.child5To7Percent ?? 50);
   const [child8To11Percent, setChild8To11Percent] = useState<number | string>(tourPricingSettings?.child8To11Percent ?? 75);
+  const [commissionRatePerPax, setCommissionRatePerPax] = useState<number | string>(tourPricingSettings?.commissionRatePerPax ?? 200);
 
   const [isSaving, setIsSaving] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
@@ -31,6 +32,7 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
       setCoupleRoomSurcharge(tourPricingSettings.coupleRoomSurcharge ?? 3000);
       setChild5To7Percent(tourPricingSettings.child5To7Percent ?? 50);
       setChild8To11Percent(tourPricingSettings.child8To11Percent ?? 75);
+      setCommissionRatePerPax(tourPricingSettings.commissionRatePerPax ?? 200);
     }
   }, [tourPricingSettings]);
 
@@ -46,6 +48,7 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
         coupleRoomSurcharge: Math.max(0, Number(coupleRoomSurcharge) || 3000),
         child5To7Percent: Math.max(0, Math.min(100, Number(child5To7Percent) || 50)),
         child8To11Percent: Math.max(0, Math.min(100, Number(child8To11Percent) || 75)),
+        commissionRatePerPax: Math.max(0, Number(commissionRatePerPax) || 200),
       };
 
       await updateTourPricing(payload);
@@ -183,6 +186,21 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
               value={child8To11Percent}
               onChange={(e) => setChild8To11Percent(e.target.value)}
               className="w-full bg-sky-50 border-2 border-zinc-900 rounded-xl px-3 py-2 text-sky-900 font-black text-sm font-mono focus:bg-white focus:outline-none"
+            />
+          </div>
+
+          {/* Commission Rate Per Pax (₹) */}
+          <div className="space-y-1">
+            <label className="block text-[11px] font-bold text-zinc-800">
+              Commission / Pax (₹) [5+ Yrs]
+            </label>
+            <input
+              type="number"
+              required
+              min={0}
+              value={commissionRatePerPax}
+              onChange={(e) => setCommissionRatePerPax(e.target.value)}
+              className="w-full bg-emerald-50 border-2 border-zinc-900 rounded-xl px-3 py-2 text-emerald-900 font-black text-sm font-mono focus:bg-white focus:outline-none"
             />
           </div>
         </div>

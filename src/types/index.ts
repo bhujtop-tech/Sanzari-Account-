@@ -172,6 +172,7 @@ export interface TourPricingSettings {
   coupleRoomSurcharge: number; // e.g. 3000
   child5To7Percent: number; // e.g. 50
   child8To11Percent: number; // e.g. 75
+  commissionRatePerPax?: number; // e.g. 200
   updatedAt?: string;
   updatedBy?: string;
 }
@@ -182,6 +183,7 @@ export const DEFAULT_TOUR_PRICING: TourPricingSettings = {
   coupleRoomSurcharge: 3000,
   child5To7Percent: 50,
   child8To11Percent: 75,
+  commissionRatePerPax: 200,
 };
 
 // ==========================================
@@ -515,7 +517,7 @@ export interface AppUser {
 }
 
 export type NavTab = 'home' | 'sales' | 'stock' | 'accounts' | 'more';
-export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 'vendors' | 'users' | 'reports' | 'monthly' | 'settings' | 'ai' | 'inquiries' | 'packages';
+export type MoreSection = 'customers' | 'products' | 'expenses' | 'purchases' | 'vendors' | 'users' | 'reports' | 'monthly' | 'settings' | 'ai' | 'inquiries' | 'packages' | 'logs' | 'commission';
 
 export interface ActivityItem {
   id: string;

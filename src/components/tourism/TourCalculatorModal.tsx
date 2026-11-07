@@ -320,8 +320,8 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
 
           {/* 2. Children Age / DOB Inputs (Only shown if Children > 0) */}
           {children.length > 0 && (
-            <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-300 space-y-2 max-h-40 overflow-y-auto">
-              <div className="flex items-center justify-between text-[10px] font-bold text-amber-900">
+            <div className="p-2.5 sm:p-3 rounded-2xl bg-amber-50/70 border border-amber-300 space-y-2 max-h-48 overflow-y-auto">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 text-[10px] font-bold text-amber-900">
                 <span>CHILD AGE OR DATE OF BIRTH (DOB)</span>
                 <span>&lt;5y: Free • 5-7y: {child5To7Percent}% • 8-11y: {child8To11Percent}%</span>
               </div>
@@ -330,26 +330,31 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                 return (
                   <div
                     key={idx}
-                    className="flex items-center justify-between gap-2 bg-white p-2 rounded-xl border border-amber-200 text-xs"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 bg-white p-2.5 rounded-xl border border-amber-200 text-xs"
                   >
-                    <span className="font-black text-zinc-800 shrink-0">
-                      Child {idx + 1}
-                    </span>
+                    <div className="flex items-center justify-between sm:justify-start gap-2">
+                      <span className="font-black text-zinc-800 shrink-0">
+                        Child {idx + 1}
+                      </span>
+                      <span className="sm:hidden font-mono font-black text-xs text-amber-900">
+                        ₹{detail?.fare.toLocaleString('en-IN')}
+                      </span>
+                    </div>
 
-                    <div className="flex items-center gap-1.5 flex-1 justify-end">
+                    <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap justify-end">
                       {/* DOB Picker */}
                       <input
                         type="date"
                         value={child.dob}
                         onChange={(e) => updateChildDob(idx, e.target.value)}
                         title="Select Child Date of Birth"
-                        className="bg-zinc-50 border border-zinc-300 rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-700 focus:outline-none"
+                        className="bg-zinc-50 border border-zinc-300 rounded-lg px-2 py-1 text-[11px] font-semibold text-zinc-700 focus:outline-none min-w-0"
                       />
 
                       <span className="text-[10px] text-zinc-400 font-bold">OR</span>
 
                       {/* Direct Age Input */}
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1 shrink-0">
                         <input
                           type="number"
                           min={0}
@@ -357,13 +362,13 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                           value={child.age}
                           onChange={(e) => updateChildAge(idx, e.target.value)}
                           placeholder="Age"
-                          className="w-12 bg-zinc-50 border border-zinc-900 rounded-lg px-1.5 py-1 text-center font-mono font-black text-xs text-zinc-950 focus:outline-none"
+                          className="w-12 bg-zinc-50 border border-zinc-900 rounded-lg px-1 py-1 text-center font-mono font-black text-xs text-zinc-950 focus:outline-none"
                         />
                         <span className="text-[10px] font-bold text-zinc-500">yr</span>
                       </div>
 
                       {/* Calculated Child Fare */}
-                      <span className="min-w-[62px] text-right font-mono font-black text-xs text-amber-900">
+                      <span className="hidden sm:inline-block min-w-[58px] text-right font-mono font-black text-xs text-amber-900 shrink-0">
                         ₹{detail?.fare.toLocaleString('en-IN')}
                       </span>
                     </div>

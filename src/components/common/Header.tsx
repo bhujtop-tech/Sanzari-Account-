@@ -99,28 +99,29 @@ export const Header: React.FC<HeaderProps> = ({
               <>
                 <button
                   onClick={() => setIsPackageExplainerOpen(true)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer border border-amber-500"
+                  title="Package Explainer"
+                  className="hidden sm:flex px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer border border-amber-500"
                 >
-                  <Sparkles size={14} className="fill-zinc-950" />
+                  <Sparkles size={14} className="fill-zinc-950 shrink-0" />
                   <span>🎙️ Package Explainer</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourInquiryOpen(true)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="hidden md:flex px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <Plus size={14} className="stroke-[3]" />
-                  <span>+ Inquiry</span>
+                  <span>Inquiry</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourBookingOpen(true)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
-                  <Plus size={14} />
+                  <Plus size={14} className="stroke-[3]" />
                   <span>+ Booking</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourBatchOpen(true)}
-                  className="hidden xs:flex px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="hidden lg:flex px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 text-xs font-bold items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
                 >
                   <FolderPlus size={14} />
                   <span>+ Date Folder</span>
@@ -163,19 +164,19 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             onClick={handleSharePublicLink}
             title="Copy Public Share Link (No Login Required)"
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-900 text-xs font-bold transition-all active:scale-95 cursor-pointer"
           >
             {copiedShareLink ? <Check size={14} className="text-emerald-600" /> : <Share2 size={14} className="text-emerald-600" />}
-            <span className="hidden sm:inline text-xs">{copiedShareLink ? 'Copied!' : 'Public Link'}</span>
+            <span className="text-xs">{copiedShareLink ? 'Copied!' : 'Public Link'}</span>
           </button>
 
           {/* AI Trigger Button */}
           <button
             onClick={() => setIsAiAssistantOpen(true)}
-            className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-linear-to-r from-amber-500/10 to-indigo-500/10 hover:from-amber-500/20 hover:to-indigo-500/20 text-zinc-900 border border-amber-500/20 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="hidden sm:flex items-center gap-1 px-2.5 py-1.5 rounded-xl bg-linear-to-r from-amber-500/10 to-indigo-500/10 hover:from-amber-500/20 hover:to-indigo-500/20 text-zinc-900 border border-amber-500/20 text-xs font-bold shadow-2xs transition-all active:scale-95 cursor-pointer"
           >
             <Sparkles size={14} className="text-amber-500 fill-amber-400" />
-            <span className="hidden sm:inline">Ask</span> AI
+            <span>Ask AI</span>
           </button>
 
           {/* Compact Circular Profile Avatar Button */}

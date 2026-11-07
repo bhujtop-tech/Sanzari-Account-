@@ -19,6 +19,7 @@ import { TourBatchesView } from './components/tourism/TourBatchesView';
 import { TourBookingsView } from './components/tourism/TourBookingsView';
 import { TourPassengersView } from './components/tourism/TourPassengersView';
 import { TourReportsView } from './components/tourism/TourReportsView';
+import { TourCommissionView } from './components/tourism/TourCommissionView';
 
 // More Sections
 import { CustomersView } from './components/customers/CustomersView';
@@ -138,7 +139,7 @@ const MainAppContent: React.FC = () => {
       />
 
       {/* Main Content Area */}
-      <div className="flex-1 flex flex-col min-h-screen min-w-0">
+      <div className="flex-1 flex flex-col min-h-screen min-w-0 max-w-full overflow-x-hidden">
         {/* Header with Business Mode Switcher */}
         <Header
           isSidebarOpen={isSidebarOpen}
@@ -147,7 +148,7 @@ const MainAppContent: React.FC = () => {
         />
 
         {/* View Router (Dynamically routed for Dry Fruits vs Tourism mode) */}
-        <main className="flex-1 px-3 sm:px-8 pt-4 sm:pt-5 pb-48 md:pb-12 overflow-y-auto">
+        <main className="flex-1 px-2.5 sm:px-8 pt-3 sm:pt-5 pb-48 md:pb-12 overflow-y-auto max-w-full overflow-x-hidden">
           {businessMode === 'tourism' ? (
             /* TOURISM VIEWS */
             <>
@@ -174,6 +175,7 @@ const MainAppContent: React.FC = () => {
                   {activeMoreSection === 'customers' && <TourPassengersView />}
                   {activeMoreSection === 'inquiries' && <TourInquiriesView />}
                   {activeMoreSection === 'packages' && <CustomTourPackagesView />}
+                  {activeMoreSection === 'commission' && <TourCommissionView />}
                   {activeMoreSection === 'reports' && <TourReportsView />}
                   {activeMoreSection === 'expenses' && <ExpensesList />}
                   {activeMoreSection === 'users' && <UsersView />}
@@ -190,6 +192,7 @@ const MainAppContent: React.FC = () => {
                   )}
                   {activeMoreSection === 'vendors' && <VendorsView />}
                   {activeMoreSection === 'purchases' && <PurchasesView />}
+                  {activeMoreSection === 'logs' && <ActivityLogsModal />}
                 </>
               )}
             </>
@@ -212,6 +215,7 @@ const MainAppContent: React.FC = () => {
                   {activeMoreSection === 'monthly' && <MonthlyView />}
                   {activeMoreSection === 'reports' && <ReportsView />}
                   {activeMoreSection === 'settings' && <SettingsView />}
+                  {activeMoreSection === 'logs' && <ActivityLogsModal />}
                 </>
               )}
             </>
@@ -228,7 +232,6 @@ const MainAppContent: React.FC = () => {
       {/* Global Transaction History Modals */}
       <TransactionDetailModal />
       <AllActivityModal />
-      <ActivityLogsModal />
 
       {/* Dryfruit Modals */}
       <AddSaleModal />

@@ -73,7 +73,26 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
       (sum, bk) => sum + Math.max(0, (bk.totalAmount || 0) - (bk.advancePaid || 0)),
       0
     );
-    return { bookingsCount: bookings.length, totalPassengers, totalRevenue, totalAdvance, totalPending };
+    let acPax = 0;
+    let nonAcPax = 0;
+    bookings.forEach((bk) => {
+      const pax = Number(bk.membersCount || 1);
+      const tc = String(bk.travelClass || '').toLowerCase();
+      if (tc.includes('sleeper') || tc.includes('non-ac') || tc.includes('non ac')) {
+        nonAcPax += pax;
+      } else {
+        acPax += pax;
+      }
+    });
+    return {
+      bookingsCount: bookings.length,
+      totalPassengers,
+      totalRevenue,
+      totalAdvance,
+      totalPending,
+      acPax,
+      nonAcPax,
+    };
   };
 
   return (
@@ -217,11 +236,19 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                   </div>
                 </div>
 
-                {/* Actions Footer */}
-                <div className="pt-2.5 mt-2.5 border-t border-zinc-200 flex items-center justify-between">
-                  <span className="text-[10px] text-zinc-600 font-semibold">
-                    {stats.totalPassengers} Passengers
-                  </span>
+                {/* Actions Footer with AC vs Non-AC Pax Breakdown */}
+                <div className="pt-2.5 mt-2.5 border-t border-zinc-200 flex items-center justify-between gap-1.5 flex-wrap">
+                  <div className="flex items-center gap-1 flex-wrap">
+                    <span className="text-[10px] text-zinc-900 font-black">
+                      {stats.totalPassengers} Pax
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 border border-blue-300 text-[9px] font-black">
+                      🚆 AC: {stats.acPax}
+                    </span>
+                    <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
+                      🚂 Non-AC: {stats.nonAcPax}
+                    </span>
+                  </div>
                   <div className="text-[10px] font-bold text-zinc-900 group-hover:text-black flex items-center gap-0.5 transition-colors">
                     <span>Open &amp; PDF</span>
                     <ChevronRight size={12} className="text-zinc-500" />

@@ -75,7 +75,7 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
   return (
     <div className="space-y-6 pb-48 sm:pb-24">
       {/* Quick Navigation Action Strip for Tourism */}
-      <div className="flex items-center gap-2 overflow-x-auto no-scrollbar py-1">
+      <div className="flex items-center gap-2 overflow-x-auto w-full max-w-full no-scrollbar py-1 px-0.5">
         <button
           onClick={() => setIsPackageExplainerOpen(true)}
           className="px-3.5 py-2 rounded-xl bg-amber-400 text-zinc-950 font-black text-xs border-2 border-zinc-900 shadow-xs hover:bg-amber-300 shrink-0 flex items-center gap-1.5 transition-all cursor-pointer"
@@ -126,43 +126,43 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         {/* Total Booked Revenue */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-zinc-500 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">Total Booked Value</span>
-            <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold">
-              <Luggage className="w-4 h-4" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-zinc-500 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-600 truncate">Total Booked Value</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
+              <Luggage className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-zinc-950 font-mono">
+          <div className="text-lg sm:text-2xl font-black text-zinc-950 font-mono truncate">
             {formatCurrency(totalTourRevenue)}
           </div>
-          <div className="text-[11px] text-zinc-600 font-medium mt-1 flex items-center justify-between">
-            <span><strong className="text-zinc-950">{tourBookings.length}</strong> Bookings Confirmed</span>
+          <div className="text-[10px] sm:text-[11px] text-zinc-600 font-medium mt-1 flex items-center justify-between flex-wrap gap-1">
+            <span className="truncate"><strong className="text-zinc-950">{tourBookings.length}</strong> Bookings</span>
             {thisMonthTourRevenue > 0 && (
-              <span className="text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded font-bold">
-                +{formatCurrency(thisMonthTourRevenue)} this mo
+              <span className="text-[9px] sm:text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-bold truncate">
+                +{formatCurrency(thisMonthTourRevenue)}
               </span>
             )}
           </div>
         </div>
 
         {/* Advance Collected */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-emerald-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-800">Advance Collected</span>
-            <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold">
-              <ArrowDownLeft className="w-4 h-4" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-emerald-600 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-800 truncate">Advance Collected</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+              <ArrowDownLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-emerald-700 font-mono">
+          <div className="text-lg sm:text-2xl font-black text-emerald-700 font-mono truncate">
             {formatCurrency(totalTourAdvance)}
           </div>
-          <div className="text-[11px] text-emerald-700 font-semibold mt-1 flex items-center justify-between flex-wrap gap-1">
-            <span>Sahil + Rizwan Wallets</span>
+          <div className="text-[10px] sm:text-[11px] text-emerald-700 font-semibold mt-1 space-y-0.5">
+            <span className="block truncate">Sahil + Rizwan Wallets</span>
             {tourWallets.length > 0 && (
-              <span className="text-[10px] text-emerald-800 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+              <span className="text-[9px] text-emerald-800 font-bold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 block truncate">
                 {tourWallets
                   .filter((w) => Number(w.currentBalance) > 0)
                   .map((w) => `${w.name.replace(' (Tour)', '')}: ${formatCurrency(w.currentBalance)}`)
@@ -173,33 +173,33 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         {/* Pending Customer Dues */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-rose-600 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-800">Remaining Dues</span>
-            <div className="w-8 h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold">
-              <AlertCircle className="w-4 h-4" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-rose-600 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-800 truncate">Remaining Dues</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
+              <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-rose-600 font-mono">
+          <div className="text-lg sm:text-2xl font-black text-rose-600 font-mono truncate">
             {formatCurrency(totalTourPending)}
           </div>
-          <div className="text-[11px] text-rose-600 font-semibold mt-1">
+          <div className="text-[10px] sm:text-[11px] text-rose-600 font-semibold mt-1 truncate">
             Pending from Travelers
           </div>
         </div>
 
         {/* Total Passengers */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden">
-          <div className="flex items-center justify-between text-zinc-900 mb-2">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-600">Total Travelers</span>
-            <div className="w-8 h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold">
-              <Users className="w-4 h-4" />
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-zinc-900 mb-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-600 truncate">Total Travelers</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
+              <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-xl sm:text-2xl font-black text-zinc-950 font-mono">
+          <div className="text-lg sm:text-2xl font-black text-zinc-950 font-mono truncate">
             {totalTourPassengers} Pax
           </div>
-          <div className="text-[11px] text-zinc-600 font-medium mt-1">
+          <div className="text-[10px] sm:text-[11px] text-zinc-600 font-medium mt-1 truncate">
             Across {tourBookings.length} confirmed bookings
           </div>
         </div>

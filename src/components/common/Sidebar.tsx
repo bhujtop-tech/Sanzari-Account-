@@ -92,6 +92,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'inquiries', label: 'Inquiries & Leads', icon: FileText },
     { id: 'packages', label: 'Tour Packages & PDF', icon: Package },
     { id: 'customers', label: 'Passengers Manifest', icon: Users },
+    { id: 'commission', label: 'Mustak Commission', icon: WalletCards },
     { id: 'reports', label: 'Tour Reports & P&L', icon: BarChart3 },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
@@ -311,25 +312,30 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="text-[10px] text-zinc-500">Ask business metrics &amp; balances</p>
         </button>
 
-        {/* Activity & Update Logs Card (Below Ask AI) */}
+        {/* Activity Logs Card (Single Line Header + Opens Full Screen View) */}
         <button
           onClick={() => {
+            setActiveTab('more');
+            setActiveMoreSection('logs');
             onCloseMobile?.();
-            setIsLogsModalOpen(true);
           }}
-          className="w-full p-2.5 rounded-2xl bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-zinc-900/5 border-2 border-emerald-500/30 text-left hover:border-emerald-600 hover:bg-emerald-50/60 transition-all cursor-pointer group shadow-2xs"
-          title="View Date-wise Hinglish logs of all bookings, updates, payments & expenses"
+          className={`w-full p-2.5 rounded-2xl border-2 text-left transition-all cursor-pointer group shadow-2xs ${
+            activeTab === 'more' && activeMoreSection === 'logs'
+              ? 'bg-emerald-50 border-emerald-600'
+              : 'bg-gradient-to-br from-emerald-500/10 via-teal-500/5 to-zinc-900/5 border-emerald-500/30 hover:border-emerald-600 hover:bg-emerald-50/60'
+          }`}
+          title="Open Full-Screen Date-wise Hinglish Activity Logs"
         >
-          <div className="flex items-center justify-between mb-0.5">
-            <span className="flex items-center gap-1.5 text-xs font-black text-zinc-950 group-hover:text-emerald-800">
-              <History size={14} className="text-emerald-600 stroke-[2.5]" />
-              Activity &amp; Update Logs
+          <div className="flex items-center justify-between gap-1.5 mb-0.5 whitespace-nowrap">
+            <span className="flex items-center gap-1.5 text-xs font-black text-zinc-950 group-hover:text-emerald-800 whitespace-nowrap truncate">
+              <History size={14} className="text-emerald-600 stroke-[2.5] shrink-0" />
+              <span>Activity Logs</span>
             </span>
-            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300">
+            <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-emerald-100 text-emerald-900 font-black border border-emerald-300 whitespace-nowrap shrink-0">
               📜 Logs
             </span>
           </div>
-          <p className="text-[10px] text-zinc-500 font-medium">Date-wise Hinglish update history</p>
+          <p className="text-[10px] text-zinc-500 font-medium truncate">Date-wise Hinglish update history</p>
         </button>
 
         {/* Lock / Switch Portal Button */}

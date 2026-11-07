@@ -22,6 +22,7 @@ import { TourBooking } from '../../types';
 import { BookingsSkeleton } from '../common/Skeleton';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
+import { resolveBookedBy } from './TourCommissionView';
 
 interface TourBookingsViewProps {
   onOpenBookingDetail?: (booking: TourBooking) => void;
@@ -41,6 +42,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Due'>('ALL');
+  const [bookedByFilter, setBookedByFilter] = useState<'ALL' | 'Rizwan' | 'Mustak'>('ALL');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     return (localStorage.getItem('sz_tour_bookings_view_mode') as 'card' | 'list') || 'card';
@@ -100,6 +102,12 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
       if (statusFilter === 'Paid' && !isFullPaid) return false;
       if (statusFilter === 'Due' && isFullPaid) return false;
 
+      if (bookedByFilter !== 'ALL') {
+        const bBy = resolveBookedBy(b).toLowerCase();
+        if (bookedByFilter === 'Rizwan' && !bBy.includes('rizwan')) return false;
+        if (bookedByFilter === 'Mustak' && !bBy.includes('mustak')) return false;
+      }
+
       if (!q) return true;
 
       const cName = (b.customerName || '').toLowerCase();
@@ -117,7 +125,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         matchMember
       );
     });
-  }, [batchFilteredBookings, searchQuery, statusFilter]);
+  }, [batchFilteredBookings, searchQuery, statusFilter, bookedByFilter]);
 
   if (loading) {
     return <BookingsSkeleton />;
@@ -181,73 +189,73 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
 
   return (
     <div className="space-y-4 pb-48 sm:pb-24">
-      {/* Quick Payment Status Summary Strip */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      {/* Quick Payment Status Summary Strip (2x2 Grid on Mobile) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
         <div
           onClick={() => setStatusFilter('ALL')}
-          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+          className={`p-2.5 sm:p-3 rounded-2xl border-2 cursor-pointer transition-all ${
             statusFilter === 'ALL'
               ? 'bg-zinc-950 text-white border-zinc-950 shadow-sm'
               : 'bg-white text-zinc-900 border-zinc-200 hover:border-zinc-900'
           }`}
         >
           <span
-            className={`text-[10px] font-bold uppercase block ${
+            className={`text-[9px] sm:text-[10px] font-bold uppercase block truncate ${
               statusFilter === 'ALL' ? 'text-zinc-400' : 'text-zinc-500'
             }`}
           >
             Total Confirmed
           </span>
-          <span className="text-base sm:text-lg font-black font-mono">
+          <span className="text-xs sm:text-lg font-black font-mono truncate block mt-0.5">
             {batchFilteredBookings.length} Bookings
           </span>
         </div>
 
         <div
           onClick={() => setStatusFilter('Paid')}
-          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+          className={`p-2.5 sm:p-3 rounded-2xl border-2 cursor-pointer transition-all ${
             statusFilter === 'Paid'
               ? 'bg-emerald-600 text-white border-emerald-800 shadow-sm'
               : 'bg-emerald-50/70 text-emerald-950 border-emerald-300 hover:border-emerald-600'
           }`}
         >
           <span
-            className={`text-[10px] font-bold uppercase flex items-center gap-1 ${
+            className={`text-[9px] sm:text-[10px] font-bold uppercase flex items-center gap-1 truncate ${
               statusFilter === 'Paid' ? 'text-emerald-100' : 'text-emerald-800'
             }`}
           >
-            <CheckCircle2 size={11} /> Full Payment Aagaya
+            <CheckCircle2 size={10} className="shrink-0" /> <span className="truncate">Full Paid</span>
           </span>
-          <span className="text-base sm:text-lg font-black font-mono">
+          <span className="text-xs sm:text-lg font-black font-mono truncate block mt-0.5">
             {summaryStats.fullPaidCount} Paid
           </span>
         </div>
 
         <div
           onClick={() => setStatusFilter('Due')}
-          className={`p-3 rounded-2xl border-2 cursor-pointer transition-all ${
+          className={`p-2.5 sm:p-3 rounded-2xl border-2 cursor-pointer transition-all ${
             statusFilter === 'Due'
               ? 'bg-rose-600 text-white border-rose-800 shadow-sm'
               : 'bg-rose-50/70 text-rose-950 border-rose-300 hover:border-rose-600'
           }`}
         >
           <span
-            className={`text-[10px] font-bold uppercase flex items-center gap-1 ${
+            className={`text-[9px] sm:text-[10px] font-bold uppercase flex items-center gap-1 truncate ${
               statusFilter === 'Due' ? 'text-rose-100' : 'text-rose-800'
             }`}
           >
-            <Clock size={11} /> Baaki Payment (Due)
+            <Clock size={10} className="shrink-0" /> <span className="truncate">Baaki (Due)</span>
           </span>
-          <span className="text-base sm:text-lg font-black font-mono">
+          <span className="text-xs sm:text-lg font-black font-mono truncate block mt-0.5">
             {summaryStats.dueCount} Bookings
           </span>
         </div>
 
-        <div className="p-3 rounded-2xl bg-white border-2 border-zinc-900">
-          <span className="text-[10px] font-bold uppercase text-zinc-500 block">
+        <div className="p-2.5 sm:p-3 rounded-2xl bg-white border-2 border-zinc-900 min-w-0">
+          <span className="text-[9px] sm:text-[10px] font-bold uppercase text-zinc-500 block truncate">
             Total Baaki to Collect
           </span>
-          <span className="text-base sm:text-lg font-black font-mono text-rose-600">
+          <span className="text-xs sm:text-lg font-black font-mono text-rose-600 truncate block mt-0.5">
             {formatCurrency(summaryStats.totalDue)}
           </span>
         </div>
@@ -338,6 +346,41 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               <Clock size={12} />
               <span>Baaki / Due ({summaryStats.dueCount})</span>
             </button>
+
+            {/* Booked By Filter Pills */}
+            <div className="flex items-center gap-1 pl-2 border-l border-zinc-200 shrink-0">
+              <span className="text-[10px] font-bold text-zinc-500 uppercase hidden sm:inline">Booked By:</span>
+              <button
+                onClick={() => setBookedByFilter('ALL')}
+                className={`px-2 py-1 text-[11px] font-bold rounded-lg transition-all cursor-pointer ${
+                  bookedByFilter === 'ALL'
+                    ? 'bg-zinc-900 text-white shadow-2xs'
+                    : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                }`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setBookedByFilter('Rizwan')}
+                className={`px-2 py-1 text-[11px] font-black rounded-lg transition-all cursor-pointer ${
+                  bookedByFilter === 'Rizwan'
+                    ? 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-blue-50 text-blue-900 hover:bg-blue-100'
+                }`}
+              >
+                👤 Rizwan
+              </button>
+              <button
+                onClick={() => setBookedByFilter('Mustak')}
+                className={`px-2 py-1 text-[11px] font-black rounded-lg transition-all cursor-pointer ${
+                  bookedByFilter === 'Mustak'
+                    ? 'bg-amber-600 text-white shadow-2xs'
+                    : 'bg-amber-50 text-amber-900 hover:bg-amber-100'
+                }`}
+              >
+                👤 Mustak
+              </button>
+            </div>
           </div>
 
           {/* View Mode Toggle: Cards vs List */}
@@ -418,9 +461,20 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                 <div>
                   {/* Top Header / Booking No & Payment Status Badge */}
                   <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2 gap-1">
-                    <span className="text-[10px] font-mono font-black text-zinc-950 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300 truncate max-w-[120px]">
-                      {b.bookingNumber}
-                    </span>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] font-mono font-black text-zinc-950 bg-zinc-100 px-2 py-0.5 rounded border border-zinc-300 truncate max-w-[110px]">
+                        {b.bookingNumber}
+                      </span>
+                      <span
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${
+                          resolveBookedBy(b).toLowerCase().includes('mustak')
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-blue-100 text-blue-900 border-blue-300'
+                        }`}
+                      >
+                        👤 {resolveBookedBy(b)}
+                      </span>
+                    </div>
 
                     <div className="flex items-center gap-1">
                       {historyCount > 1 && (
@@ -505,9 +559,22 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                       </span>
                     </div>
 
-                    <div className="text-[10px] text-zinc-700 flex items-center gap-1.5">
+                    <div className="text-[10px] text-zinc-700 flex items-center gap-1.5 flex-wrap">
                       <Users size={12} className="text-zinc-900 shrink-0" />
-                      <span className="font-extrabold text-zinc-900">{b.membersCount} Pax</span>
+                      <span className="px-2 py-0.5 rounded-md bg-zinc-900 text-white font-black text-[10px]">
+                        {b.membersCount} Pax
+                      </span>
+                      {String(b.travelClass || '').toLowerCase().includes('sleeper') ||
+                      String(b.travelClass || '').toLowerCase().includes('non-ac') ||
+                      String(b.travelClass || '').toLowerCase().includes('non ac') ? (
+                        <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-400 font-black text-[10px]">
+                          🚂 Non-AC
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-md bg-blue-100 text-blue-900 border border-blue-400 font-black text-[10px]">
+                          🚆 AC
+                        </span>
+                      )}
                       <span className="text-zinc-500 text-[10px] truncate">
                         ({b.members.map((m) => m.name).slice(0, 2).join(', ')}
                         {b.members.length > 2 ? '...' : ''})
@@ -736,6 +803,15 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     <h4 className="text-sm font-black text-zinc-950 tracking-tight flex items-center gap-1.5 flex-wrap">
                       <span>{b.customerName}</span>
                       <span
+                        className={`text-[9px] font-black px-1.5 py-0.2 rounded border ${
+                          resolveBookedBy(b).toLowerCase().includes('mustak')
+                            ? 'bg-amber-100 text-amber-900 border-amber-300'
+                            : 'bg-blue-100 text-blue-900 border-blue-300'
+                        }`}
+                      >
+                        👤 {resolveBookedBy(b)}
+                      </span>
+                      <span
                         onClick={() => setPaymentModalBooking(b)}
                         className={`hidden lg:inline-flex items-center gap-0.5 text-[9px] font-black px-1.5 py-0.2 rounded border cursor-pointer ${
                           isFullPaid
@@ -787,11 +863,23 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </div>
                   </div>
 
-                  {/* Pax Count & Names */}
+                  {/* Pax Count & AC/Non-AC Badge */}
                   <div className="col-span-1 lg:text-center">
-                    <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-zinc-100 border border-zinc-300 text-xs font-black text-zinc-950">
-                      <Users size={12} className="text-zinc-900" />
-                      <span>{b.membersCount} Pax</span>
+                    <div className="inline-flex items-center gap-1 flex-wrap justify-center">
+                      <span className="px-2 py-0.5 rounded-lg bg-zinc-900 text-white text-[10px] font-black">
+                        {b.membersCount} Pax
+                      </span>
+                      {String(b.travelClass || '').toLowerCase().includes('sleeper') ||
+                      String(b.travelClass || '').toLowerCase().includes('non-ac') ||
+                      String(b.travelClass || '').toLowerCase().includes('non ac') ? (
+                        <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-400 text-[10px] font-black">
+                          🚂 Non-AC
+                        </span>
+                      ) : (
+                        <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-900 border border-blue-400 text-[10px] font-black">
+                          🚆 AC
+                        </span>
+                      )}
                     </div>
                     <p className="text-[10px] text-zinc-500 truncate max-w-[120px] lg:mx-auto mt-0.5">
                       {b.members.map((m) => m.name).slice(0, 2).join(', ')}

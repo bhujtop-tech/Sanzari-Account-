@@ -8,6 +8,7 @@ export const TourPassengersView: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
+  const [expandedIds, setExpandedIds] = useState<Record<string, boolean>>({});
 
   const filteredBookings = useMemo(() => {
     if (selectedBatchId === 'ALL') return tourBookings;
@@ -143,9 +144,115 @@ export const TourPassengersView: React.FC = () => {
         </div>
       </div>
 
-      {/* Passengers Table */}
+      {/* Passengers View: Mobile List (Single-Line Expandable) & Desktop Table */}
       <div className="bg-white rounded-2xl border-2 border-zinc-900 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+        {/* Mobile View: Compact Expandable Single-Line Rows */}
+        <div className="sm:hidden divide-y divide-zinc-200">
+          {filtered.length === 0 ? (
+            <div className="p-8 text-center text-xs text-zinc-400 font-medium">
+              No passengers found.
+            </div>
+          ) : (
+            filtered.map((p, idx) => {
+              const isPaid = p.dueAmount === 0 && p.totalAmount > 0;
+              const expandKey = `${p.bookingId}-${idx}`;
+              const isExpanded = Boolean(expandedIds[expandKey]);
+
+              return (
+                <div key={expandKey} className="bg-white">
+                  {/* Single-Line Compact Mobile Row */}
+                  <div
+                    onClick={() =>
+                      setExpandedIds((prev) => ({ ...prev, [expandKey]: !prev[expandKey] }))
+                    }
+                    className="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-zinc-50 active:bg-zinc-100 transition-colors select-none"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-zinc-400 shrink-0">
+                        #{idx + 1}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-xs text-zinc-950 truncate">
+                            {p.passengerName}
+                          </span>
+                          {p.age && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 bg-zinc-100 text-zinc-700 rounded border border-zinc-200">
+                              {p.age}y
+                            </span>
+                          )}
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-900 border border-amber-200 rounded">
+                            {p.travelClass}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-500 font-medium truncate">
+                          📍 {p.destination} • {p.customerName}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {isPaid ? (
+                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                          ✅ FULL PAID
+                        </span>
+                      ) : (
+                        <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
+                          Due: {formatCurrency(p.dueAmount)}
+                        </span>
+                      )}
+                      <span className="text-zinc-400 text-xs">
+                        {isExpanded ? '▲' : '▼'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Expanded Mobile Details Card */}
+                  {isExpanded && (
+                    <div className="p-3 bg-zinc-50 border-t border-zinc-100 space-y-2 text-xs">
+                      <div className="grid grid-cols-2 gap-2 text-[11px]">
+                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
+                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">Booked By / Customer</span>
+                          <span className="font-bold text-zinc-950 block truncate">{p.customerName}</span>
+                          <a
+                            href={`tel:${p.customerPhone}`}
+                            className="text-blue-600 font-mono font-bold hover:underline flex items-center gap-1 mt-0.5"
+                          >
+                            📞 {p.customerPhone}
+                          </a>
+                        </div>
+
+                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
+                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">Booking Ref &amp; Date</span>
+                          <span className="font-mono font-bold text-zinc-900 block">{p.bookingNumber}</span>
+                          <span className="text-zinc-600 block text-[10px] font-medium mt-0.5">{p.tourDate}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-white p-2 rounded-xl border border-zinc-200 flex items-center justify-between font-mono text-[11px]">
+                        <div>
+                          <span className="text-zinc-500 text-[10px] uppercase font-bold block">Total Fare</span>
+                          <span className="font-bold text-zinc-900">{formatCurrency(p.totalAmount)}</span>
+                        </div>
+                        <div>
+                          <span className="text-emerald-700 text-[10px] uppercase font-bold block">Advance Paid</span>
+                          <span className="font-bold text-emerald-700">{formatCurrency(p.advancePaid)}</span>
+                        </div>
+                        <div>
+                          <span className="text-rose-600 text-[10px] uppercase font-bold block">Remaining Baaki</span>
+                          <span className="font-bold text-rose-600">{formatCurrency(p.dueAmount)}</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        {/* Desktop View: Full Data Table (Hidden on Mobile) */}
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-left text-xs border-collapse">
             <thead>
               <tr className="bg-zinc-100 text-zinc-700 font-black border-b-2 border-zinc-900 uppercase text-[10px] tracking-wider">

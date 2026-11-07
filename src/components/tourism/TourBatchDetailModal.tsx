@@ -16,6 +16,7 @@ import {
   ChevronDown,
   ChevronUp,
   MessageCircle,
+  Search,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +55,8 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
   const [activeView, setActiveView] = useState<'manifest' | 'account'>('manifest');
   const [cashTab, setCashTab] = useState<'cash_in' | 'cash_out'>('cash_in');
+  const [classFilter, setClassFilter] = useState<'ALL' | 'AC' | 'NON_AC'>('ALL');
+  const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
@@ -65,6 +68,11 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   const [expPaymentMode, setExpPaymentMode] = useState<TourPaymentMode>('UPI');
   const [isSavingExpense, setIsSavingExpense] = useState(false);
 
+  const isNonAcTravelClass = (tc?: string): boolean => {
+    const val = String(tc || '').toLowerCase();
+    return val.includes('sleeper') || val.includes('non-ac') || val.includes('non ac');
+  };
+
   const batch = useMemo(
     () => (batchId ? tourBatches.find((b) => b.id === batchId) || null : null),
     [batchId, tourBatches]
@@ -74,6 +82,40 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     () => (batch ? tourBookings.filter((b) => b.tourBatchId === batch.id) : []),
     [batch, tourBookings]
   );
+
+  const acStats = useMemo(() => {
+    let acBookings = 0;
+    let acPax = 0;
+    let nonAcBookings = 0;
+    let nonAcPax = 0;
+    bookings.forEach((b) => {
+      const pax = Number(b.membersCount || 1);
+      if (isNonAcTravelClass(b.travelClass)) {
+        nonAcBookings += 1;
+        nonAcPax += pax;
+      } else {
+        acBookings += 1;
+        acPax += pax;
+      }
+    });
+    return { acBookings, acPax, nonAcBookings, nonAcPax };
+  }, [bookings]);
+
+  const filteredManifestBookings = useMemo(() => {
+    const q = manifestSearchQuery.trim().toLowerCase();
+    return bookings.filter((b) => {
+      if (classFilter === 'AC' && isNonAcTravelClass(b.travelClass)) return false;
+      if (classFilter === 'NON_AC' && !isNonAcTravelClass(b.travelClass)) return false;
+      if (q) {
+        const memberNames = Array.isArray(b.members)
+          ? b.members.map((m) => m.name || '').join(' ')
+          : '';
+        const haystack = `${b.customerName || ''} ${b.customerPhone || ''} ${b.bookingNumber || ''} ${b.city || ''} ${b.walletName || ''} ${memberNames}`.toLowerCase();
+        if (!haystack.includes(q)) return false;
+      }
+      return true;
+    });
+  }, [bookings, classFilter, manifestSearchQuery]);
 
   const expenses = useMemo(
     () => (batch ? tourExpenses.filter((e) => e.tourBatchId === batch.id) : []),
@@ -262,100 +304,114 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-6xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-6xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[98vh] sm:max-h-[94vh] flex flex-col">
         {/* Clean Header */}
-        <div className="bg-white p-4 sm:p-5 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
-          <div className="flex items-start justify-between gap-3 flex-wrap">
+        <div className="bg-white p-3 sm:p-5 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
+          <div className="flex items-start justify-between gap-2.5 flex-wrap">
             <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-bold text-zinc-900 bg-zinc-100 border border-zinc-300 px-2.5 py-0.5 rounded-full">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <span className="text-[10px] sm:text-[11px] font-bold text-zinc-900 bg-zinc-100 border border-zinc-300 px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full">
                   🗓️ Departure: {formatDate(batch.departureDate)}
                 </span>
-                <span className="text-[11px] bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold px-2 py-0.5 rounded-md">
+                <span className="text-[10px] sm:text-[11px] bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md">
                   {batch.tourType}
                 </span>
+                <span className="text-[10px] sm:text-[11px] bg-blue-100 border border-blue-400 text-blue-900 font-black px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg">
+                  🚆 AC: {acStats.acPax} Pax ({acStats.acBookings})
+                </span>
+                <span className="text-[10px] sm:text-[11px] bg-amber-100 border border-amber-400 text-amber-900 font-black px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg">
+                  🚂 Non-AC: {acStats.nonAcPax} Pax ({acStats.nonAcBookings})
+                </span>
               </div>
-              <h2 className="text-xl sm:text-2xl font-black mt-1 text-zinc-950 tracking-tight">
+              <h2 className="text-lg sm:text-2xl font-black mt-1 text-zinc-950 tracking-tight leading-tight">
                 {batch.title}
               </h2>
-              <p className="text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
-                <MapPin className="w-3.5 h-3.5 text-zinc-900" /> {batch.destination} •{' '}
+              <p className="text-[11px] sm:text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
+                <MapPin className="w-3.5 h-3.5 text-zinc-900 shrink-0" /> {batch.destination} •{' '}
                 {batch.durationDays} Days ({batch.travelMode})
               </p>
             </div>
 
-            {/* Top Action Buttons: Account Button (Marked Area), Download PDF, Delete, Close */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Top Action Buttons: Account Button, Download PDF, Delete, Close */}
+            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() =>
                   setActiveView((prev) => (prev === 'account' ? 'manifest' : 'account'))
                 }
-                className={`px-3.5 py-2 rounded-xl border-2 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
+                className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 text-[11px] sm:text-xs font-black flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
                   activeView === 'account'
                     ? 'bg-zinc-950 text-white border-zinc-950'
                     : 'bg-amber-400 hover:bg-amber-500 text-zinc-950 border-zinc-900'
                 }`}
               >
-                <Wallet size={14} className="stroke-[2.5]" />
-                <span>{activeView === 'account' ? '← Back to Bookings' : 'Account'}</span>
+                <Wallet size={13} className="stroke-[2.5]" />
+                <span>{activeView === 'account' ? '← Back' : 'Account'}</span>
               </button>
 
               <button
                 type="button"
                 onClick={() => setIsPDFModalOpen(true)}
                 disabled={bookings.length === 0}
-                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-[11px] sm:text-xs font-black flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer"
               >
-                <FileDown size={14} className="stroke-[2.5]" />
+                <FileDown size={13} className="stroke-[2.5]" />
                 <span>Download Group PDF</span>
               </button>
 
               <button
                 type="button"
                 onClick={handleDeleteBatch}
-                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+                className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-[11px] sm:text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
               >
-                <Trash2 size={13} />
-                <span>Delete Folder</span>
+                <Trash2 size={12} />
+                <span className="hidden sm:inline">Delete Folder</span>
               </button>
 
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* 4 Summary Cards */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-4 pt-3 border-t border-zinc-200 text-xs">
-            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
-              <span className="text-zinc-500 block text-[11px] font-medium">Seat Capacity</span>
-              <span className="text-sm sm:text-base font-black text-zinc-950">
+          {/* 4 Summary Cards (Compact 2x2 Grid on Mobile) */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 mt-3 pt-2.5 border-t border-zinc-200 text-xs">
+            <div className="bg-zinc-50 border border-zinc-200 p-2 sm:p-2.5 rounded-xl min-w-0">
+              <span className="text-zinc-500 block text-[10px] sm:text-[11px] font-medium truncate">Seat Capacity</span>
+              <span className="text-xs sm:text-base font-black text-zinc-950 truncate block">
                 {totalPassengers} / {totalSeats} Booked ({percentage}%)
               </span>
+              <div className="flex items-center gap-1 mt-1 flex-wrap">
+                <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 border border-blue-300 text-[9px] font-black">
+                  🚆 AC: {acStats.acPax}
+                </span>
+                <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
+                  🚂 Non-AC: {acStats.nonAcPax}
+                </span>
+              </div>
             </div>
 
-            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl">
-              <span className="text-zinc-500 block text-[11px] font-medium">Total Package Value</span>
-              <span className="text-sm sm:text-base font-black text-zinc-950">
+            <div className="bg-zinc-50 border border-zinc-200 p-2 sm:p-2.5 rounded-xl min-w-0">
+              <span className="text-zinc-500 block text-[10px] sm:text-[11px] font-medium truncate">Total Package Value</span>
+              <span className="text-xs sm:text-base font-black text-zinc-950 truncate block">
                 {formatCurrency(totalRevenue)}
               </span>
             </div>
 
-            <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl">
-              <span className="text-emerald-800 block text-[11px] font-bold">Advance / Received</span>
-              <span className="text-sm sm:text-base font-black text-emerald-700">
+            <div className="bg-emerald-50/70 border border-emerald-200 p-2 sm:p-2.5 rounded-xl min-w-0">
+              <span className="text-emerald-800 block text-[10px] sm:text-[11px] font-bold truncate">Advance / Received</span>
+              <span className="text-xs sm:text-base font-black text-emerald-700 truncate block">
                 {formatCurrency(totalAdvance)}
               </span>
             </div>
 
-            <div className="bg-rose-50/70 border border-rose-200 p-2.5 rounded-xl">
-              <span className="text-rose-800 block text-[11px] font-bold">Remaining Baaki (Due)</span>
-              <span className="text-sm sm:text-base font-black text-rose-600">
+            <div className="bg-rose-50/70 border border-rose-200 p-2 sm:p-2.5 rounded-xl min-w-0">
+              <span className="text-rose-800 block text-[10px] sm:text-[11px] font-bold truncate">Remaining Baaki (Due)</span>
+              <span className="text-xs sm:text-base font-black text-rose-600 truncate block">
                 {formatCurrency(totalPending)}
               </span>
             </div>
@@ -483,9 +539,18 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                                 <span className="font-black text-sm text-zinc-950">
                                   {b.customerName}
                                 </span>
-                                <span className="text-[11px] font-bold text-zinc-500">
-                                  ({b.membersCount} Pax)
+                                <span className="px-2 py-0.5 rounded-lg bg-zinc-900 text-white text-[10px] font-black">
+                                  {b.membersCount} Pax
                                 </span>
+                                {isNonAcTravelClass(b.travelClass) ? (
+                                  <span className="px-2 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-400 text-[10px] font-black">
+                                    🚂 Non-AC
+                                  </span>
+                                ) : (
+                                  <span className="px-2 py-0.5 rounded-lg bg-blue-100 text-blue-900 border border-blue-400 text-[10px] font-black">
+                                    🚆 AC
+                                  </span>
+                                )}
                               </div>
                               <div className="text-[11px] font-bold text-zinc-600 mt-0.5 flex items-center gap-2 flex-wrap">
                                 <span className="px-2 py-0.2 rounded bg-zinc-100 border border-zinc-300 text-zinc-900">
@@ -638,53 +703,118 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                DEFAULT VIEW: BOOKED PASSENGERS MANIFEST
                ========================================================= */
             <>
-              <div className="flex items-center justify-between gap-3 flex-wrap">
-                <div>
-                  <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
-                    <Users className="w-4 h-4 text-zinc-950 shrink-0" />
-                    <span>
-                      Booked Passengers Manifest ({bookings.length} Bookings • {totalPassengers} Pax)
-                    </span>
-                  </h3>
-                  <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
-                    💡 Click on any customer booking row below to expand &amp; view all members and details
-                  </p>
+              <div className="space-y-2.5">
+                {/* Top Row: Manifest Title on Left + Search Bar on Right */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5 flex-wrap">
+                      <Users className="w-4 h-4 text-zinc-950 shrink-0" />
+                      <span>
+                        Booked Passengers Manifest ({bookings.length} Bookings • {totalPassengers} Pax)
+                      </span>
+                    </h3>
+                    <p className="text-[11px] text-zinc-500 font-medium mt-0.5">
+                      💡 Click on any customer booking row below to expand &amp; view all members and details
+                    </p>
+                  </div>
+
+                  {/* Search Bar right across from Booked Passengers Manifest */}
+                  <div className="relative w-full sm:w-80 shrink-0">
+                    <Search className="w-3.5 h-3.5 text-zinc-500 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={manifestSearchQuery}
+                      onChange={(e) => setManifestSearchQuery(e.target.value)}
+                      placeholder="Search passenger name, phone or booking ID..."
+                      className="w-full pl-8 pr-7 py-2 bg-zinc-50 focus:bg-white border-2 border-zinc-900 rounded-xl text-xs font-bold text-zinc-950 placeholder:text-zinc-400 focus:outline-none transition-colors"
+                    />
+                    {manifestSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setManifestSearchQuery('')}
+                        title="Clear search"
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 rounded-md text-zinc-400 hover:text-zinc-900 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  {bookings.length > 0 && (
+                {/* Second Row: AC / Non-AC Filter Pills + Expand All + Book Passenger Button */}
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                  {/* AC vs Non-AC Filter Pills inside Tour Folder */}
+                  <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl border border-zinc-300">
                     <button
                       type="button"
-                      onClick={() => {
-                        const allExpanded = bookings.every((bk) => expandedBookingIds[bk.id]);
-                        if (allExpanded) {
-                          setExpandedBookingIds({});
-                        } else {
-                          const next: Record<string, boolean> = {};
-                          bookings.forEach((bk) => {
-                            next[bk.id] = true;
-                          });
-                          setExpandedBookingIds(next);
-                        }
-                      }}
-                      className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      onClick={() => setClassFilter('ALL')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer ${
+                        classFilter === 'ALL'
+                          ? 'bg-zinc-950 text-white shadow-2xs'
+                          : 'text-zinc-700 hover:bg-white'
+                      }`}
                     >
-                      {bookings.every((bk) => expandedBookingIds[bk.id])
-                        ? 'Collapse All'
-                        : 'Expand All'}
+                      All ({totalPassengers} Pax)
                     </button>
-                  )}
+                    <button
+                      type="button"
+                      onClick={() => setClassFilter('AC')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
+                        classFilter === 'AC'
+                          ? 'bg-blue-600 text-white border-blue-700 shadow-2xs'
+                          : 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                      }`}
+                    >
+                      🚆 AC ({acStats.acPax} Pax)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClassFilter('NON_AC')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
+                        classFilter === 'NON_AC'
+                          ? 'bg-amber-500 text-zinc-950 border-amber-600 shadow-2xs'
+                          : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                      }`}
+                    >
+                      🚂 Non-AC ({acStats.nonAcPax} Pax)
+                    </button>
+                  </div>
 
-                  <button
-                    onClick={() => onAddBookingToBatch(batch.id)}
-                    className="px-3.5 py-2 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
-                  >
-                    <Plus className="w-3.5 h-3.5 stroke-[3]" /> + Book Passenger for this Date
-                  </button>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {bookings.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allExpanded = bookings.every((bk) => expandedBookingIds[bk.id]);
+                          if (allExpanded) {
+                            setExpandedBookingIds({});
+                          } else {
+                            const next: Record<string, boolean> = {};
+                            bookings.forEach((bk) => {
+                              next[bk.id] = true;
+                            });
+                            setExpandedBookingIds(next);
+                          }
+                        }}
+                        className="px-3 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 rounded-xl text-xs font-bold transition-all cursor-pointer"
+                      >
+                        {bookings.every((bk) => expandedBookingIds[bk.id])
+                          ? 'Collapse All'
+                          : 'Expand All'}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => onAddBookingToBatch(batch.id)}
+                      className="px-3.5 py-2 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+                    >
+                      <Plus className="w-3.5 h-3.5 stroke-[3]" /> + Book Passenger for this Date
+                    </button>
+                  </div>
                 </div>
               </div>
 
-              {bookings.length === 0 ? (
+              {filteredManifestBookings.length === 0 ? (
                 <div className="bg-zinc-50 border border-zinc-200 rounded-2xl p-8 text-center space-y-2">
                   <Luggage className="w-8 h-8 text-zinc-400 mx-auto" />
                   <p className="text-xs font-bold text-zinc-900">
@@ -697,13 +827,14 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {bookings.map((b) => {
+                  {filteredManifestBookings.map((b) => {
                     const total = Number(b.totalAmount || 0);
                     const adv = Number(b.advancePaid || 0);
                     const due = Math.max(0, total - adv);
                     const isFullPaid = due === 0 && total > 0;
                     const isExpanded = Boolean(expandedBookingIds[b.id]);
                     const instList = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
+                    const isNonAc = isNonAcTravelClass(b.travelClass);
 
                     return (
                       <div
@@ -716,12 +847,12 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             : 'border-zinc-200 hover:border-zinc-400'
                         }`}
                       >
-                        {/* Main Clickable Row (Customer Name, PAX, Payment Status & Actions) */}
+                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Payment Status & Actions) */}
                         <div
                           onClick={() => toggleBookingExpand(b.id)}
                           className="p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none hover:bg-zinc-50/60 transition-colors"
                         >
-                          {/* Left: Booking ID, Customer Name, Phone, PAX & Quick Financial Summary */}
+                          {/* Left: Booking ID, Customer Name, Phone, PAX, AC/Non-AC Badge & Quick Financial Summary */}
                           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
                             <span className="text-xs font-mono font-bold px-2 py-0.5 bg-zinc-100 rounded-lg text-zinc-800 border border-zinc-300">
                               {b.bookingNumber}
@@ -739,6 +870,17 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               {b.membersCount} Pax
                             </span>
 
+                            {/* AC vs Non-AC Distinct Colored Badge right next to 2 Pax */}
+                            {isNonAc ? (
+                              <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-400 text-[11px] font-black shadow-2xs">
+                                🚂 Non-AC
+                              </span>
+                            ) : (
+                              <span className="px-2.5 py-0.5 rounded-lg bg-blue-100 text-blue-900 border border-blue-400 text-[11px] font-black shadow-2xs">
+                                🚆 AC
+                              </span>
+                            )}
+
                             {/* Inline Financial Summary on Closed Card */}
                             <div className="flex items-center gap-2 text-xs font-mono pl-1">
                               <span className="text-zinc-600">
@@ -755,9 +897,9 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             </div>
                           </div>
 
-                          {/* Right: Status Badge + Action Buttons + Expand Chevron */}
+                          {/* Desktop Right: Status Badge + Action Buttons + Expand Chevron (Hidden on Mobile) */}
                           <div
-                            className="flex items-center justify-between lg:justify-end gap-1.5 flex-wrap shrink-0"
+                            className="hidden lg:flex items-center justify-end gap-1.5 shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
                             <span
@@ -838,11 +980,72 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               )}
                             </button>
                           </div>
+
+                          {/* Mobile Right Action Chevron (Shown on Mobile) */}
+                          <div className="lg:hidden flex items-center gap-2 shrink-0 self-end sm:self-auto">
+                            {!isFullPaid ? (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setPaymentModalBooking(b);
+                                }}
+                                className="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-black flex items-center gap-1 shadow-2xs cursor-pointer"
+                              >
+                                <ArrowDownLeft className="w-3 h-3 stroke-[3]" /> + Recv
+                              </button>
+                            ) : (
+                              <span className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 text-[10px] font-black">
+                                ✅ PAID
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleBookingExpand(b.id);
+                              }}
+                              className="p-1 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer"
+                            >
+                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                            </button>
+                          </div>
                         </div>
 
-                        {/* Expandable Lower Details (Members List, Wallet/Mode, Installments, Notes) */}
+                        {/* Expandable Lower Details (Members List, Mobile Action Bar, Wallet/Mode, Installments, Notes) */}
                         {isExpanded && (
-                          <div className="px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 space-y-3">
+                          <div className="px-3 sm:px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 space-y-3">
+                            {/* Mobile Quick Action Buttons Bar (Share, Edit, Slip, Delete) */}
+                            <div className="flex items-center gap-1.5 flex-wrap lg:hidden pb-2 border-b border-zinc-200">
+                              <button
+                                type="button"
+                                onClick={(e) => handleWhatsAppShareBooking(e, b)}
+                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <MessageCircle size={13} /> Share WhatsApp
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => openEditTourBookingModal(b)}
+                                className="px-2.5 py-1.5 bg-white text-zinc-800 hover:bg-zinc-100 border border-zinc-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Edit2 size={13} /> Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleShareVoucher(b)}
+                                className="px-2.5 py-1.5 bg-zinc-950 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Share2 size={13} /> Voucher Slip
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteBooking(b.id, b.customerName)}
+                                className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
+                              >
+                                <Trash2 size={13} /> Delete
+                              </button>
+                            </div>
                             {/* Members Sub-list */}
                             <div className="bg-white p-3 rounded-xl border border-zinc-200">
                               <div className="flex items-center justify-between mb-2">
