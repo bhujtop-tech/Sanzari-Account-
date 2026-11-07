@@ -21,7 +21,7 @@ import {
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { TourBooking, TourPaymentMode } from '../../types';
-import { addTourExpense, deleteTourExpense } from '../../services/db';
+import { addTourExpense, deleteTourExpense, updateTourBookingTicketStatus } from '../../services/db';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
 
@@ -867,26 +867,43 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                     const isExpanded = Boolean(expandedBookingIds[b.id]);
                     const instList = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
                     const isNonAc = isNonAcTravelClass(b.travelClass);
+                    const ticketStatus = b.ticketStatus || 'PENDING';
+                    const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
+
+                    const handleToggleTicketStatus = (
+                      e: React.MouseEvent,
+                      target: '1_WAY' | '2_WAY'
+                    ) => {
+                      e.stopPropagation();
+                      const next = ticketStatus === target ? 'PENDING' : target;
+                      updateTourBookingTicketStatus(b.id, next).catch((err) =>
+                        console.error('Failed to update ticket status:', err)
+                      );
+                    };
 
                     return (
                       <div
                         key={b.id}
-                        className={`bg-white border-2 rounded-2xl transition-all overflow-hidden ${
-                          isFullPaid
-                            ? 'border-emerald-500 bg-emerald-50/10'
+                        className={`border-2 rounded-2xl transition-all overflow-hidden ${
+                          isTicketDone
+                            ? 'bg-emerald-50/90 border-emerald-500 shadow-xs'
+                            : isFullPaid
+                            ? 'bg-white border-emerald-500'
                             : isExpanded
-                            ? 'border-zinc-900 shadow-sm'
-                            : 'border-zinc-200 hover:border-zinc-400'
+                            ? 'bg-white border-zinc-900 shadow-sm'
+                            : 'bg-white border-zinc-200 hover:border-zinc-400'
                         }`}
                       >
-                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Payment Status & Actions) */}
+                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Ticket Done, Payment Status & Actions) */}
                         <div
                           onClick={() => toggleBookingExpand(b.id)}
-                          className="p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none hover:bg-zinc-50/60 transition-colors"
+                          className={`p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                            isTicketDone ? 'hover:bg-emerald-100/60' : 'hover:bg-zinc-50/60'
+                          }`}
                         >
-                          {/* Left: Booking ID, Customer Name, Phone, PAX, AC/Non-AC Badge & Quick Financial Summary */}
+                          {/* Left: Booking ID, Customer Name, Phone, PAX, AC/Non-AC Badge, Ticket Done & Quick Financial Summary */}
                           <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-                            <span className="text-xs font-mono font-bold px-2 py-0.5 bg-zinc-100 rounded-lg text-zinc-800 border border-zinc-300">
+                            <span className="text-xs font-mono font-bold px-2 py-0.5 bg-white/90 rounded-lg text-zinc-800 border border-zinc-300">
                               {b.bookingNumber}
                             </span>
 
@@ -921,6 +938,37 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                                 🚆 AC
                               </span>
                             )}
+
+                            {/* 1 Way / 2 Way Ticket Done Quick Toggle */}
+                            <div
+                              onClick={(e) => e.stopPropagation()}
+                              className="inline-flex items-center gap-1 bg-white/90 p-0.5 rounded-lg border border-zinc-300 shadow-2xs"
+                            >
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleTicketStatus(e, '1_WAY')}
+                                title="Mark 1 Way Ticket Done (click again to clear)"
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                                  ticketStatus === '1_WAY'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : 'text-zinc-600 hover:bg-zinc-100'
+                                }`}
+                              >
+                                {ticketStatus === '1_WAY' ? '🎫 Ticket Done (1 Way)' : '🎫 1 Way'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => handleToggleTicketStatus(e, '2_WAY')}
+                                title="Mark 2 Way Ticket Done (click again to clear)"
+                                className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                                  ticketStatus === '2_WAY'
+                                    ? 'bg-emerald-600 text-white shadow-2xs'
+                                    : 'text-zinc-600 hover:bg-zinc-100'
+                                }`}
+                              >
+                                {ticketStatus === '2_WAY' ? '🎫 Ticket Done (2 Way)' : '🎫 2 Way'}
+                              </button>
+                            </div>
 
                             {/* Inline Financial Summary on Closed Card */}
                             <div className="flex items-center gap-2 text-xs font-mono pl-1">

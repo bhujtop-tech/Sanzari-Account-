@@ -2593,6 +2593,23 @@ export async function updateTourBooking(
     }
   }
 
+export async function updateTourBookingTicketStatus(
+  id: string,
+  ticketStatus: 'PENDING' | '1_WAY' | '2_WAY'
+): Promise<void> {
+  if (!id) return;
+  try {
+    const bookingRef = doc(db, 'tourBookings', id);
+    await updateDoc(bookingRef, {
+      ticketStatus,
+      updatedAt: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${id}`);
+    throw error;
+  }
+}
+
 export async function deleteTourBooking(id: string, userEmail: string): Promise<void> {
   if (!id) return;
   try {

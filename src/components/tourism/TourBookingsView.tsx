@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBooking } from '../../types';
+import { updateTourBookingTicketStatus } from '../../services/db';
 import { BookingsSkeleton } from '../common/Skeleton';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
@@ -462,12 +463,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               Array.isArray(b.paymentHistory) && b.paymentHistory.length > 1
                 ? b.paymentHistory[b.paymentHistory.length - 1]
                 : null;
+            const ticketStatus = b.ticketStatus || 'PENDING';
+            const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
 
             return (
               <div
                 key={b.id}
-                className={`bg-white text-zinc-950 rounded-2xl border-2 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group ${
-                  isFullPaid ? 'border-emerald-600 bg-emerald-50/10' : 'border-zinc-900'
+                className={`text-zinc-950 rounded-2xl border-2 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group ${
+                  isTicketDone
+                    ? 'bg-emerald-50/90 border-emerald-500'
+                    : isFullPaid
+                    ? 'bg-white border-emerald-600'
+                    : 'bg-white border-zinc-900'
                 }`}
               >
                 <div>
@@ -600,6 +607,45 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                         ({b.members.map((m) => m.name).slice(0, 2).join(', ')}
                         {b.members.length > 2 ? '...' : ''})
                       </span>
+                    </div>
+
+                    {/* 1 Way / 2 Way Ticket Done Quick Selector */}
+                    <div className="pt-1 border-t border-zinc-200/80 flex items-center justify-between gap-1.5">
+                      <span className="text-[10px] font-black text-zinc-600 uppercase">
+                        🎫 Train Ticket:
+                      </span>
+                      <div className="inline-flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = ticketStatus === '1_WAY' ? 'PENDING' : '1_WAY';
+                            updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                          }}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-all cursor-pointer ${
+                            ticketStatus === '1_WAY'
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                              : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {ticketStatus === '1_WAY' ? '✅ Ticket Done (1 Way)' : '1 Way'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const next = ticketStatus === '2_WAY' ? 'PENDING' : '2_WAY';
+                            updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                          }}
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-all cursor-pointer ${
+                            ticketStatus === '2_WAY'
+                              ? 'bg-emerald-600 text-white border-emerald-700 shadow-2xs'
+                              : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+                          }`}
+                        >
+                          {ticketStatus === '2_WAY' ? '✅ Ticket Done (2 Way)' : '2 Way'}
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -785,12 +831,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               const due = Math.max(0, total - adv);
               const isFullPaid = due === 0 && total > 0;
               const historyCount = Array.isArray(b.paymentHistory) ? b.paymentHistory.length : (adv > 0 ? 1 : 0);
+              const ticketStatus = b.ticketStatus || 'PENDING';
+              const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
 
               return (
                 <div
                   key={b.id}
-                  className={`p-3.5 sm:p-4 hover:bg-zinc-50 transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:items-center ${
-                    isFullPaid ? 'bg-emerald-50/20' : ''
+                  className={`p-3.5 sm:p-4 transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:items-center ${
+                    isTicketDone
+                      ? 'bg-emerald-50/90 hover:bg-emerald-100/60'
+                      : isFullPaid
+                      ? 'bg-emerald-50/20 hover:bg-zinc-50'
+                      : 'hover:bg-zinc-50'
                   }`}
                 >
                   {/* Date & Booking Number */}
@@ -889,9 +941,41 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                       <MapPin size={12} className="text-zinc-900 shrink-0" />
                       <span className="truncate">{b.destination}</span>
                     </div>
-                    <div className="text-[10px] font-semibold text-zinc-500 mt-0.5 flex items-center gap-1">
+                    <div className="text-[10px] font-semibold text-zinc-500 mt-0.5 flex items-center gap-1 flex-wrap">
                       <span>{b.travelClass}</span>
                       {b.tourBatchTitle && <span>• {b.tourBatchTitle}</span>}
+                    </div>
+                    <div className="mt-1 inline-flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = ticketStatus === '1_WAY' ? 'PENDING' : '1_WAY';
+                          updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all cursor-pointer ${
+                          ticketStatus === '1_WAY'
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-white text-zinc-600 border-zinc-300 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {ticketStatus === '1_WAY' ? '🎫 Ticket Done (1 Way)' : '🎫 1 Way'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const next = ticketStatus === '2_WAY' ? 'PENDING' : '2_WAY';
+                          updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                        }}
+                        className={`px-1.5 py-0.5 rounded text-[9px] font-black border transition-all cursor-pointer ${
+                          ticketStatus === '2_WAY'
+                            ? 'bg-emerald-600 text-white border-emerald-700'
+                            : 'bg-white text-zinc-600 border-zinc-300 hover:bg-zinc-100'
+                        }`}
+                      >
+                        {ticketStatus === '2_WAY' ? '🎫 Ticket Done (2 Way)' : '🎫 2 Way'}
+                      </button>
                     </div>
                   </div>
 

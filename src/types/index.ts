@@ -118,6 +118,7 @@ export interface TourBooking {
   
   // Additional Notes & Status
   bookingStatus: TourBookingStatus;
+  ticketStatus?: 'PENDING' | '1_WAY' | '2_WAY';
   bookedBy?: string;
   transactionId?: string;
   specialNotes?: string;
