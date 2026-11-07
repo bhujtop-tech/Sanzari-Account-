@@ -48,6 +48,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     setTourReceiptBooking,
     setIsTourReceiptOpen,
     openEditTourBookingModal,
+    openEditTourExpenseModal,
     deleteTourBookingById,
     deleteTourBatchById,
   } = useData();
@@ -678,14 +679,24 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               </div>
                             </div>
 
-                            <div className="flex items-center gap-2.5 shrink-0">
+                            <div className="flex items-center gap-2 shrink-0">
                               <span className="font-mono font-black text-sm sm:text-base text-rose-600">
                                 - {formatCurrency(e.amount)}
                               </span>
                               <button
                                 type="button"
+                                onClick={() => openEditTourExpenseModal(e)}
+                                className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-zinc-950 border border-amber-400 text-[10px] font-black inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Edit Expense"
+                              >
+                                <Edit2 size={11} />
+                                <span>Edit</span>
+                              </button>
+                              <button
+                                type="button"
                                 onClick={() => handleDeleteFolderExpense(e.id, e.description)}
                                 className="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-600 text-zinc-500 hover:text-white transition-colors cursor-pointer"
+                                title="Delete Expense"
                               >
                                 <Trash2 size={13} />
                               </button>

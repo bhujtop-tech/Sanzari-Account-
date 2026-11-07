@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { BottomSheet } from '../common/BottomSheet';
 import { Wallet } from '../../types';
@@ -7,6 +7,8 @@ import {
   ArrowDownLeft,
   ArrowUpRight,
   ArrowRightLeft,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 
 export const WalletLedgerModal: React.FC = () => {
@@ -28,7 +30,12 @@ export const WalletLedgerModal: React.FC = () => {
     setSelectedSaleId,
     setIsAddExpenseOpen,
     setIsAddTourExpenseOpen,
+    setEditingTourExpense,
+    openEditTourExpenseModal,
+    deleteTourExpenseById,
   } = useData();
+
+  const [confirmDeleteExpId, setConfirmDeleteExpId] = useState<string | null>(null);
 
   const allWallets = useMemo(() => {
     const map = new Map<string, Wallet>();
@@ -278,6 +285,7 @@ export const WalletLedgerModal: React.FC = () => {
               onClick={() => {
                 setSelectedWalletId(null);
                 if (isTourWallet) {
+                  setEditingTourExpense(null);
                   setIsAddTourExpenseOpen(true);
                 } else {
                   setIsAddExpenseOpen(true);
@@ -333,7 +341,7 @@ export const WalletLedgerModal: React.FC = () => {
                     </div>
                   </div>
 
-                  <div className="text-right shrink-0">
+                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     <div
                       className={`text-xs font-extrabold tracking-tight ${
                         item.isPositive ? 'text-emerald-600' : 'text-rose-600'
@@ -347,6 +355,51 @@ export const WalletLedgerModal: React.FC = () => {
                         ? 'Payment Received'
                         : item.type.replace('_', ' ')}
                     </span>
+
+                    {item.type === 'tour_expense' && item.refId && (
+                      <div
+                        className="flex items-center gap-1 pt-0.5"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const exp = tourExpenses.find((te) => te.id === item.refId);
+                            if (exp) {
+                              setSelectedWalletId(null);
+                              openEditTourExpenseModal(exp);
+                            }
+                          }}
+                          className="px-2 py-0.5 rounded-lg bg-amber-100 hover:bg-amber-200 text-zinc-950 border border-amber-400 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+                          title="Edit Expense"
+                        >
+                          <Pencil size={10} />
+                          <span>Edit</span>
+                        </button>
+
+                        {confirmDeleteExpId === item.refId ? (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              await deleteTourExpenseById(item.refId!);
+                              setConfirmDeleteExpId(null);
+                            }}
+                            className="px-2 py-0.5 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteExpId(item.refId!)}
+                            className="p-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 transition-colors cursor-pointer"
+                            title="Delete Expense"
+                          >
+                            <Trash2 size={10} />
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}

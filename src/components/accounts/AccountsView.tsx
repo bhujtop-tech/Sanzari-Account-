@@ -13,9 +13,12 @@ import {
   Plus,
   X,
   Wallet as WalletIcon,
+  Pencil,
+  Trash2,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { addWallet } from '../../services/db';
+import { TourExpense } from '../../types';
 import {
   buildTourWalletLedger,
   extractBookingPayments,
@@ -34,6 +37,9 @@ export const AccountsView: React.FC = () => {
     setIsTransferOpen,
     setIsAddExpenseOpen,
     setIsAddTourExpenseOpen,
+    setEditingTourExpense,
+    openEditTourExpenseModal,
+    deleteTourExpenseById,
     sales,
     expenses,
     transfers,
@@ -42,6 +48,7 @@ export const AccountsView: React.FC = () => {
   } = useData();
 
   const isTourism = businessMode === 'tourism';
+  const [confirmDeleteExpenseId, setConfirmDeleteExpenseId] = useState<string | null>(null);
 
   const [filterWalletId, setFilterWalletId] = useState<string>('all');
   const [tourHistoryFilter, setTourHistoryFilter] = useState<
@@ -111,6 +118,7 @@ export const AccountsView: React.FC = () => {
       subtitle: string;
       paymentMode?: string;
       badgeText: string;
+      expenseObj?: TourExpense;
     }> = [];
 
     const findMatchingWallet = (wId?: string, wName?: string) => {
@@ -197,6 +205,7 @@ export const AccountsView: React.FC = () => {
         subtitle: `${te.tourTitle || te.destination || 'Office / General Expense'}${te.paymentMode ? ` • ${te.paymentMode}` : ''}`,
         paymentMode: te.paymentMode,
         badgeText: `Paid from ${targetW.name.replace(' (Tour)', '')}`,
+        expenseObj: te,
       });
     });
 
@@ -307,7 +316,14 @@ export const AccountsView: React.FC = () => {
         <div className="flex items-center gap-2 flex-wrap">
           <button
             type="button"
-            onClick={() => (isTourism ? setIsAddTourExpenseOpen(true) : setIsAddExpenseOpen(true))}
+            onClick={() => {
+              if (isTourism) {
+                setEditingTourExpense(null);
+                setIsAddTourExpenseOpen(true);
+              } else {
+                setIsAddExpenseOpen(true);
+              }
+            }}
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer"
           >
             <Plus size={14} className="stroke-[3]" />
@@ -672,9 +688,9 @@ export const AccountsView: React.FC = () => {
                       </div>
                     </div>
 
-                    <div className="text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-zinc-100 flex sm:flex-col items-center justify-between sm:items-end shrink-0">
+                    <div className="text-right border-t sm:border-t-0 pt-2 sm:pt-0 border-zinc-100 flex sm:flex-col items-center justify-between sm:items-end gap-1.5 shrink-0">
                       <span className="text-xs text-zinc-600 font-medium sm:hidden">Amount:</span>
-                      <div>
+                      <div className="flex flex-col sm:items-end gap-1">
                         <div
                           className={`text-base font-black font-mono tracking-tight ${
                             rec.kind === 'transfer'
@@ -688,7 +704,7 @@ export const AccountsView: React.FC = () => {
                           {formatCurrency(rec.amount)}
                         </div>
                         <span
-                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block mt-0.5 ${
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-full inline-block ${
                             rec.kind === 'cross_booking'
                               ? 'text-purple-800 bg-purple-50 border border-purple-200'
                               : rec.kind === 'transfer'
@@ -700,6 +716,55 @@ export const AccountsView: React.FC = () => {
                         >
                           {rec.badgeText}
                         </span>
+
+                        {rec.kind === 'expense_out' && rec.expenseObj && (
+                          <div
+                            className="flex items-center gap-1.5 pt-1"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => openEditTourExpenseModal(rec.expenseObj!)}
+                              className="px-2.5 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-zinc-950 border border-amber-400 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer shadow-2xs"
+                              title="Edit Expense"
+                            >
+                              <Pencil size={11} />
+                              <span>Edit</span>
+                            </button>
+
+                            {confirmDeleteExpenseId === rec.expenseObj.id ? (
+                              <div className="inline-flex items-center gap-1">
+                                <button
+                                  type="button"
+                                  onClick={async () => {
+                                    await deleteTourExpenseById(rec.expenseObj!.id);
+                                    setConfirmDeleteExpenseId(null);
+                                  }}
+                                  className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                                >
+                                  Confirm Delete
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteExpenseId(null)}
+                                  className="px-2 py-1 rounded-lg bg-zinc-100 text-zinc-700 border border-zinc-300 text-[10px] font-bold cursor-pointer"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteExpenseId(rec.expenseObj!.id)}
+                                className="px-2 py-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 text-[10px] font-black inline-flex items-center gap-1 transition-colors cursor-pointer"
+                                title="Delete Expense"
+                              >
+                                <Trash2 size={11} />
+                                <span>Delete</span>
+                              </button>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>

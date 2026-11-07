@@ -50,6 +50,7 @@ import {
   updateTourPricingSettings,
   deleteTourBooking,
   deleteTourBatch,
+  deleteTourExpense,
   deleteTourInquiry,
   deleteCustomTourPackage,
   subscribeAuditLogs,
@@ -98,6 +99,7 @@ interface DataContextType {
   tourBatches: TourBatch[];
   tourBookings: TourBooking[];
   tourExpenses: TourExpense[];
+  setTourExpenses: React.Dispatch<React.SetStateAction<TourExpense[]>>;
   selectedTourBatchId: string | null;
   setSelectedTourBatchId: (id: string | null) => void;
   selectedTourBookingId: string | null;
@@ -113,6 +115,10 @@ interface DataContextType {
   deleteTourBatchById: (id: string) => Promise<void>;
   isAddTourExpenseOpen: boolean;
   setIsAddTourExpenseOpen: (open: boolean) => void;
+  editingTourExpense: TourExpense | null;
+  setEditingTourExpense: (expense: TourExpense | null) => void;
+  openEditTourExpenseModal: (expense: TourExpense) => void;
+  deleteTourExpenseById: (id: string) => Promise<void>;
   isTourReceiptOpen: boolean;
   setIsTourReceiptOpen: (open: boolean) => void;
   tourReceiptBooking: TourBooking | null;
@@ -298,6 +304,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [editingTourBooking, setEditingTourBooking] = useState<TourBooking | null>(null);
   const [isAddTourBatchOpen, setIsAddTourBatchOpen] = useState(false);
   const [isAddTourExpenseOpen, setIsAddTourExpenseOpen] = useState(false);
+  const [editingTourExpense, setEditingTourExpense] = useState<TourExpense | null>(null);
   const [isTourReceiptOpen, setIsTourReceiptOpen] = useState(false);
   const [tourReceiptBooking, setTourReceiptBooking] = useState<TourBooking | null>(null);
 
@@ -362,6 +369,25 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       await deleteTourBatch(id, user?.email || 'admin@sanzari.com');
     } catch (err) {
       console.warn('Delete tour batch error:', err);
+    }
+  };
+
+  const openEditTourExpenseModal = (expense: TourExpense) => {
+    setEditingTourExpense(expense);
+    setIsAddTourExpenseOpen(true);
+  };
+
+  const deleteTourExpenseById = async (id: string) => {
+    if (!id) return;
+    setTourExpenses((prev) => {
+      const updated = prev.filter((e) => e.id !== id);
+      localStorage.setItem('sz_tour_expenses', JSON.stringify(updated));
+      return updated;
+    });
+    try {
+      await deleteTourExpense(id, user?.email || 'admin@sanzari.com');
+    } catch (err) {
+      console.warn('Delete tour expense error:', err);
     }
   };
 
@@ -972,6 +998,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         tourBatches,
         tourBookings,
         tourExpenses,
+        setTourExpenses,
         selectedTourBatchId,
         setSelectedTourBatchId,
         selectedTourBookingId,
@@ -987,6 +1014,10 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deleteTourBatchById,
         isAddTourExpenseOpen,
         setIsAddTourExpenseOpen,
+        editingTourExpense,
+        setEditingTourExpense,
+        openEditTourExpenseModal,
+        deleteTourExpenseById,
         isTourReceiptOpen,
         setIsTourReceiptOpen,
         tourReceiptBooking,

@@ -2762,6 +2762,94 @@ export async function addTourExpense(
   }
 }
 
+export async function updateTourExpense(
+  id: string,
+  expenseData: Partial<Omit<TourExpense, 'id' | 'createdAt'>>,
+  userEmail: string
+): Promise<void> {
+  try {
+    const expRef = doc(db, 'tourExpenses', id);
+    const expSnap = await getDoc(expRef);
+    const now = new Date().toISOString();
+
+    if (expSnap.exists()) {
+      const oldData = expSnap.data() as TourExpense;
+      const oldAmt = Number(oldData.amount || 0);
+      const newAmt = expenseData.amount !== undefined ? Number(expenseData.amount) : oldAmt;
+      const oldWalletName = (oldData.walletName || '').toLowerCase().trim();
+      const newWalletName = (
+        expenseData.walletName !== undefined ? expenseData.walletName : oldData.walletName || ''
+      )
+        .toLowerCase()
+        .trim();
+      const oldWalletId = oldData.walletId || '';
+      const newWalletId =
+        expenseData.walletId !== undefined ? expenseData.walletId : oldWalletId;
+
+      try {
+        const walletsSnap = await getDocs(collection(db, 'wallets'));
+        const findWalletDoc = (wId?: string, wNameLower?: string) =>
+          walletsSnap.docs.find(
+            (w) =>
+              (wId && w.id === wId) ||
+              (wNameLower && (w.data().name || '').toLowerCase().trim() === wNameLower)
+          );
+
+        const oldWalletDoc = findWalletDoc(oldWalletId, oldWalletName);
+        const newWalletDoc = findWalletDoc(newWalletId, newWalletName);
+
+        if (oldWalletDoc && newWalletDoc && oldWalletDoc.id === newWalletDoc.id) {
+          const diff = newAmt - oldAmt;
+          if (diff !== 0) {
+            const curBal = Number(oldWalletDoc.data().currentBalance || 0);
+            await updateDoc(doc(db, 'wallets', oldWalletDoc.id), {
+              currentBalance: curBal - diff,
+              updatedAt: now,
+            });
+          }
+        } else {
+          if (oldWalletDoc && oldAmt > 0) {
+            const curOldBal = Number(oldWalletDoc.data().currentBalance || 0);
+            await updateDoc(doc(db, 'wallets', oldWalletDoc.id), {
+              currentBalance: curOldBal + oldAmt,
+              updatedAt: now,
+            });
+          }
+          if (newWalletDoc && newAmt > 0) {
+            const curNewBal = Number(newWalletDoc.data().currentBalance || 0);
+            await updateDoc(doc(db, 'wallets', newWalletDoc.id), {
+              currentBalance: curNewBal - newAmt,
+              updatedAt: now,
+            });
+          }
+        }
+      } catch (wErr) {
+        console.warn('Wallet adjustment fallback during updateTourExpense:', wErr);
+      }
+    }
+
+    const cleanUpdates = sanitizeForFirestore({
+      ...expenseData,
+      ...(expenseData.date ? { monthKey: getMonthKey(expenseData.date) } : {}),
+      updatedAt: now,
+    });
+
+    await updateDoc(expRef, cleanUpdates);
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail,
+      action: 'UPDATE_TOUR_EXPENSE',
+      recordType: 'tourExpenses',
+      recordId: id,
+      newValue: JSON.stringify(cleanUpdates),
+      timestamp: now,
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourExpenses/${id}`);
+    throw error;
+  }
+}
+
 export async function deleteTourExpense(id: string, userEmail: string): Promise<void> {
   try {
     const expRef = doc(db, 'tourExpenses', id);

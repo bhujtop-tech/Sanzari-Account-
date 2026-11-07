@@ -18,6 +18,7 @@ import {
   History,
   Sparkles,
   ArrowUpRight,
+  Pencil,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -67,6 +68,7 @@ export const TourCommissionView: React.FC = () => {
     tourExpenses,
     tourWallets,
     tourPricingSettings,
+    openEditTourExpenseModal,
     formatCurrency,
     formatDate,
   } = useData();
@@ -1047,15 +1049,26 @@ export const TourCommissionView: React.FC = () => {
                       Recorded Payout
                     </span>
                   </div>
-                  <button
-                    type="button"
-                    disabled={deletingPayoutId === p.id}
-                    onClick={() => handleDeletePayout(p.id)}
-                    title="Delete payout record & refund wallet"
-                    className="p-2 rounded-xl text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
-                  >
-                    <Trash2 className="w-4 h-4" />
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => openEditTourExpenseModal(p)}
+                      title="Edit payout record"
+                      className="px-2.5 py-1.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-zinc-950 border border-amber-400 text-[11px] font-black inline-flex items-center gap-1 transition-colors cursor-pointer"
+                    >
+                      <Pencil className="w-3.5 h-3.5" />
+                      <span>Edit</span>
+                    </button>
+                    <button
+                      type="button"
+                      disabled={deletingPayoutId === p.id}
+                      onClick={() => handleDeletePayout(p.id)}
+                      title="Delete payout record & refund wallet"
+                      className="p-2 rounded-xl text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer disabled:opacity-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               </div>
             ))}

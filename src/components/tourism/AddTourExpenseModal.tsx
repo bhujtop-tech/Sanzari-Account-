@@ -1,10 +1,21 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { X, Receipt, Wallet, CheckCircle2, Sparkles, UserCheck } from 'lucide-react';
+import {
+  X,
+  Receipt,
+  Wallet,
+  CheckCircle2,
+  Sparkles,
+  UserCheck,
+  Pencil,
+  Trash2,
+  History,
+} from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { addTourExpense } from '../../services/db';
-import { TourExpenseCategory, TourPaymentMode } from '../../types';
+import { addTourExpense, updateTourExpense } from '../../services/db';
+import { TourExpense, TourExpenseCategory, TourPaymentMode } from '../../types';
 import { getBillablePaxCount, resolveBookedBy, isPrivateTourBooking } from './TourCommissionView';
+import { matchesTourWallet } from '../../utils/tourWalletLedger';
 
 interface AddTourExpenseModalProps {
   isOpen: boolean;
@@ -30,8 +41,13 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
     tourBatches,
     tourBookings,
     tourExpenses,
+    setTourExpenses,
+    editingTourExpense,
+    setEditingTourExpense,
+    deleteTourExpenseById,
     tourPricingSettings,
     formatCurrency,
+    formatDate,
   } = useData();
   const { currentUserProfile } = useAuth();
 
@@ -46,23 +62,50 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  // Ensure default wallet is selected whenever modal opens
+  // Sync form state when modal opens or when editingTourExpense changes
   useEffect(() => {
-    if (isOpen) {
-      setErrorMsg('');
+    if (!isOpen) return;
+    setErrorMsg('');
+    setConfirmDeleteId(null);
+
+    if (editingTourExpense) {
+      setCategory((editingTourExpense.category as TourExpenseCategory) || 'Other');
+      setAmount(editingTourExpense.amount || '');
+      setDate(editingTourExpense.date || new Date().toISOString().split('T')[0]);
+      setPaymentMode((editingTourExpense.paymentMode as TourPaymentMode) || 'UPI');
+      setSelectedBatchId(editingTourExpense.tourBatchId || '');
+      setDescription(editingTourExpense.description || '');
+
+      const matchedWallet =
+        tourWallets.find((w) =>
+          matchesTourWallet(w, editingTourExpense.walletId, editingTourExpense.walletName)
+        ) || tourWallets[0];
+      if (matchedWallet) {
+        setSelectedWalletId(matchedWallet.id);
+      }
+    } else {
       setAmount('');
       setDescription('');
+      setSelectedBatchId('');
       setDate(new Date().toISOString().split('T')[0]);
-      if (tourWallets.length > 0 && !selectedWalletId) {
+      if (tourWallets.length > 0) {
         const defaultW =
+          tourWallets.find((w) => w.id === selectedWalletId) ||
           tourWallets.find((w) => w.name.toLowerCase().includes('rizwan')) ||
           tourWallets.find((w) => w.name.toLowerCase().includes('sahil')) ||
           tourWallets[0];
         if (defaultW) setSelectedWalletId(defaultW.id);
       }
     }
-  }, [isOpen, tourWallets, selectedWalletId]);
+  }, [isOpen, editingTourExpense, tourWallets]);
+
+  const handleCloseModal = () => {
+    setEditingTourExpense(null);
+    setConfirmDeleteId(null);
+    onClose();
+  };
 
   const privateTourBookings = useMemo(() => {
     return tourBookings.filter((b) => isPrivateTourBooking(b, tourBatches));
@@ -85,6 +128,7 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
 
     const totalPaid = tourExpenses
       .filter((e) => {
+        if (editingTourExpense && e.id === editingTourExpense.id) return false;
         const isMustak =
           e.category === 'Mustak Commission' ||
           (e.paidToPerson || '').toLowerCase().includes('mustak') ||
@@ -103,12 +147,17 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
       totalPaid,
       pendingBaaki,
     };
-  }, [tourBookings, tourBatches, tourExpenses, tourPricingSettings, selectedBatchId]);
+  }, [tourBookings, tourBatches, tourExpenses, tourPricingSettings, selectedBatchId, editingTourExpense]);
 
   const handleSelectCategory = (cat: TourExpenseCategory) => {
     setCategory(cat);
     if (cat === 'Mustak Commission') {
-      if (!description.trim() || description.includes('Salary') || description.includes('Rent') || description.includes('Bill')) {
+      if (
+        !description.trim() ||
+        description.includes('Salary') ||
+        description.includes('Rent') ||
+        description.includes('Bill')
+      ) {
         setDescription('Mustak Commission Payout');
       }
       if (!amount && mustakCommissionSummary.pendingBaaki > 0) {
@@ -155,34 +204,58 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
       ? 'Commission Payout'
       : 'Office / General Expense';
 
-    setIsSubmitting(true);
-    try {
-      await addTourExpense(
-        {
-          tourBatchId: selectedBatchId || '',
-          tourTitle: resolvedTourTitle,
-          destination: batch?.destination || privBooking?.destination || '',
-          category,
-          amount: parsedAmount,
-          walletId: activeWallet.id,
-          walletName: activeWallet.name,
-          paymentMode,
-          paidToPerson: category === 'Mustak Commission' ? 'Mustak' : undefined,
-          date,
-          monthKey: date.substring(0, 7),
-          description: finalDescription,
-        },
-        currentUserProfile?.email || 'admin@sanzari.com'
-      );
+    const payload = {
+      tourBatchId: selectedBatchId || '',
+      tourTitle: resolvedTourTitle,
+      destination: batch?.destination || privBooking?.destination || '',
+      category,
+      amount: parsedAmount,
+      walletId: activeWallet.id,
+      walletName: activeWallet.name,
+      paymentMode,
+      paidToPerson: category === 'Mustak Commission' ? 'Mustak' : undefined,
+      date,
+      monthKey: date.substring(0, 7),
+      description: finalDescription,
+    };
 
-      onClose();
+    const userEmail = currentUserProfile?.email || 'admin@sanzari.com';
+    setIsSubmitting(true);
+
+    try {
+      if (editingTourExpense) {
+        // Optimistic update in local state
+        setTourExpenses((prev) =>
+          prev.map((item) =>
+            item.id === editingTourExpense.id
+              ? { ...item, ...payload, updatedAt: new Date().toISOString() }
+              : item
+          )
+        );
+        await updateTourExpense(editingTourExpense.id, payload, userEmail);
+      } else {
+        await addTourExpense(payload, userEmail);
+      }
+
+      handleCloseModal();
     } catch (err: any) {
-      console.error('Failed to add tour expense:', err);
-      setErrorMsg(err.message || 'Failed to record expense.');
+      console.error('Failed to save tour expense:', err);
+      setErrorMsg(err.message || 'Failed to save expense.');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const handleDeleteExpense = async (exp: TourExpense) => {
+    await deleteTourExpenseById(exp.id);
+    if (editingTourExpense && editingTourExpense.id === exp.id) {
+      handleCloseModal();
+    } else {
+      setConfirmDeleteId(null);
+    }
+  };
+
+  const recentExpenses = tourExpenses.slice(0, 6);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/65 backdrop-blur-xs overflow-y-auto">
@@ -190,21 +263,31 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
         {/* Header */}
         <div className="bg-zinc-950 px-5 py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600 flex items-center justify-center text-white shadow-sm">
-              <Receipt className="w-5 h-5" />
+            <div
+              className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm ${
+                editingTourExpense ? 'bg-amber-500 text-zinc-950' : 'bg-rose-600'
+              }`}
+            >
+              {editingTourExpense ? (
+                <Pencil className="w-5 h-5 stroke-[2.5]" />
+              ) : (
+                <Receipt className="w-5 h-5" />
+              )}
             </div>
             <div>
               <h2 className="text-base sm:text-lg font-black tracking-tight">
-                Add Expense / Payout
+                {editingTourExpense ? '✏️ Edit Expense / Payout' : 'Add Expense / Payout'}
               </h2>
               <p className="text-[11px] text-zinc-400 font-medium">
-                Salary, Rent, Electricity, Mustak Commission &amp; Tour Expenses
+                {editingTourExpense
+                  ? 'Correct amount, wallet account, category, date or notes'
+                  : 'Salary, Rent, Electricity, Mustak Commission & Tour Expenses'}
               </p>
             </div>
           </div>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseModal}
             className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
@@ -217,6 +300,26 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
             {errorMsg && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
                 {errorMsg}
+              </div>
+            )}
+
+            {editingTourExpense && (
+              <div className="p-3 rounded-2xl bg-amber-50 border-2 border-amber-400 flex items-center justify-between gap-2">
+                <div className="text-xs">
+                  <span className="font-black text-amber-950 block">
+                    Editing Existing Expense ({formatCurrency(editingTourExpense.amount)})
+                  </span>
+                  <span className="text-[11px] text-amber-800 font-semibold">
+                    Mistake fix karke &quot;Update Expense&quot; dabayein, wallet balance automatically adjust ho jayega.
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditingTourExpense(null)}
+                  className="px-2.5 py-1 rounded-lg bg-white border border-amber-400 text-[11px] font-black text-zinc-800 hover:bg-zinc-100 shrink-0 cursor-pointer"
+                >
+                  + New Instead
+                </button>
               </div>
             )}
 
@@ -450,6 +553,107 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
                 className="w-full text-xs font-semibold bg-zinc-50 border border-zinc-300 rounded-xl px-3 py-2.5 text-zinc-900 focus:bg-white focus:border-zinc-950 focus:outline-none"
               />
             </div>
+
+            {/* Delete Expense Confirmation when editing */}
+            {editingTourExpense && (
+              <div className="pt-2 border-t border-zinc-200">
+                {confirmDeleteId === editingTourExpense.id ? (
+                  <div className="p-3 rounded-2xl bg-rose-50 border border-rose-300 flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold text-rose-900">
+                      Delete this expense &amp; refund {formatCurrency(editingTourExpense.amount)} to wallet?
+                    </span>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteId(null)}
+                        className="px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-xs font-bold text-zinc-700 cursor-pointer"
+                      >
+                        No
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteExpense(editingTourExpense)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-600 text-white text-xs font-black cursor-pointer"
+                      >
+                        Yes, Delete
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setConfirmDeleteId(editingTourExpense.id)}
+                    className="w-full py-2 px-3 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 text-xs font-black flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete This Expense Record</span>
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Recent Expenses Quick Edit/Delete List (when in Add Mode) */}
+            {!editingTourExpense && recentExpenses.length > 0 && (
+              <div className="pt-3 border-t-2 border-zinc-100 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-black uppercase tracking-wider text-zinc-500 flex items-center gap-1">
+                    <History className="w-3.5 h-3.5 text-rose-600" />
+                    <span>Recent Expenses (Mistake ho to ✏️ Edit ya 🗑️ Delete karein)</span>
+                  </span>
+                </div>
+                <div className="space-y-1.5 max-h-44 overflow-y-auto pr-1">
+                  {recentExpenses.map((exp) => (
+                    <div
+                      key={exp.id}
+                      className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <div className="min-w-0">
+                        <div className="font-black text-zinc-900 truncate">
+                          {exp.description || exp.category || 'Expense'}{' '}
+                          <span className="text-rose-600 font-mono">
+                            ({formatCurrency(exp.amount)})
+                          </span>
+                        </div>
+                        <div className="text-[10px] font-bold text-zinc-500 truncate">
+                          💳 {(exp.walletName || 'Tour').replace(' (Tour)', '')} • 📅{' '}
+                          {formatDate(exp.date)}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => setEditingTourExpense(exp)}
+                          className="px-2 py-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-zinc-950 border border-amber-400 text-[10px] font-black flex items-center gap-1 cursor-pointer"
+                          title="Edit Expense"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                        {confirmDeleteId === exp.id ? (
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteExpense(exp)}
+                            className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                          >
+                            Confirm
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(exp.id)}
+                            className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-600 hover:text-white border border-rose-200 transition-colors cursor-pointer"
+                            title="Delete Expense"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between gap-2 shrink-0">
@@ -459,7 +663,7 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleCloseModal}
                 className="px-4 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-200/80 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
@@ -467,10 +671,18 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2.5 text-xs font-black text-white bg-rose-600 hover:bg-rose-700 rounded-xl shadow-md shadow-rose-600/20 flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer"
+                className={`px-5 py-2.5 text-xs font-black rounded-xl shadow-md flex items-center gap-1.5 transition-all disabled:opacity-50 cursor-pointer ${
+                  editingTourExpense
+                    ? 'bg-amber-400 hover:bg-amber-500 text-zinc-950 border border-zinc-900'
+                    : 'bg-rose-600 hover:bg-rose-700 text-white shadow-rose-600/20'
+                }`}
               >
                 <CheckCircle2 className="w-4 h-4" />
-                {isSubmitting ? 'Saving...' : 'Save Expense'}
+                {isSubmitting
+                  ? 'Saving...'
+                  : editingTourExpense
+                  ? 'Update Expense'
+                  : 'Save Expense'}
               </button>
             </div>
           </div>
