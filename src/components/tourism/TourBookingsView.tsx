@@ -16,6 +16,7 @@ import {
   ArrowDownLeft,
   FileDown,
   Folder,
+  XCircle,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBooking } from '../../types';
@@ -23,6 +24,7 @@ import { updateTourBookingTicketStatus } from '../../services/db';
 import { BookingsSkeleton } from '../common/Skeleton';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
+import { CancelTourBookingModal } from './CancelTourBookingModal';
 import { resolveBookedBy } from './TourCommissionView';
 
 interface TourBookingsViewProps {
@@ -42,13 +44,14 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   } = useData();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Due'>('ALL');
+  const [statusFilter, setStatusFilter] = useState<'ALL' | 'Paid' | 'Due' | 'Cancelled'>('ALL');
   const [bookedByFilter, setBookedByFilter] = useState<'ALL' | 'Rizwan' | 'Mustak'>('ALL');
   const [selectedBatchId, setSelectedBatchId] = useState<string>('ALL');
   const [viewMode, setViewMode] = useState<'card' | 'list'>(() => {
     return (localStorage.getItem('sz_tour_bookings_view_mode') as 'card' | 'list') || 'card';
   });
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
+  const [cancelModalBooking, setCancelModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [copiedName, setCopiedName] = useState<string | null>(null);
 
@@ -74,14 +77,19 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
     return tourBookings.filter((b) => b.tourBatchId === selectedBatchId);
   }, [tourBookings, selectedBatchId]);
 
-  // Summary counts for Full Paid vs Baaki Due
+  // Summary counts for Full Paid vs Baaki Due vs Cancelled
   const summaryStats = useMemo(() => {
     let fullPaidCount = 0;
     let dueCount = 0;
+    let cancelledCount = 0;
     let totalReceived = 0;
     let totalDue = 0;
 
     batchFilteredBookings.forEach((b) => {
+      if (b.bookingStatus === 'Cancelled') {
+        cancelledCount++;
+        return;
+      }
       const total = Number(b.totalAmount || 0);
       const adv = Number(b.advancePaid || 0);
       const due = Math.max(0, total - adv);
@@ -99,6 +107,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
     return {
       fullPaidCount,
       dueCount,
+      cancelledCount,
       totalReceived,
       totalDue,
     };
@@ -107,13 +116,15 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   const filteredBookings = useMemo(() => {
     return batchFilteredBookings.filter((b) => {
       const q = searchQuery.toLowerCase().trim();
+      const isCancelled = b.bookingStatus === 'Cancelled';
       const total = Number(b.totalAmount || 0);
       const adv = Number(b.advancePaid || 0);
       const due = Math.max(0, total - adv);
       const isFullPaid = due === 0 && total > 0;
 
-      if (statusFilter === 'Paid' && !isFullPaid) return false;
-      if (statusFilter === 'Due' && isFullPaid) return false;
+      if (statusFilter === 'Cancelled' && !isCancelled) return false;
+      if (statusFilter === 'Paid' && (isCancelled || !isFullPaid)) return false;
+      if (statusFilter === 'Due' && (isCancelled || isFullPaid)) return false;
 
       if (bookedByFilter !== 'ALL') {
         const bBy = resolveBookedBy(b).toLowerCase();
@@ -359,6 +370,17 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               <Clock size={12} />
               <span>Baaki / Due ({summaryStats.dueCount})</span>
             </button>
+            <button
+              onClick={() => setStatusFilter('Cancelled')}
+              className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer flex items-center gap-1 ${
+                statusFilter === 'Cancelled'
+                  ? 'bg-zinc-950 text-white border-zinc-950 shadow-xs'
+                  : 'bg-rose-50 text-rose-900 border-rose-300 hover:bg-rose-100'
+              }`}
+            >
+              <XCircle size={12} />
+              <span>Cancelled / Lost ({summaryStats.cancelledCount})</span>
+            </button>
 
             {/* Booked By Filter Pills */}
             <div className="flex items-center gap-1 pl-2 border-l border-zinc-200 shrink-0">
@@ -463,14 +485,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               Array.isArray(b.paymentHistory) && b.paymentHistory.length > 1
                 ? b.paymentHistory[b.paymentHistory.length - 1]
                 : null;
+            const isCancelled = b.bookingStatus === 'Cancelled';
+            const cancelInfo = b.cancellationDetails;
             const ticketStatus = b.ticketStatus || 'PENDING';
-            const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
+            const isTicketDone = !isCancelled && (ticketStatus === '1_WAY' || ticketStatus === '2_WAY');
 
             return (
               <div
                 key={b.id}
                 className={`text-zinc-950 rounded-2xl border-2 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group ${
-                  isTicketDone
+                  isCancelled
+                    ? 'bg-rose-50/85 border-rose-400'
+                    : isTicketDone
                     ? 'bg-emerald-50/90 border-emerald-500'
                     : isFullPaid
                     ? 'bg-white border-emerald-600'
@@ -787,6 +813,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     >
                       <FileText size={13} />
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setCancelModalBooking(b)}
+                      title={isCancelled ? 'Edit Cancellation & Refund Details' : 'Cancel Booking & Refund'}
+                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                        isCancelled
+                          ? 'bg-rose-600 text-white border-rose-700'
+                          : 'bg-amber-50 hover:bg-rose-600 text-rose-700 hover:text-white border-amber-300'
+                      }`}
+                    >
+                      <XCircle size={13} />
+                    </button>
                   </div>
 
                   <button
@@ -798,6 +836,21 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     <Trash2 size={13} />
                   </button>
                 </div>
+                {isCancelled && cancelInfo && (
+                  <div className="mt-2 pt-2 border-t border-rose-200 text-[10px] font-bold text-rose-900 flex items-center justify-between flex-wrap gap-1">
+                    <span>
+                      ❌ Refund: <strong>{formatCurrency(cancelInfo.refundAmount)}</strong>
+                      {cancelInfo.refundAmount > 0 && cancelInfo.refundWalletName
+                        ? ` (${cancelInfo.refundWalletName.replace(' (Tour)', '')})`
+                        : ''}
+                    </span>
+                    {Number(cancelInfo.ticketOrHotelLoss || 0) > 0 && (
+                      <span className="bg-rose-200/70 px-1.5 py-0.2 rounded">
+                        Loss: {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
@@ -831,14 +884,17 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               const due = Math.max(0, total - adv);
               const isFullPaid = due === 0 && total > 0;
               const historyCount = Array.isArray(b.paymentHistory) ? b.paymentHistory.length : (adv > 0 ? 1 : 0);
+              const isCancelled = b.bookingStatus === 'Cancelled';
               const ticketStatus = b.ticketStatus || 'PENDING';
-              const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
+              const isTicketDone = !isCancelled && (ticketStatus === '1_WAY' || ticketStatus === '2_WAY');
 
               return (
                 <div
                   key={b.id}
                   className={`p-3.5 sm:p-4 transition-colors flex flex-col lg:grid lg:grid-cols-12 gap-3 lg:items-center ${
-                    isTicketDone
+                    isCancelled
+                      ? 'bg-rose-50/85 hover:bg-rose-100/50'
+                      : isTicketDone
                       ? 'bg-emerald-50/90 hover:bg-emerald-100/60'
                       : isFullPaid
                       ? 'bg-emerald-50/20 hover:bg-zinc-50'
@@ -1079,6 +1135,18 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
                     </button>
                     <button
                       type="button"
+                      onClick={() => setCancelModalBooking(b)}
+                      title={isCancelled ? 'Edit Cancellation & Refund' : 'Cancel Booking & Refund'}
+                      className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                        isCancelled
+                          ? 'bg-rose-600 text-white border-rose-700'
+                          : 'bg-amber-50 hover:bg-rose-600 text-rose-700 hover:text-white border-amber-300'
+                      }`}
+                    >
+                      <XCircle size={13} />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDelete(b.id, b.customerName)}
                       title="Delete Booking"
                       className="p-1.5 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 transition-all cursor-pointer"
@@ -1100,12 +1168,19 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         booking={paymentModalBooking}
       />
 
+      {/* Cancel Booking & Refund Policy Modal */}
+      <CancelTourBookingModal
+        isOpen={Boolean(cancelModalBooking)}
+        onClose={() => setCancelModalBooking(null)}
+        booking={cancelModalBooking}
+      />
+
       {/* Custom PDF Export Options Modal */}
       <TourPDFExportModal
         isOpen={isPDFModalOpen}
         onClose={() => setIsPDFModalOpen(false)}
         initialBatchId={selectedBatchId}
-        initialPaymentFilter={statusFilter}
+        initialPaymentFilter={statusFilter === 'Cancelled' ? 'ALL' : statusFilter}
       />
 
       {copiedName && (

@@ -99,10 +99,8 @@ export function extractBookingPayments(tb: TourBooking): NormalizedBookingPaymen
     if (tb.paymentHistory.length === 1) {
       const only = tb.paymentHistory[0];
       const isAddedInstallment = Boolean(only.id && only.id.startsWith('pay-'));
-      const entryWallet = isAddedInstallment
-        ? only.walletName || primaryWallet
-        : primaryWallet || only.walletName || 'Rizwan (Tour)';
-      const entryAmt = adv > 0 ? adv : Number(only.amount || 0);
+      const entryWallet = only.walletName || primaryWallet || 'Rizwan (Tour)';
+      const entryAmt = Number(only.amount || 0) > 0 ? Number(only.amount) : adv;
 
       if (entryAmt > 0) {
         results.push({

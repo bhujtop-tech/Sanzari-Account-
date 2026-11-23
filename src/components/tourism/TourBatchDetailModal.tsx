@@ -17,13 +17,22 @@ import {
   ChevronUp,
   MessageCircle,
   Search,
+  MoreVertical,
+  XCircle,
+  RotateCcw,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { TourBooking, TourPaymentMode } from '../../types';
-import { addTourExpense, deleteTourExpense, updateTourBookingTicketStatus } from '../../services/db';
+import {
+  addTourExpense,
+  deleteTourExpense,
+  updateTourBookingTicketStatus,
+  restoreCancelledTourBooking,
+} from '../../services/db';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
+import { CancelTourBookingModal } from './CancelTourBookingModal';
 
 interface TourBatchDetailModalProps {
   isOpen: boolean;
@@ -56,9 +65,11 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
   const [activeView, setActiveView] = useState<'manifest' | 'account'>('manifest');
   const [cashTab, setCashTab] = useState<'cash_in' | 'cash_out'>('cash_in');
-  const [classFilter, setClassFilter] = useState<'ALL' | 'AC' | 'NON_AC'>('ALL');
+  const [classFilter, setClassFilter] = useState<'ALL' | 'AC' | 'NON_AC' | 'CANCELLED'>('ALL');
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
+  const [cancelModalBooking, setCancelModalBooking] = useState<TourBooking | null>(null);
+  const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
   const [copiedName, setCopiedName] = useState<string | null>(null);
@@ -96,12 +107,22 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     [batch, tourBookings]
   );
 
+  const activeBookings = useMemo(
+    () => bookings.filter((b) => b.bookingStatus !== 'Cancelled'),
+    [bookings]
+  );
+
+  const cancelledBookings = useMemo(
+    () => bookings.filter((b) => b.bookingStatus === 'Cancelled'),
+    [bookings]
+  );
+
   const acStats = useMemo(() => {
     let acBookings = 0;
     let acPax = 0;
     let nonAcBookings = 0;
     let nonAcPax = 0;
-    bookings.forEach((b) => {
+    activeBookings.forEach((b) => {
       const pax = Number(b.membersCount || 1);
       if (isNonAcTravelClass(b.travelClass)) {
         nonAcBookings += 1;
@@ -112,23 +133,36 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
       }
     });
     return { acBookings, acPax, nonAcBookings, nonAcPax };
-  }, [bookings]);
+  }, [activeBookings]);
 
   const filteredManifestBookings = useMemo(() => {
     const q = manifestSearchQuery.trim().toLowerCase();
-    return bookings.filter((b) => {
+    const matchesQuery = (b: TourBooking) => {
+      if (!q) return true;
+      const memberNames = Array.isArray(b.members)
+        ? b.members.map((m) => m.name || '').join(' ')
+        : '';
+      const haystack = `${b.customerName || ''} ${b.customerPhone || ''} ${b.bookingNumber || ''} ${b.city || ''} ${b.walletName || ''} ${memberNames}`.toLowerCase();
+      return haystack.includes(q);
+    };
+
+    if (classFilter === 'CANCELLED') {
+      return cancelledBookings.filter(matchesQuery);
+    }
+
+    const filteredActive = activeBookings.filter((b) => {
       if (classFilter === 'AC' && isNonAcTravelClass(b.travelClass)) return false;
       if (classFilter === 'NON_AC' && !isNonAcTravelClass(b.travelClass)) return false;
-      if (q) {
-        const memberNames = Array.isArray(b.members)
-          ? b.members.map((m) => m.name || '').join(' ')
-          : '';
-        const haystack = `${b.customerName || ''} ${b.customerPhone || ''} ${b.bookingNumber || ''} ${b.city || ''} ${b.walletName || ''} ${memberNames}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
+      return matchesQuery(b);
     });
-  }, [bookings, classFilter, manifestSearchQuery]);
+
+    // In 'ALL' view, keep active bookings first and show cancelled/lost bookings cleanly right below
+    if (classFilter === 'ALL') {
+      return [...filteredActive, ...cancelledBookings.filter(matchesQuery)];
+    }
+
+    return filteredActive;
+  }, [activeBookings, cancelledBookings, classFilter, manifestSearchQuery]);
 
   const expenses = useMemo(
     () => (batch ? tourExpenses.filter((e) => e.tourBatchId === batch.id) : []),
@@ -266,13 +300,29 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
     }
   };
 
-  const totalPassengers = bookings.reduce((sum, b) => sum + (b.membersCount || 1), 0);
-  const totalRevenue = bookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
-  const totalAdvance = bookings.reduce((sum, b) => sum + (b.advancePaid || 0), 0);
-  const totalPending = bookings.reduce(
+  const totalPassengers = activeBookings.reduce((sum, b) => sum + (b.membersCount || 1), 0);
+  const totalRevenue = activeBookings.reduce((sum, b) => sum + (b.totalAmount || 0), 0);
+  const totalAdvance = activeBookings.reduce((sum, b) => sum + (b.advancePaid || 0), 0);
+  const totalPending = activeBookings.reduce(
     (sum, b) => sum + Math.max(0, (b.totalAmount || 0) - (b.advancePaid || 0)),
     0
   );
+
+  const handleQuickRestoreBooking = async (b: TourBooking) => {
+    if (
+      !window.confirm(
+        `Kya aap "${b.customerName}" ki cancelled booking wapas Confirm (Restore) karna chahte hain? Agar refund wallet se deduct hua tha, toh wo balance wapas add ho jayega.`
+      )
+    ) {
+      return;
+    }
+    try {
+      const userEmail = currentUserProfile?.email || user?.email || 'admin@sanzari.com';
+      await restoreCancelledTourBooking(b.id, userEmail);
+    } catch (err) {
+      console.error('Failed to restore booking:', err);
+    }
+  };
 
   const totalSeats = batch.totalSeats || 30;
   const percentage = Math.min(100, Math.round((totalPassengers / totalSeats) * 100));
@@ -432,7 +482,12 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
         </div>
 
         {/* Scrollable Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1 min-h-0 bg-white text-zinc-900">
+        <div
+          onClick={() => {
+            if (openMenuBookingId) setOpenMenuBookingId(null);
+          }}
+          className="p-4 sm:p-5 pb-24 overflow-y-auto space-y-4 flex-1 min-h-0 bg-white text-zinc-900"
+        >
           {activeView === 'account' ? (
             /* =========================================================
                SIMPLE FOLDER ACCOUNT VIEW (CASH IN / CASH OUT + WALLETS)
@@ -775,8 +830,8 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
                 {/* Second Row: AC / Non-AC Filter Pills + Expand All + Book Passenger Button */}
                 <div className="flex items-center justify-between gap-2 flex-wrap">
-                  {/* AC vs Non-AC Filter Pills inside Tour Folder */}
-                  <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl border border-zinc-300">
+                  {/* AC vs Non-AC vs Cancelled/Lost Filter Pills inside Tour Folder */}
+                  <div className="flex items-center gap-1.5 flex-wrap bg-zinc-100 p-1 rounded-xl border border-zinc-300">
                     <button
                       type="button"
                       onClick={() => setClassFilter('ALL')}
@@ -809,6 +864,17 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                       }`}
                     >
                       🚂 Non-AC ({acStats.nonAcPax} Pax)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setClassFilter('CANCELLED')}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-black transition-all cursor-pointer border ${
+                        classFilter === 'CANCELLED'
+                          ? 'bg-rose-600 text-white border-rose-700 shadow-2xs'
+                          : 'bg-rose-50 text-rose-800 border-rose-300 hover:bg-rose-100'
+                      }`}
+                    >
+                      ❌ Cancelled / Lost ({cancelledBookings.length})
                     </button>
                   </div>
 
@@ -867,8 +933,11 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                     const isExpanded = Boolean(expandedBookingIds[b.id]);
                     const instList = Array.isArray(b.paymentHistory) ? b.paymentHistory : [];
                     const isNonAc = isNonAcTravelClass(b.travelClass);
+                    const isCancelled = b.bookingStatus === 'Cancelled';
+                    const cancelInfo = b.cancellationDetails;
                     const ticketStatus = b.ticketStatus || 'PENDING';
-                    const isTicketDone = ticketStatus === '1_WAY' || ticketStatus === '2_WAY';
+                    const isTicketDone = !isCancelled && (ticketStatus === '1_WAY' || ticketStatus === '2_WAY');
+                    const isMenuOpen = openMenuBookingId === b.id;
 
                     const handleToggleTicketStatus = (
                       e: React.MouseEvent,
@@ -881,11 +950,119 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                       );
                     };
 
+                    const renderThreeDotMenu = () => (
+                      <div className="relative" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuBookingId((prev) => (prev === b.id ? null : b.id));
+                          }}
+                          title="More Options (Share, Edit, Slip, Cancel / Refund, Delete)"
+                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                            isMenuOpen
+                              ? 'bg-zinc-950 text-white border-zinc-950'
+                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300'
+                          }`}
+                        >
+                          <MoreVertical className="w-4 h-4" />
+                        </button>
+
+                        {isMenuOpen && (
+                          <div className="absolute right-0 top-full mt-1.5 z-50 w-56 bg-white rounded-2xl border-2 border-zinc-900 shadow-2xl py-1.5 text-xs font-bold text-zinc-900">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                setOpenMenuBookingId(null);
+                                handleWhatsAppShareBooking(e, b);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-emerald-50 text-emerald-800 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <MessageCircle className="w-4 h-4 shrink-0" />
+                              <span>Share on WhatsApp</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuBookingId(null);
+                                openEditTourBookingModal(b);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-zinc-100 text-zinc-900 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Edit2 className="w-4 h-4 shrink-0" />
+                              <span>Edit Booking</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuBookingId(null);
+                                handleShareVoucher(b);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-zinc-100 text-zinc-900 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Share2 className="w-4 h-4 shrink-0" />
+                              <span>Voucher Slip</span>
+                            </button>
+
+                            <div className="my-1 border-t border-zinc-200" />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuBookingId(null);
+                                setCancelModalBooking(b);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-amber-50 text-amber-900 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <XCircle className="w-4 h-4 shrink-0 text-rose-600" />
+                              <span>
+                                {isCancelled ? 'Edit Refund & Loss' : 'Cancel Booking & Refund'}
+                              </span>
+                            </button>
+
+                            {isCancelled && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuBookingId(null);
+                                  handleQuickRestoreBooking(b);
+                                }}
+                                className="w-full px-3.5 py-2 text-left hover:bg-blue-50 text-blue-800 flex items-center gap-2.5 cursor-pointer"
+                              >
+                                <RotateCcw className="w-4 h-4 shrink-0" />
+                                <span>Restore Booking</span>
+                              </button>
+                            )}
+
+                            <div className="my-1 border-t border-zinc-200" />
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuBookingId(null);
+                                handleDeleteBooking(b.id, b.customerName);
+                              }}
+                              className="w-full px-3.5 py-2 text-left hover:bg-rose-50 text-rose-600 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Trash2 className="w-4 h-4 shrink-0" />
+                              <span>Delete Booking</span>
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+
                     return (
                       <div
                         key={b.id}
-                        className={`border-2 rounded-2xl transition-all overflow-hidden ${
-                          isTicketDone
+                        className={`relative border-2 rounded-2xl transition-all ${
+                          isMenuOpen ? 'z-30' : 'z-0'
+                        } ${
+                          isCancelled
+                            ? 'bg-rose-50/85 border-rose-300'
+                            : isTicketDone
                             ? 'bg-emerald-50/90 border-emerald-500 shadow-xs'
                             : isFullPaid
                             ? 'bg-white border-emerald-500'
@@ -894,11 +1071,15 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             : 'bg-white border-zinc-200 hover:border-zinc-400'
                         }`}
                       >
-                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Ticket Done, Payment Status & Actions) */}
+                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Ticket Done, Payment Status, Expand & 3-Dot Menu) */}
                         <div
                           onClick={() => toggleBookingExpand(b.id)}
-                          className={`p-3.5 sm:p-4 flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
-                            isTicketDone ? 'hover:bg-emerald-100/60' : 'hover:bg-zinc-50/60'
+                          className={`p-3.5 sm:p-4 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                            isCancelled
+                              ? 'hover:bg-rose-100/50'
+                              : isTicketDone
+                              ? 'hover:bg-emerald-100/60'
+                              : 'hover:bg-zinc-50/60'
                           }`}
                         >
                           {/* Left: Booking ID, Customer Name, Phone, PAX, AC/Non-AC Badge, Ticket Done & Quick Financial Summary */}
@@ -912,7 +1093,9 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               onDoubleClick={(e) => copyNameToClipboard(e, b.customerName)}
                               title="Click or Double-click to copy name"
                               className={`text-sm sm:text-base font-black cursor-pointer select-none transition-colors ${
-                                copiedName === String(b.customerName || '').trim()
+                                isCancelled
+                                  ? 'line-through text-rose-900/80'
+                                  : copiedName === String(b.customerName || '').trim()
                                   ? 'text-emerald-600'
                                   : 'text-zinc-950 hover:text-emerald-700'
                               }`}
@@ -928,6 +1111,12 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               {b.membersCount} Pax
                             </span>
 
+                            {isCancelled && (
+                              <span className="px-2.5 py-0.5 rounded-lg bg-rose-600 text-white text-[11px] font-black shadow-2xs">
+                                ❌ CANCELLED / LOST
+                              </span>
+                            )}
+
                             {/* AC vs Non-AC Distinct Colored Badge right next to 2 Pax */}
                             {isNonAc ? (
                               <span className="px-2.5 py-0.5 rounded-lg bg-amber-100 text-amber-900 border border-amber-400 text-[11px] font-black shadow-2xs">
@@ -939,128 +1128,143 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                               </span>
                             )}
 
-                            {/* 1 Way / 2 Way Ticket Done Quick Toggle */}
-                            <div
-                              onClick={(e) => e.stopPropagation()}
-                              className="inline-flex items-center gap-1 bg-white/90 p-0.5 rounded-lg border border-zinc-300 shadow-2xs"
-                            >
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleTicketStatus(e, '1_WAY')}
-                                title="Mark 1 Way Ticket Done (click again to clear)"
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                                  ticketStatus === '1_WAY'
-                                    ? 'bg-emerald-600 text-white shadow-2xs'
-                                    : 'text-zinc-600 hover:bg-zinc-100'
-                                }`}
+                            {/* 1 Way / 2 Way Ticket Done Quick Toggle (Only for active bookings) */}
+                            {!isCancelled && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="inline-flex items-center gap-1 bg-white/90 p-0.5 rounded-lg border border-zinc-300 shadow-2xs"
                               >
-                                {ticketStatus === '1_WAY' ? '🎫 Ticket Done (1 Way)' : '🎫 1 Way'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={(e) => handleToggleTicketStatus(e, '2_WAY')}
-                                title="Mark 2 Way Ticket Done (click again to clear)"
-                                className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
-                                  ticketStatus === '2_WAY'
-                                    ? 'bg-emerald-600 text-white shadow-2xs'
-                                    : 'text-zinc-600 hover:bg-zinc-100'
-                                }`}
-                              >
-                                {ticketStatus === '2_WAY' ? '🎫 Ticket Done (2 Way)' : '🎫 2 Way'}
-                              </button>
-                            </div>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleTicketStatus(e, '1_WAY')}
+                                  title="Mark 1 Way Ticket Done (click again to clear)"
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                                    ticketStatus === '1_WAY'
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : 'text-zinc-600 hover:bg-zinc-100'
+                                  }`}
+                                >
+                                  {ticketStatus === '1_WAY' ? '🎫 Ticket Done (1 Way)' : '🎫 1 Way'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleTicketStatus(e, '2_WAY')}
+                                  title="Mark 2 Way Ticket Done (click again to clear)"
+                                  className={`px-2 py-0.5 rounded-md text-[10px] font-black transition-all cursor-pointer ${
+                                    ticketStatus === '2_WAY'
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : 'text-zinc-600 hover:bg-zinc-100'
+                                  }`}
+                                >
+                                  {ticketStatus === '2_WAY' ? '🎫 Ticket Done (2 Way)' : '🎫 2 Way'}
+                                </button>
+                              </div>
+                            )}
 
-                            {/* Inline Financial Summary on Closed Card */}
-                            <div className="flex items-center gap-2 text-xs font-mono pl-1">
-                              <span className="text-zinc-600">
-                                Total: <strong className="text-zinc-950">{formatCurrency(total)}</strong>
-                              </span>
-                              <span className="text-emerald-700 font-bold">
-                                • Recd: {formatCurrency(adv)}
-                              </span>
-                              {!isFullPaid && (
-                                <span className="text-rose-600 font-black">
-                                  • Baaki: {formatCurrency(due)}
+                            {/* Inline Financial Summary OR Cancellation/Refund/Loss Strip */}
+                            {isCancelled && cancelInfo ? (
+                              <div className="flex items-center gap-2 flex-wrap text-xs font-mono pl-1">
+                                <span className="text-zinc-700 font-bold">
+                                  Recd: {formatCurrency(cancelInfo.receivedAmount)}
                                 </span>
-                              )}
-                            </div>
+                                <span className="text-rose-700 font-black">
+                                  • Refund: {formatCurrency(cancelInfo.refundAmount)}
+                                  {cancelInfo.refundAmount > 0 && cancelInfo.refundWalletName
+                                    ? ` (${cancelInfo.refundWalletName.replace(' (Tour)', '')}${
+                                        cancelInfo.refundPaymentMode
+                                          ? ` • ${cancelInfo.refundPaymentMode}`
+                                          : ''
+                                      })`
+                                    : ''}
+                                </span>
+                                {Number(cancelInfo.ticketOrHotelLoss || 0) > 0 && (
+                                  <span className="text-rose-800 font-black bg-rose-200/70 px-1.5 py-0.5 rounded">
+                                    Loss: {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
+                                  </span>
+                                )}
+                                <span
+                                  className={`font-black px-1.5 py-0.5 rounded ${
+                                    Number(cancelInfo.netRetained || 0) < 0
+                                      ? 'bg-rose-600 text-white'
+                                      : 'bg-emerald-100 text-emerald-900'
+                                  }`}
+                                >
+                                  {Number(cancelInfo.netRetained || 0) < 0
+                                    ? `Net Loss: -${formatCurrency(Math.abs(Number(cancelInfo.netRetained || 0)))}`
+                                    : `Retained: ${formatCurrency(Number(cancelInfo.netRetained || 0))}`}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2 text-xs font-mono pl-1">
+                                <span className="text-zinc-600">
+                                  Total: <strong className="text-zinc-950">{formatCurrency(total)}</strong>
+                                </span>
+                                <span className="text-emerald-700 font-bold">
+                                  • Recd: {formatCurrency(adv)}
+                                </span>
+                                {!isFullPaid && (
+                                  <span className="text-rose-600 font-black">
+                                    • Baaki: {formatCurrency(due)}
+                                  </span>
+                                )}
+                              </div>
+                            )}
                           </div>
 
-                          {/* Desktop Right: Status Badge + Action Buttons + Expand Chevron (Hidden on Mobile) */}
+                          {/* Desktop Right: Payment Badge + Receive/History + Expand Chevron + 3-Dot Menu */}
                           <div
                             className="hidden lg:flex items-center justify-end gap-1.5 shrink-0"
                             onClick={(e) => e.stopPropagation()}
                           >
-                            <span
-                              onClick={() => setPaymentModalBooking(b)}
-                              className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg cursor-pointer ${
-                                isFullPaid
-                                  ? 'bg-emerald-600 text-white border border-emerald-700'
-                                  : 'bg-amber-50 text-amber-900 border border-amber-300'
-                              }`}
-                            >
-                              {isFullPaid
-                                ? '✅ FULL PAID'
-                                : `Received: ₹${adv.toLocaleString('en-IN')}`}
-                            </span>
-
-                            {!isFullPaid ? (
+                            {isCancelled ? (
                               <button
                                 type="button"
-                                onClick={() => setPaymentModalBooking(b)}
-                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                onClick={() => setCancelModalBooking(b)}
+                                className="px-2.5 py-1 bg-rose-100 hover:bg-rose-200 text-rose-900 border border-rose-300 rounded-lg text-xs font-black flex items-center gap-1 transition-colors cursor-pointer"
                               >
-                                <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" /> + Receive
+                                <XCircle className="w-3.5 h-3.5" /> Refund Details
                               </button>
                             ) : (
-                              <button
-                                type="button"
-                                onClick={() => setPaymentModalBooking(b)}
-                                className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                              >
-                                <CheckCircle2 className="w-3.5 h-3.5" /> History
-                              </button>
+                              <>
+                                <span
+                                  onClick={() => setPaymentModalBooking(b)}
+                                  className={`text-[11px] font-bold px-2.5 py-0.5 rounded-lg cursor-pointer ${
+                                    isFullPaid
+                                      ? 'bg-emerald-600 text-white border border-emerald-700'
+                                      : 'bg-amber-50 text-amber-900 border border-amber-300'
+                                  }`}
+                                >
+                                  {isFullPaid
+                                    ? '✅ FULL PAID'
+                                    : `Received: ₹${adv.toLocaleString('en-IN')}`}
+                                </span>
+
+                                {!isFullPaid ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPaymentModalBooking(b)}
+                                    className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-black flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                  >
+                                    <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" /> + Receive
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setPaymentModalBooking(b)}
+                                    className="px-2.5 py-1 bg-emerald-100 hover:bg-emerald-200 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
+                                  >
+                                    <CheckCircle2 className="w-3.5 h-3.5" /> History
+                                  </button>
+                                )}
+                              </>
                             )}
 
-                            <button
-                              type="button"
-                              onClick={(e) => handleWhatsAppShareBooking(e, b)}
-                              title="Share Booking Details on WhatsApp"
-                              className="px-2.5 py-1 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                            >
-                              <MessageCircle className="w-3.5 h-3.5" /> Share
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => openEditTourBookingModal(b)}
-                              className="px-2.5 py-1 bg-zinc-100 text-zinc-800 hover:bg-zinc-200 rounded-lg text-xs font-bold flex items-center gap-1 transition-colors cursor-pointer"
-                            >
-                              <Edit2 className="w-3.5 h-3.5" /> Edit
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleShareVoucher(b)}
-                              className="px-2.5 py-1 bg-zinc-900 text-white hover:bg-black rounded-lg text-xs font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                            >
-                              <Share2 className="w-3.5 h-3.5" /> Slip
-                            </button>
-
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBooking(b.id, b.customerName)}
-                              title="Delete Booking"
-                              className="p-1.5 rounded-lg bg-zinc-100 hover:bg-rose-50 text-zinc-500 hover:text-rose-600 transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-
+                            {/* Expand / Collapse Chevron */}
                             <button
                               type="button"
                               onClick={() => toggleBookingExpand(b.id)}
                               title={isExpanded ? 'Hide Details' : 'Show Members & Other Details'}
-                              className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 transition-colors cursor-pointer ml-1"
+                              className="p-1.5 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border border-zinc-300 transition-colors cursor-pointer ml-0.5"
                             >
                               {isExpanded ? (
                                 <ChevronUp className="w-4 h-4" />
@@ -1068,17 +1272,28 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                                 <ChevronDown className="w-4 h-4" />
                               )}
                             </button>
+
+                            {/* 3-Dot Action Menu behind Expand Icon */}
+                            {renderThreeDotMenu()}
                           </div>
 
-                          {/* Mobile Right Action Chevron (Shown on Mobile) */}
-                          <div className="lg:hidden flex items-center gap-2 shrink-0 self-end sm:self-auto">
-                            {!isFullPaid ? (
+                          {/* Mobile Right Action Bar (Payment + Expand Chevron + 3-Dot Menu) */}
+                          <div
+                            className="lg:hidden flex items-center gap-1.5 shrink-0 self-end sm:self-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {isCancelled ? (
                               <button
                                 type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setPaymentModalBooking(b);
-                                }}
+                                onClick={() => setCancelModalBooking(b)}
+                                className="px-2 py-1 bg-rose-100 text-rose-900 border border-rose-300 rounded-lg text-[10px] font-black cursor-pointer"
+                              >
+                                Refund Info
+                              </button>
+                            ) : !isFullPaid ? (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentModalBooking(b)}
                                 className="px-2 py-1 bg-emerald-600 text-white rounded-lg text-[11px] font-black flex items-center gap-1 shadow-2xs cursor-pointer"
                               >
                                 <ArrowDownLeft className="w-3 h-3 stroke-[3]" /> + Recv
@@ -1090,51 +1305,81 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             )}
                             <button
                               type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                toggleBookingExpand(b.id);
-                              }}
-                              className="p-1 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer"
+                              onClick={() => toggleBookingExpand(b.id)}
+                              className="p-1.5 rounded-lg bg-zinc-100 text-zinc-800 border border-zinc-300 cursor-pointer"
                             >
-                              {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
                             </button>
+                            {renderThreeDotMenu()}
                           </div>
                         </div>
 
-                        {/* Expandable Lower Details (Members List, Mobile Action Bar, Wallet/Mode, Installments, Notes) */}
+                        {/* Expandable Lower Details (Cancellation Summary if cancelled, Members List, Wallet/Mode, Installments, Notes) */}
                         {isExpanded && (
-                          <div className="px-3 sm:px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 space-y-3">
-                            {/* Mobile Quick Action Buttons Bar (Share, Edit, Slip, Delete) */}
-                            <div className="flex items-center gap-1.5 flex-wrap lg:hidden pb-2 border-b border-zinc-200">
-                              <button
-                                type="button"
-                                onClick={(e) => handleWhatsAppShareBooking(e, b)}
-                                className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-800 hover:text-white border border-emerald-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <MessageCircle size={13} /> Share WhatsApp
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => openEditTourBookingModal(b)}
-                                className="px-2.5 py-1.5 bg-white text-zinc-800 hover:bg-zinc-100 border border-zinc-300 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <Edit2 size={13} /> Edit
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleShareVoucher(b)}
-                                className="px-2.5 py-1.5 bg-zinc-950 text-white rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <Share2 size={13} /> Voucher Slip
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteBooking(b.id, b.customerName)}
-                                className="px-2.5 py-1.5 bg-rose-50 text-rose-700 hover:bg-rose-600 hover:text-white border border-rose-200 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer"
-                              >
-                                <Trash2 size={13} /> Delete
-                              </button>
-                            </div>
+                          <div className="px-3 sm:px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 rounded-b-2xl space-y-3">
+                            {/* Cancellation & Refund Policy Record Card if Cancelled */}
+                            {isCancelled && cancelInfo && (
+                              <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 space-y-2">
+                                <div className="flex items-center justify-between flex-wrap gap-2">
+                                  <span className="text-xs font-black text-rose-900 uppercase flex items-center gap-1.5">
+                                    <XCircle size={14} className="text-rose-600" />
+                                    Cancellation &amp; Refund Summary ({cancelInfo.cancelDate})
+                                  </span>
+                                  <span className="text-[11px] font-black px-2 py-0.5 rounded bg-white border border-rose-300 text-rose-800">
+                                    📋 Policy: {cancelInfo.policySlab}
+                                  </span>
+                                </div>
+                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
+                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Received</span>
+                                    <strong className="text-zinc-950">{formatCurrency(cancelInfo.receivedAmount)}</strong>
+                                  </div>
+                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Policy Charge</span>
+                                    <strong className="text-amber-800">{formatCurrency(cancelInfo.cancellationCharge)}</strong>
+                                  </div>
+                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                    <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Refund Given</span>
+                                    <strong className="text-rose-700">{formatCurrency(cancelInfo.refundAmount)}</strong>
+                                  </div>
+                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                    <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Ticket/Hotel Loss</span>
+                                    <strong className="text-rose-700">
+                                      {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
+                                    </strong>
+                                  </div>
+                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">
+                                      {Number(cancelInfo.netRetained || 0) < 0 ? 'Net Loss' : 'Net Retained'}
+                                    </span>
+                                    <strong
+                                      className={
+                                        Number(cancelInfo.netRetained || 0) < 0
+                                          ? 'text-rose-600'
+                                          : 'text-emerald-700'
+                                      }
+                                    >
+                                      {Number(cancelInfo.netRetained || 0) < 0
+                                        ? `-${formatCurrency(Math.abs(Number(cancelInfo.netRetained || 0)))}`
+                                        : formatCurrency(Number(cancelInfo.netRetained || 0))}
+                                    </strong>
+                                  </div>
+                                </div>
+                                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] font-bold text-rose-900">
+                                  <span>
+                                    💳 Refund Paid From:{' '}
+                                    <strong>
+                                      {cancelInfo.refundAmount > 0 && cancelInfo.refundWalletName
+                                        ? `${cancelInfo.refundWalletName.replace(' (Tour)', '')} (${cancelInfo.refundPaymentMode || 'UPI'})`
+                                        : 'No Refund Outflow (₹0)'}
+                                    </strong>
+                                  </span>
+                                  {cancelInfo.reason && (
+                                    <span>📝 Reason: {cancelInfo.reason}</span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
                             {/* Members Sub-list */}
                             <div className="bg-white p-3 rounded-xl border border-zinc-200">
                               <div className="flex items-center justify-between mb-2">
@@ -1258,6 +1503,12 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
         isOpen={Boolean(paymentModalBooking)}
         onClose={() => setPaymentModalBooking(null)}
         booking={paymentModalBooking}
+      />
+
+      <CancelTourBookingModal
+        isOpen={Boolean(cancelModalBooking)}
+        onClose={() => setCancelModalBooking(null)}
+        booking={cancelModalBooking}
       />
 
       <TourPDFExportModal

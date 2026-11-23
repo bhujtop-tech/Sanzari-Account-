@@ -63,9 +63,11 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     setPdfModalBatchId(batch.id);
   };
 
-  // Calculate stats for a given batch
+  // Calculate stats for a given batch (excluding cancelled bookings from active capacity/due)
   const getBatchStats = (batchId: string) => {
-    const bookings = tourBookings.filter((bk) => bk.tourBatchId === batchId);
+    const allBatchBookings = tourBookings.filter((bk) => bk.tourBatchId === batchId);
+    const bookings = allBatchBookings.filter((bk) => bk.bookingStatus !== 'Cancelled');
+    const cancelledCount = allBatchBookings.length - bookings.length;
     const totalPassengers = bookings.reduce((sum, bk) => sum + (bk.membersCount || 1), 0);
     const totalRevenue = bookings.reduce((sum, bk) => sum + (bk.totalAmount || 0), 0);
     const totalAdvance = bookings.reduce((sum, bk) => sum + (bk.advancePaid || 0), 0);
@@ -86,6 +88,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     });
     return {
       bookingsCount: bookings.length,
+      cancelledCount,
       totalPassengers,
       totalRevenue,
       totalAdvance,
@@ -248,6 +251,11 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
                     <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
                       🚂 Non-AC: {stats.nonAcPax}
                     </span>
+                    {stats.cancelledCount > 0 && (
+                      <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[9px] font-black">
+                        ❌ {stats.cancelledCount} Canc
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] font-bold text-zinc-900 group-hover:text-black flex items-center gap-0.5 transition-colors">
                     <span>Open &amp; PDF</span>

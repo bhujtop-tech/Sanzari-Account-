@@ -36,6 +36,14 @@ export interface TourMember {
   notes?: string;
 }
 
+export interface TourChecklistItem {
+  id: string;
+  label: string;
+  done: boolean;
+  note?: string;
+  updatedAt?: string;
+}
+
 export interface TourBatch {
   id: string;
   title: string; // e.g. "Kashmir Autumn Deluxe Tour"
@@ -59,6 +67,7 @@ export interface TourBatch {
   inclusions?: string[];
   monthKey: string; // YYYY-MM
   notes?: string;
+  departureChecklist?: TourChecklistItem[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -105,6 +114,11 @@ export interface TourBooking {
   
   // Financials
   totalAmount: number;
+  originalTotalAmount?: number;
+  discountAmount?: number;
+  discountType?: 'Discount' | 'Gapchi / Waived';
+  discountReason?: string;
+  discountDate?: string;
   advancePaid: number;
   pendingAmount: number;
   balanceDue?: number; // Exactly matched with Booking Receipt Generator
@@ -119,12 +133,33 @@ export interface TourBooking {
   // Additional Notes & Status
   bookingStatus: TourBookingStatus;
   ticketStatus?: 'PENDING' | '1_WAY' | '2_WAY';
+  cancellationDetails?: TourBookingCancellation;
+  departureChecklist?: TourChecklistItem[];
+  tourDurationDays?: number;
   bookedBy?: string;
   transactionId?: string;
   specialNotes?: string;
   
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface TourBookingCancellation {
+  cancelledAt: string; // ISO timestamp
+  cancelDate: string; // YYYY-MM-DD
+  policySlab: string; // e.g. "15-29 Days (25% Charge)"
+  daysBeforeDeparture?: number;
+  receivedAmount: number;
+  cancellationCharge: number;
+  ticketOrHotelLoss?: number;
+  refundAmount: number;
+  netRetained: number; // receivedAmount - refundAmount - (ticketOrHotelLoss || 0)
+  refundWalletId?: string;
+  refundWalletName?: string;
+  refundPaymentMode?: TourPaymentMode;
+  refundExpenseId?: string;
+  reason?: string;
+  cancelledBy?: string;
 }
 
 export interface ConfirmedBookingDocument {
@@ -154,6 +189,7 @@ export type TourExpenseCategory =
   | 'Office Rent'
   | 'Electricity Bill'
   | 'Mustak Commission'
+  | 'Customer Refund'
   | 'Hotel & Stay'
   | 'Train & Transport'
   | 'Food & Meals'

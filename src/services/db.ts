@@ -34,6 +34,7 @@ import {
   StoreSettings,
   TourBatch,
   TourBooking,
+  TourChecklistItem,
   ConfirmedBookingDocument,
   TourExpense,
   TourInquiry,
@@ -42,6 +43,7 @@ import {
   PaymentStatus,
   ExpenseCategory,
   TourPaymentMode,
+  TourPaymentEntry,
   TourPricingSettings,
   DEFAULT_TOUR_PRICING,
   MissedCall,
@@ -2290,6 +2292,63 @@ export async function addTourBooking(
   }
 }
 
+function findTourWalletDoc(
+  walletsSnap: Awaited<ReturnType<typeof getDocs>>,
+  walletName?: string
+): { id: string; name: string } | null {
+  const target = (walletName || '').toLowerCase().trim();
+  if (!target) return null;
+
+  // 1. Exact case-insensitive match
+  const exact = walletsSnap.docs.find(
+    (w) => ((w.data() as any).name || '').toLowerCase().trim() === target
+  );
+  if (exact) {
+    return { id: exact.id, name: (exact.data() as any).name || walletName || '' };
+  }
+
+  // 2. Partner keyword match strictly within tourism wallets
+  const isTourDoc = (data: any) =>
+    data.scope === 'tourism' || ((data.name || '').toLowerCase().includes('(tour)'));
+
+  const keywords = ['sahil', 'rizwan', 'bus'];
+  for (const kw of keywords) {
+    if (target.includes(kw)) {
+      const matched = walletsSnap.docs.find((w) => {
+        const d = w.data() as any;
+        return isTourDoc(d) && ((d.name || '').toLowerCase().includes(kw) || d.partnerKey === kw);
+      });
+      if (matched) {
+        return { id: matched.id, name: (matched.data() as any).name || walletName || '' };
+      }
+    }
+  }
+
+  return null;
+}
+
+function materializeBookingPaymentHistory(bData: TourBooking, fallbackWallet?: string): TourPaymentEntry[] {
+  if (Array.isArray(bData.paymentHistory) && bData.paymentHistory.length > 0) {
+    return bData.paymentHistory.map((h) => ({ ...h }));
+  }
+  const oldAdvance = Number(bData.advancePaid || 0);
+  if (oldAdvance > 0) {
+    return [
+      {
+        id: 'init-adv',
+        amount: oldAdvance,
+        date: bData.createdAt || bData.tourDate || new Date().toISOString(),
+        walletName: bData.walletName || fallbackWallet || 'Rizwan (Tour)',
+        paymentMode: bData.paymentMode || 'Online',
+        paymentMethod: bData.paymentMethod || 'UPI',
+        notes: 'Initial Booking Advance',
+        receivedBy: bData.bookedBy || 'Office Staff',
+      },
+    ];
+  }
+  return [];
+}
+
 export async function recordTourBookingPayment(params: {
   bookingId: string;
   amount: number;
@@ -2300,16 +2359,23 @@ export async function recordTourBookingPayment(params: {
   receivedBy?: string;
   paymentDate?: string;
   userEmail: string;
+  discountAmount?: number;
+  discountType?: 'Discount' | 'Gapchi / Waived';
+  discountReason?: string;
 }): Promise<void> {
   try {
+    const payAmt = Math.max(0, Number(params.amount || 0));
+    const discAmt = Math.max(0, Number(params.discountAmount || 0));
+    if (payAmt <= 0 && discAmt <= 0) {
+      throw new Error('Please enter a valid payment amount or discount/waive amount.');
+    }
+
     let targetWalletId = '';
-    if (params.walletName) {
+    if (payAmt > 0 && params.walletName) {
       try {
         const walletsSnap = await getDocs(collection(db, 'wallets'));
-        const targetWallet = walletsSnap.docs.find(
-          (w) => (w.data().name || '').toLowerCase() === (params.walletName || '').toLowerCase()
-        );
-        if (targetWallet) targetWalletId = targetWallet.id;
+        const matched = findTourWalletDoc(walletsSnap, params.walletName);
+        if (matched) targetWalletId = matched.id;
       } catch {
         // Fallback
       }
@@ -2325,67 +2391,86 @@ export async function recordTourBookingPayment(params: {
 
       let wRef = null;
       let wSnap = null;
-      if (targetWalletId) {
+      if (payAmt > 0 && targetWalletId) {
         wRef = doc(db, 'wallets', targetWalletId);
         wSnap = await transaction.get(wRef);
       }
 
       // WRITES SECOND
       const bData = bSnap.data() as TourBooking;
+      const oldTotal = Number(bData.totalAmount || 0);
       const oldAdvance = Number(bData.advancePaid || 0);
-      const newAdvance = oldAdvance + Number(params.amount);
-      const newPending = Math.max(0, Number(bData.totalAmount || 0) - newAdvance);
-      const newPaymentStatus = newPending === 0 ? 'Paid' : 'Partial';
+      const oldDiscount = Number(bData.discountAmount || 0);
+      const originalTotal =
+        Number(bData.originalTotalAmount || 0) > 0
+          ? Number(bData.originalTotalAmount)
+          : oldTotal + oldDiscount;
 
-      // Build paymentHistory array preserving initial advance if not yet tracked
-      const existingHistory = Array.isArray(bData.paymentHistory) && bData.paymentHistory.length > 0
-        ? [...bData.paymentHistory]
-        : oldAdvance > 0
-        ? [
-            {
-              id: 'init-adv',
-              amount: oldAdvance,
-              date: bData.createdAt || new Date().toISOString(),
-              walletName: bData.walletName || params.walletName,
-              paymentMode: bData.paymentMode || 'Online',
-              paymentMethod: bData.paymentMethod || 'UPI',
-              notes: 'Initial Booking Advance',
-              receivedBy: bData.bookedBy || 'Office Staff',
-            },
-          ]
-        : [];
+      const newDiscount = oldDiscount + discAmt;
+      const newTotal = Math.max(0, oldTotal - discAmt);
+      const newAdvance = oldAdvance + payAmt;
+      const newPending = Math.max(0, newTotal - newAdvance);
+      const newPaymentStatus: PaymentStatus =
+        newPending === 0 && (newTotal > 0 || newDiscount > 0)
+          ? 'Paid'
+          : newAdvance > 0
+          ? 'Partial'
+          : 'Pending';
 
-      const newEntry = sanitizeForFirestore({
-        id: `pay-${Date.now()}`,
-        amount: Number(params.amount),
-        date: payTimestamp,
-        walletName: params.walletName,
-        paymentMode: params.paymentMode,
-        paymentMethod: params.paymentMethod,
-        notes:
-          params.notes?.trim() ||
-          (newPending === 0
-            ? 'Full & Final Balance Received'
-            : `Installment #${existingHistory.length + 1} Received`),
-        receivedBy: params.receivedBy || 'Office Staff',
-      });
+      const existingHistory = materializeBookingPaymentHistory(bData, params.walletName);
+      const updatedHistory = [...existingHistory];
 
-      const updatedHistory = [...existingHistory, newEntry];
+      if (payAmt > 0) {
+        const newEntry = sanitizeForFirestore({
+          id: `pay-${Date.now()}`,
+          amount: payAmt,
+          date: payTimestamp,
+          walletName: params.walletName,
+          paymentMode: params.paymentMode,
+          paymentMethod: params.paymentMethod,
+          notes:
+            params.notes?.trim() ||
+            (newPending === 0
+              ? discAmt > 0
+                ? `Full & Final Settled (${params.discountType || 'Discount'}: ₹${discAmt.toLocaleString('en-IN')})`
+                : 'Full & Final Balance Received'
+              : `Installment #${existingHistory.length + 1} Received`),
+          receivedBy: params.receivedBy || 'Office Staff',
+        });
+        updatedHistory.push(newEntry);
+      }
 
-      transaction.update(bookingRef, {
+      const bookingUpdatePayload: Record<string, any> = {
+        totalAmount: newTotal,
         advancePaid: newAdvance,
         pendingAmount: newPending,
         balanceDue: newPending,
         paymentStatus: newPaymentStatus,
         paymentHistory: updatedHistory,
-        lastPaymentDate: payTimestamp,
         updatedAt: new Date().toISOString(),
-      });
+      };
 
-      if (wRef && wSnap && wSnap.exists()) {
-        const currentBal = Number(wSnap.data().currentBalance || 0);
+      if (payAmt > 0) {
+        bookingUpdatePayload.lastPaymentDate = payTimestamp;
+      }
+
+      if (discAmt > 0) {
+        bookingUpdatePayload.originalTotalAmount = originalTotal;
+        bookingUpdatePayload.discountAmount = newDiscount;
+        bookingUpdatePayload.discountType = params.discountType || bData.discountType || 'Discount';
+        bookingUpdatePayload.discountReason =
+          params.discountReason?.trim() ||
+          bData.discountReason ||
+          (params.discountType === 'Gapchi / Waived' ? 'Last amount waived / gapchi' : 'Package discount given');
+        bookingUpdatePayload.discountDate = payTimestamp;
+      }
+
+      transaction.update(bookingRef, sanitizeForFirestore(bookingUpdatePayload));
+
+      if (payAmt > 0 && wRef && wSnap && wSnap.exists()) {
+        const currentBal = Number((wSnap.data() as any).currentBalance || 0);
         transaction.update(wRef, {
-          currentBalance: currentBal + Number(params.amount),
+          currentBalance: currentBal + payAmt,
           updatedAt: new Date().toISOString(),
         });
       }
@@ -2407,19 +2492,440 @@ export async function recordTourBookingPayment(params: {
 
     await addDoc(collection(db, 'auditLogs'), {
       userEmail: params.userEmail,
-      action: 'TOUR_PAYMENT_COLLECTED',
+      action: discAmt > 0 && payAmt === 0 ? 'TOUR_DISCOUNT_APPLIED' : 'TOUR_PAYMENT_COLLECTED',
       recordType: 'tourBookings',
       recordId: params.bookingId,
       newValue: JSON.stringify({
-        amount: params.amount,
-        wallet: params.walletName,
-        paymentMode: params.paymentMode,
+        amount: payAmt,
+        wallet: payAmt > 0 ? params.walletName : undefined,
+        paymentMode: payAmt > 0 ? params.paymentMode : undefined,
+        discountAmount: discAmt > 0 ? discAmt : undefined,
+        discountType: discAmt > 0 ? params.discountType : undefined,
+        discountReason: discAmt > 0 ? params.discountReason : undefined,
         notes: params.notes,
       }),
       timestamp: new Date().toISOString(),
     });
   } catch (error) {
     handleFirestoreError(error, OperationType.WRITE, `tourBookings/${params.bookingId}/payment`);
+    throw error;
+  }
+}
+
+export async function updateTourBookingPaymentEntry(params: {
+  bookingId: string;
+  entryIndex: number;
+  entryId?: string;
+  amount: number;
+  walletName: string;
+  paymentMode: TourPaymentMode;
+  paymentMethod: PaymentMethod;
+  paymentDate: string;
+  notes?: string;
+  userEmail: string;
+}): Promise<void> {
+  try {
+    const newAmt = Number(params.amount);
+    if (!newAmt || newAmt <= 0) {
+      throw new Error('Payment amount must be greater than ₹0.');
+    }
+
+    const bookingRef = doc(db, 'tourBookings', params.bookingId);
+    const [preSnap, walletsSnap] = await Promise.all([
+      getDoc(bookingRef),
+      getDocs(collection(db, 'wallets')),
+    ]);
+
+    if (!preSnap.exists()) throw new Error('Tour booking not found');
+    const preData = preSnap.data() as TourBooking;
+    const preHistory = materializeBookingPaymentHistory(preData);
+
+    let targetIdx = params.entryIndex;
+    if (params.entryId) {
+      const byIdIdx = preHistory.findIndex((h) => h.id === params.entryId);
+      if (byIdIdx !== -1) targetIdx = byIdIdx;
+    }
+    if (targetIdx < 0 || targetIdx >= preHistory.length) {
+      throw new Error('Payment entry not found.');
+    }
+
+    const oldEntryPre = preHistory[targetIdx];
+    const oldWalletDoc = findTourWalletDoc(walletsSnap, oldEntryPre.walletName || preData.walletName);
+    const newWalletDoc = findTourWalletDoc(walletsSnap, params.walletName);
+    const resolvedNewWalletName = newWalletDoc?.name || params.walletName;
+
+    let auditOldSummary: Record<string, any> = {};
+    let auditNewSummary: Record<string, any> = {};
+
+    await runTransaction(db, async (transaction) => {
+      // READS FIRST
+      const bSnap = await transaction.get(bookingRef);
+      if (!bSnap.exists()) throw new Error('Tour booking not found');
+
+      const oldWalletRef = oldWalletDoc ? doc(db, 'wallets', oldWalletDoc.id) : null;
+      const newWalletRef =
+        newWalletDoc && newWalletDoc.id !== oldWalletDoc?.id
+          ? doc(db, 'wallets', newWalletDoc.id)
+          : oldWalletRef && newWalletDoc && newWalletDoc.id === oldWalletDoc?.id
+          ? oldWalletRef
+          : null;
+
+      const oldWalletSnap = oldWalletRef ? await transaction.get(oldWalletRef) : null;
+      const newWalletSnap =
+        newWalletRef && newWalletRef.id !== oldWalletRef?.id
+          ? await transaction.get(newWalletRef)
+          : oldWalletSnap;
+
+      // WRITES SECOND
+      const bData = bSnap.data() as TourBooking;
+      const history = materializeBookingPaymentHistory(bData);
+
+      let idx = params.entryIndex;
+      if (params.entryId) {
+        const byId = history.findIndex((h) => h.id === params.entryId);
+        if (byId !== -1) idx = byId;
+      }
+      if (idx < 0 || idx >= history.length) {
+        throw new Error('Payment entry no longer exists.');
+      }
+
+      const oldEntry = history[idx];
+      const oldAmt = Number(oldEntry.amount || 0);
+
+      const updatedEntry: TourPaymentEntry = sanitizeForFirestore({
+        ...oldEntry,
+        id: oldEntry.id || `pay-${Date.now()}`,
+        amount: newAmt,
+        walletName: resolvedNewWalletName,
+        paymentMode: params.paymentMode,
+        paymentMethod: params.paymentMethod,
+        date: params.paymentDate || oldEntry.date || new Date().toISOString(),
+        notes: params.notes !== undefined ? params.notes.trim() : oldEntry.notes || '',
+      });
+
+      const updatedHistory = history.map((h, i) => (i === idx ? updatedEntry : h));
+      const newAdvance = updatedHistory.reduce((sum, h) => sum + Number(h.amount || 0), 0);
+      const totalAmount = Number(bData.totalAmount || 0);
+
+      if (newAdvance > totalAmount && newAmt > oldAmt) {
+        throw new Error(
+          `Total received (₹${newAdvance.toLocaleString('en-IN')}) cannot exceed package total (₹${totalAmount.toLocaleString('en-IN')}).`
+        );
+      }
+
+      const newPending = Math.max(0, totalAmount - newAdvance);
+      const newPaymentStatus: PaymentStatus =
+        newPending === 0 && totalAmount > 0 ? 'Paid' : newAdvance > 0 ? 'Partial' : 'Pending';
+
+      const latestDate =
+        updatedHistory
+          .map((h) => h.date || '')
+          .filter(Boolean)
+          .sort()
+          .pop() || bData.lastPaymentDate;
+
+      const bookingUpdate: Record<string, any> = {
+        advancePaid: newAdvance,
+        pendingAmount: newPending,
+        balanceDue: newPending,
+        paymentStatus: newPaymentStatus,
+        paymentHistory: updatedHistory,
+        lastPaymentDate: latestDate,
+        updatedAt: new Date().toISOString(),
+      };
+
+      // Keep primary booking wallet/mode synced when 1st entry is edited
+      if (idx === 0) {
+        bookingUpdate.walletName = resolvedNewWalletName;
+        if (newWalletDoc?.id) {
+          bookingUpdate.walletId = newWalletDoc.id;
+        }
+        bookingUpdate.paymentMode = params.paymentMode;
+        bookingUpdate.paymentMethod = params.paymentMethod;
+      }
+
+      transaction.update(bookingRef, sanitizeForFirestore(bookingUpdate));
+
+      // Atomically reconcile BOTH old & new wallet balances in Firestore
+      const nowIso = new Date().toISOString();
+      if (oldWalletRef && newWalletRef && oldWalletRef.id === newWalletRef.id) {
+        if (oldWalletSnap && oldWalletSnap.exists()) {
+          const curBal = Number((oldWalletSnap.data() as any).currentBalance || 0);
+          const diff = newAmt - oldAmt;
+          if (diff !== 0) {
+            transaction.update(oldWalletRef, {
+              currentBalance: curBal + diff,
+              updatedAt: nowIso,
+            });
+          }
+        }
+      } else {
+        if (oldWalletRef && oldWalletSnap && oldWalletSnap.exists() && oldAmt !== 0) {
+          const oldBal = Number((oldWalletSnap.data() as any).currentBalance || 0);
+          transaction.update(oldWalletRef, {
+            currentBalance: oldBal - oldAmt,
+            updatedAt: nowIso,
+          });
+        }
+        if (newWalletRef && newWalletSnap && newWalletSnap.exists() && newAmt !== 0) {
+          const newBal = Number((newWalletSnap.data() as any).currentBalance || 0);
+          transaction.update(newWalletRef, {
+            currentBalance: newBal + newAmt,
+            updatedAt: nowIso,
+          });
+        }
+      }
+
+      auditOldSummary = {
+        amount: oldAmt,
+        walletName: oldEntry.walletName,
+        paymentMode: oldEntry.paymentMode,
+        date: oldEntry.date,
+        notes: oldEntry.notes,
+      };
+      auditNewSummary = {
+        amount: newAmt,
+        walletName: resolvedNewWalletName,
+        paymentMode: params.paymentMode,
+        date: updatedEntry.date,
+        notes: updatedEntry.notes,
+      };
+    });
+
+    // Sync into confirmed_bookings collection
+    try {
+      const updatedSnap = await getDoc(bookingRef);
+      if (updatedSnap.exists()) {
+        await syncConfirmedBookingToFirestore({
+          ...(updatedSnap.data() as TourBooking),
+          id: params.bookingId,
+        });
+      }
+    } catch (e) {
+      console.warn('confirmed_bookings sync error on payment edit:', e);
+    }
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail: params.userEmail,
+      action: 'TOUR_PAYMENT_EDITED',
+      recordType: 'tourBookings',
+      recordId: params.bookingId,
+      oldValue: JSON.stringify(auditOldSummary),
+      newValue: JSON.stringify(auditNewSummary),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${params.bookingId}/payment`);
+    throw error;
+  }
+}
+
+export async function deleteTourBookingPaymentEntry(params: {
+  bookingId: string;
+  entryIndex: number;
+  entryId?: string;
+  userEmail: string;
+}): Promise<void> {
+  try {
+    const bookingRef = doc(db, 'tourBookings', params.bookingId);
+    const [preSnap, walletsSnap] = await Promise.all([
+      getDoc(bookingRef),
+      getDocs(collection(db, 'wallets')),
+    ]);
+
+    if (!preSnap.exists()) throw new Error('Tour booking not found');
+    const preData = preSnap.data() as TourBooking;
+    const preHistory = materializeBookingPaymentHistory(preData);
+
+    let targetIdx = params.entryIndex;
+    if (params.entryId) {
+      const byId = preHistory.findIndex((h) => h.id === params.entryId);
+      if (byId !== -1) targetIdx = byId;
+    }
+    if (targetIdx < 0 || targetIdx >= preHistory.length) {
+      throw new Error('Payment entry not found.');
+    }
+
+    const oldEntryPre = preHistory[targetIdx];
+    const oldWalletDoc = findTourWalletDoc(walletsSnap, oldEntryPre.walletName || preData.walletName);
+    let deletedSummary: Record<string, any> = {};
+
+    await runTransaction(db, async (transaction) => {
+      // READS FIRST
+      const bSnap = await transaction.get(bookingRef);
+      if (!bSnap.exists()) throw new Error('Tour booking not found');
+
+      const oldWalletRef = oldWalletDoc ? doc(db, 'wallets', oldWalletDoc.id) : null;
+      const oldWalletSnap = oldWalletRef ? await transaction.get(oldWalletRef) : null;
+
+      // WRITES SECOND
+      const bData = bSnap.data() as TourBooking;
+      const history = materializeBookingPaymentHistory(bData);
+
+      let idx = params.entryIndex;
+      if (params.entryId) {
+        const byId = history.findIndex((h) => h.id === params.entryId);
+        if (byId !== -1) idx = byId;
+      }
+      if (idx < 0 || idx >= history.length) {
+        throw new Error('Payment entry no longer exists.');
+      }
+
+      const removed = history[idx];
+      const removedAmt = Number(removed.amount || 0);
+      const updatedHistory = history.filter((_, i) => i !== idx);
+      const newAdvance = updatedHistory.reduce((sum, h) => sum + Number(h.amount || 0), 0);
+      const totalAmount = Number(bData.totalAmount || 0);
+      const newPending = Math.max(0, totalAmount - newAdvance);
+      const newPaymentStatus: PaymentStatus =
+        newPending === 0 && totalAmount > 0 ? 'Paid' : newAdvance > 0 ? 'Partial' : 'Pending';
+
+      const bookingUpdate: Record<string, any> = {
+        advancePaid: newAdvance,
+        pendingAmount: newPending,
+        balanceDue: newPending,
+        paymentStatus: newPaymentStatus,
+        paymentHistory: updatedHistory,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (idx === 0 && updatedHistory.length > 0) {
+        bookingUpdate.walletName = updatedHistory[0].walletName || bData.walletName;
+        bookingUpdate.paymentMode = updatedHistory[0].paymentMode || bData.paymentMode;
+        bookingUpdate.paymentMethod = updatedHistory[0].paymentMethod || bData.paymentMethod;
+      }
+
+      transaction.update(bookingRef, sanitizeForFirestore(bookingUpdate));
+
+      if (oldWalletRef && oldWalletSnap && oldWalletSnap.exists() && removedAmt !== 0) {
+        const curBal = Number((oldWalletSnap.data() as any).currentBalance || 0);
+        transaction.update(oldWalletRef, {
+          currentBalance: curBal - removedAmt,
+          updatedAt: new Date().toISOString(),
+        });
+      }
+
+      deletedSummary = {
+        amount: removedAmt,
+        walletName: removed.walletName,
+        paymentMode: removed.paymentMode,
+        date: removed.date,
+        notes: removed.notes,
+      };
+    });
+
+    try {
+      const updatedSnap = await getDoc(bookingRef);
+      if (updatedSnap.exists()) {
+        await syncConfirmedBookingToFirestore({
+          ...(updatedSnap.data() as TourBooking),
+          id: params.bookingId,
+        });
+      }
+    } catch (e) {
+      console.warn('confirmed_bookings sync error on payment delete:', e);
+    }
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail: params.userEmail,
+      action: 'TOUR_PAYMENT_DELETED',
+      recordType: 'tourBookings',
+      recordId: params.bookingId,
+      oldValue: JSON.stringify(deletedSummary),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, `tourBookings/${params.bookingId}/payment`);
+    throw error;
+  }
+}
+
+export async function updateTourBookingDiscount(params: {
+  bookingId: string;
+  discountAmount: number;
+  discountType?: 'Discount' | 'Gapchi / Waived';
+  discountReason?: string;
+  userEmail: string;
+}): Promise<void> {
+  try {
+    const newDiscount = Math.max(0, Number(params.discountAmount || 0));
+    const bookingRef = doc(db, 'tourBookings', params.bookingId);
+
+    let oldSummary: Record<string, any> = {};
+    let newSummary: Record<string, any> = {};
+
+    await runTransaction(db, async (transaction) => {
+      const bSnap = await transaction.get(bookingRef);
+      if (!bSnap.exists()) throw new Error('Tour booking not found');
+
+      const bData = bSnap.data() as TourBooking;
+      const oldTotal = Number(bData.totalAmount || 0);
+      const oldDiscount = Number(bData.discountAmount || 0);
+      const originalTotal =
+        Number(bData.originalTotalAmount || 0) > 0
+          ? Number(bData.originalTotalAmount)
+          : oldTotal + oldDiscount;
+      const advancePaid = Number(bData.advancePaid || 0);
+
+      const maxAllowedDiscount = Math.max(0, originalTotal - advancePaid);
+      if (newDiscount > maxAllowedDiscount) {
+        throw new Error(
+          `Discount cannot exceed ₹${maxAllowedDiscount.toLocaleString('en-IN')} (Original ₹${originalTotal.toLocaleString('en-IN')} minus Received ₹${advancePaid.toLocaleString('en-IN')}).`
+        );
+      }
+
+      const newTotal = Math.max(0, originalTotal - newDiscount);
+      const newPending = Math.max(0, newTotal - advancePaid);
+      const newPaymentStatus: PaymentStatus =
+        newPending === 0 && (newTotal > 0 || newDiscount > 0)
+          ? 'Paid'
+          : advancePaid > 0
+          ? 'Partial'
+          : 'Pending';
+
+      transaction.update(
+        bookingRef,
+        sanitizeForFirestore({
+          originalTotalAmount: originalTotal,
+          discountAmount: newDiscount,
+          discountType: newDiscount > 0 ? params.discountType || bData.discountType || 'Discount' : 'Discount',
+          discountReason: newDiscount > 0 ? (params.discountReason ?? bData.discountReason ?? '').trim() : '',
+          discountDate: newDiscount > 0 ? new Date().toISOString() : '',
+          totalAmount: newTotal,
+          pendingAmount: newPending,
+          balanceDue: newPending,
+          paymentStatus: newPaymentStatus,
+          updatedAt: new Date().toISOString(),
+        })
+      );
+
+      oldSummary = { totalAmount: oldTotal, discountAmount: oldDiscount, discountReason: bData.discountReason };
+      newSummary = { totalAmount: newTotal, discountAmount: newDiscount, discountReason: params.discountReason };
+    });
+
+    try {
+      const updatedSnap = await getDoc(bookingRef);
+      if (updatedSnap.exists()) {
+        await syncConfirmedBookingToFirestore({
+          ...(updatedSnap.data() as TourBooking),
+          id: params.bookingId,
+        });
+      }
+    } catch (e) {
+      console.warn('confirmed_bookings sync error on discount update:', e);
+    }
+
+    await addDoc(collection(db, 'auditLogs'), {
+      userEmail: params.userEmail,
+      action: 'TOUR_DISCOUNT_UPDATED',
+      recordType: 'tourBookings',
+      recordId: params.bookingId,
+      oldValue: JSON.stringify(oldSummary),
+      newValue: JSON.stringify(newSummary),
+      timestamp: new Date().toISOString(),
+    });
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${params.bookingId}/discount`);
     throw error;
   }
 }
@@ -2610,6 +3116,240 @@ export async function updateTourBookingTicketStatus(
   }
 }
 
+export async function updateTourDepartureChecklist(
+  targetType: 'batch' | 'booking',
+  id: string,
+  departureChecklist: TourChecklistItem[],
+  durationDays?: number
+): Promise<void> {
+  if (!id) return;
+  const colName = targetType === 'batch' ? 'tourBatches' : 'tourBookings';
+  try {
+    const targetRef = doc(db, colName, id);
+    const payload: Record<string, unknown> = {
+      departureChecklist,
+      updatedAt: new Date().toISOString(),
+    };
+    if (durationDays !== undefined && Number.isFinite(durationDays) && durationDays >= 1) {
+      if (targetType === 'booking') {
+        payload.tourDurationDays = Math.round(durationDays);
+      } else {
+        payload.durationDays = Math.round(durationDays);
+      }
+    }
+    await updateDoc(targetRef, sanitizeForFirestore(payload));
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `${colName}/${id}`);
+    throw error;
+  }
+}
+
+export async function cancelTourBooking(
+  params: {
+    bookingId: string;
+    cancelDate: string;
+    policySlab: string;
+    daysBeforeDeparture?: number;
+    cancellationCharge: number;
+    ticketOrHotelLoss: number;
+    refundAmount: number;
+    refundWalletId?: string;
+    refundWalletName?: string;
+    refundPaymentMode?: TourPaymentMode;
+    reason?: string;
+  },
+  userEmail: string
+): Promise<void> {
+  if (!params.bookingId) return;
+  try {
+    const bookingRef = doc(db, 'tourBookings', params.bookingId);
+    const bSnap = await getDoc(bookingRef);
+    if (!bSnap.exists()) {
+      throw new Error('Tour booking not found');
+    }
+
+    const existing = bSnap.data() as TourBooking;
+    const wasAlreadyCancelled = existing.bookingStatus === 'Cancelled';
+    const now = new Date().toISOString();
+    const receivedAmount = Number(existing.advancePaid || 0);
+    const refundAmount = Math.max(0, Number(params.refundAmount || 0));
+    const cancellationCharge = Math.max(0, Number(params.cancellationCharge || 0));
+    const ticketOrHotelLoss = Math.max(0, Number(params.ticketOrHotelLoss || 0));
+    const netRetained = receivedAmount - refundAmount - ticketOrHotelLoss;
+
+    // If editing an existing cancellation that previously created a refund expense, delete old expense first (refunds wallet back)
+    const prevRefundExpenseId = existing.cancellationDetails?.refundExpenseId;
+    if (prevRefundExpenseId) {
+      try {
+        await deleteTourExpense(prevRefundExpenseId, userEmail);
+      } catch (err) {
+        console.warn('Could not clean up previous refund expense:', err);
+      }
+    }
+
+    // Create linked refund expense entry in tourExpenses if refundAmount > 0 so wallet balance & ledger deduct accurately
+    let refundExpenseId: string | undefined = undefined;
+    if (refundAmount > 0 && (params.refundWalletId || params.refundWalletName)) {
+      const walletLabel = params.refundWalletName || 'Rizwan (Tour)';
+      const modeLabel = params.refundPaymentMode || 'UPI';
+      refundExpenseId = await addTourExpense(
+        {
+          tourBatchId: existing.tourBatchId || '',
+          tourTitle: existing.tourBatchTitle || existing.tourTitle || '',
+          destination: existing.destination || '',
+          category: 'Customer Refund',
+          amount: refundAmount,
+          walletId: params.refundWalletId || '',
+          walletName: walletLabel,
+          paymentMode: modeLabel,
+          paidToPerson: existing.customerName || '',
+          date: params.cancelDate || now.slice(0, 10),
+          monthKey: getMonthKey(params.cancelDate || now.slice(0, 10)),
+          description: `Booking Cancelled Refund: ${existing.customerName} (${existing.bookingNumber})`,
+          notes: `${params.policySlab}${params.reason ? ` • ${params.reason}` : ''}`,
+        },
+        userEmail
+      );
+    }
+
+    const cancellationDetails = sanitizeForFirestore({
+      cancelledAt: now,
+      cancelDate: params.cancelDate || now.slice(0, 10),
+      policySlab: params.policySlab,
+      daysBeforeDeparture: params.daysBeforeDeparture,
+      receivedAmount,
+      cancellationCharge,
+      ticketOrHotelLoss,
+      refundAmount,
+      netRetained,
+      refundWalletId: refundAmount > 0 ? params.refundWalletId || '' : '',
+      refundWalletName: refundAmount > 0 ? params.refundWalletName || '' : '',
+      refundPaymentMode: refundAmount > 0 ? params.refundPaymentMode || 'UPI' : undefined,
+      refundExpenseId: refundExpenseId || '',
+      reason: (params.reason || '').trim(),
+      cancelledBy: userEmail || 'admin@sanzari.com',
+    });
+
+    await updateDoc(bookingRef, {
+      bookingStatus: 'Cancelled',
+      cancellationDetails,
+      updatedAt: now,
+    });
+
+    // Free up batch seats if this booking was previously active
+    if (!wasAlreadyCancelled && existing.tourBatchId) {
+      try {
+        const batchRef = doc(db, 'tourBatches', existing.tourBatchId);
+        const batchSnap = await getDoc(batchRef);
+        if (batchSnap.exists()) {
+          const currentBooked = Number(batchSnap.data().bookedSeats || 0);
+          const membersCount = Number(existing.membersCount || 1);
+          await updateDoc(batchRef, {
+            bookedSeats: Math.max(0, currentBooked - membersCount),
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        console.warn('Batch seat adjustment on cancel failed:', err);
+      }
+    }
+
+    try {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail: userEmail || 'admin@sanzari.com',
+        action: 'CANCEL_TOUR_BOOKING',
+        recordType: 'tourBookings',
+        recordId: params.bookingId,
+        newValue: JSON.stringify({
+          bookingNumber: existing.bookingNumber,
+          customerName: existing.customerName,
+          refundAmount,
+          cancellationCharge,
+          ticketOrHotelLoss,
+          refundWalletName: params.refundWalletName || '',
+          policySlab: params.policySlab,
+        }),
+        timestamp: now,
+      });
+    } catch {
+      // ignore audit failure
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${params.bookingId}`);
+    throw error;
+  }
+}
+
+export async function restoreCancelledTourBooking(
+  bookingId: string,
+  userEmail: string
+): Promise<void> {
+  if (!bookingId) return;
+  try {
+    const bookingRef = doc(db, 'tourBookings', bookingId);
+    const bSnap = await getDoc(bookingRef);
+    if (!bSnap.exists()) {
+      throw new Error('Tour booking not found');
+    }
+
+    const existing = bSnap.data() as TourBooking;
+    const now = new Date().toISOString();
+
+    // Reverse refund expense (restores wallet balance) if one was created
+    const prevRefundExpenseId = existing.cancellationDetails?.refundExpenseId;
+    if (prevRefundExpenseId) {
+      try {
+        await deleteTourExpense(prevRefundExpenseId, userEmail);
+      } catch (err) {
+        console.warn('Could not delete refund expense on restore:', err);
+      }
+    }
+
+    await updateDoc(bookingRef, {
+      bookingStatus: 'Confirmed',
+      cancellationDetails: null,
+      updatedAt: now,
+    });
+
+    // Re-add seats to tour batch
+    if (existing.bookingStatus === 'Cancelled' && existing.tourBatchId) {
+      try {
+        const batchRef = doc(db, 'tourBatches', existing.tourBatchId);
+        const batchSnap = await getDoc(batchRef);
+        if (batchSnap.exists()) {
+          const currentBooked = Number(batchSnap.data().bookedSeats || 0);
+          const membersCount = Number(existing.membersCount || 1);
+          await updateDoc(batchRef, {
+            bookedSeats: currentBooked + membersCount,
+            updatedAt: now,
+          });
+        }
+      } catch (err) {
+        console.warn('Batch seat restore failed:', err);
+      }
+    }
+
+    try {
+      await addDoc(collection(db, 'auditLogs'), {
+        userEmail: userEmail || 'admin@sanzari.com',
+        action: 'RESTORE_TOUR_BOOKING',
+        recordType: 'tourBookings',
+        recordId: bookingId,
+        newValue: JSON.stringify({
+          bookingNumber: existing.bookingNumber,
+          customerName: existing.customerName,
+        }),
+        timestamp: now,
+      });
+    } catch {
+      // ignore
+    }
+  } catch (error) {
+    handleFirestoreError(error, OperationType.UPDATE, `tourBookings/${bookingId}`);
+    throw error;
+  }
+}
+
 export async function deleteTourBooking(id: string, userEmail: string): Promise<void> {
   if (!id) return;
   try {
@@ -2618,9 +3358,19 @@ export async function deleteTourBooking(id: string, userEmail: string): Promise<
 
     if (bSnap.exists()) {
       const existing = bSnap.data() as TourBooking;
+      const wasCancelled = existing.bookingStatus === 'Cancelled';
 
-      // 1. Adjust batch seats (best effort)
-      if (existing.tourBatchId) {
+      // 0. If this cancelled booking had a linked refund expense, delete it (reverses wallet refund)
+      if (existing.cancellationDetails?.refundExpenseId) {
+        try {
+          await deleteTourExpense(existing.cancellationDetails.refundExpenseId, userEmail);
+        } catch (e) {
+          console.warn('Refund expense cleanup error on delete:', e);
+        }
+      }
+
+      // 1. Adjust batch seats (best effort — skip if already subtracted when cancelled)
+      if (existing.tourBatchId && !wasCancelled) {
         try {
           const batchRef = doc(db, 'tourBatches', existing.tourBatchId);
           const batchSnap = await getDoc(batchRef);

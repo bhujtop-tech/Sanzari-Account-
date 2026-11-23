@@ -9,14 +9,23 @@ import {
   MessageCircle,
   FileText,
   ArrowDownLeft,
-  Sparkles,
   Phone,
   MapPin,
+  Pencil,
+  Trash2,
+  Check,
+  Tag,
+  ArrowRightLeft,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
 import { TourBooking, TourPaymentMode, PaymentMethod, TourPaymentEntry } from '../../types';
-import { recordTourBookingPayment } from '../../services/db';
+import {
+  recordTourBookingPayment,
+  updateTourBookingPaymentEntry,
+  deleteTourBookingPaymentEntry,
+  updateTourBookingDiscount,
+} from '../../services/db';
 
 interface ReceiveTourPaymentModalProps {
   isOpen: boolean;
@@ -52,6 +61,41 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [justPaidAmount, setJustPaidAmount] = useState<number | null>(null);
+  const [actionBanner, setActionBanner] = useState<string>('');
+
+  // Discount / Gapchi (write-off) state inside Receive Payment form
+  const [showDiscountBox, setShowDiscountBox] = useState(false);
+  const [discountInput, setDiscountInput] = useState<string>('');
+  const [discountType, setDiscountType] = useState<'Discount' | 'Gapchi / Waived'>('Discount');
+  const [discountReason, setDiscountReason] = useState<string>('');
+
+  // Edit existing applied discount state
+  const [isEditingDiscount, setIsEditingDiscount] = useState(false);
+  const [editDiscountAmount, setEditDiscountAmount] = useState<string>('');
+  const [editDiscountType, setEditDiscountType] = useState<'Discount' | 'Gapchi / Waived'>('Discount');
+  const [editDiscountReason, setEditDiscountReason] = useState<string>('');
+  const [isSavingDiscount, setIsSavingDiscount] = useState(false);
+  const [discountEditError, setDiscountEditError] = useState('');
+
+  // Inline Edit Payment Entry state
+  const [editingEntryIdx, setEditingEntryIdx] = useState<number | null>(null);
+  const [editWalletName, setEditWalletName] = useState<string>('');
+  const [editPaymentMode, setEditPaymentMode] = useState<TourPaymentMode>('UPI');
+  const [editAmount, setEditAmount] = useState<string>('');
+  const [editDate, setEditDate] = useState<string>('');
+  const [editNotes, setEditNotes] = useState<string>('');
+  const [editError, setEditError] = useState<string>('');
+  const [isSavingEdit, setIsSavingEdit] = useState(false);
+  const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
+
+  const walletOptions = useMemo(() => {
+    if (tourWallets.length > 0) return tourWallets;
+    return [
+      { id: 'sahil', name: 'Sahil (Tour)' },
+      { id: 'rizwan', name: 'Rizwan (Tour)' },
+      { id: 'bus', name: 'Bus (Tour)' },
+    ];
+  }, [tourWallets]);
 
   useEffect(() => {
     if (isOpen && liveBooking) {
@@ -61,6 +105,16 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
       setNotes('');
       setErrorMsg('');
       setJustPaidAmount(null);
+      setActionBanner('');
+      setShowDiscountBox(false);
+      setDiscountInput('');
+      setDiscountType('Discount');
+      setDiscountReason('');
+      setIsEditingDiscount(false);
+      setDiscountEditError('');
+      setEditingEntryIdx(null);
+      setConfirmDeleteIdx(null);
+      setEditError('');
 
       // Default wallet to booking's wallet or current logged-in partner's wallet
       const isSahil =
@@ -80,6 +134,11 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
   }, [isOpen, liveBooking?.id]);
 
   const totalAmount = Number(liveBooking?.totalAmount || 0);
+  const appliedDiscount = Number(liveBooking?.discountAmount || 0);
+  const originalTotalAmount =
+    Number(liveBooking?.originalTotalAmount || 0) > 0
+      ? Number(liveBooking?.originalTotalAmount)
+      : totalAmount + appliedDiscount;
   const advancePaid = Number(liveBooking?.advancePaid || 0);
   const currentDue = Math.max(0, totalAmount - advancePaid);
   const paidPercentage = totalAmount > 0 ? Math.min(100, Math.round((advancePaid / totalAmount) * 100)) : 0;
@@ -109,9 +168,20 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
 
   if (!isOpen || !liveBooking) return null;
 
-  const numEntering = Number(amountReceived || 0);
-  const previewNewAdvance = advancePaid + (numEntering > 0 ? numEntering : 0);
-  const previewNewDue = Math.max(0, totalAmount - previewNewAdvance);
+  const numEntering = Math.max(0, Number(amountReceived || 0));
+  const numDiscount = showDiscountBox ? Math.max(0, Number(discountInput || 0)) : 0;
+  const previewNewTotal = Math.max(0, totalAmount - numDiscount);
+  const previewNewAdvance = advancePaid + numEntering;
+  const previewNewDue = Math.max(0, previewNewTotal - previewNewAdvance);
+  const leftoverAfterCash = Math.max(0, currentDue - numEntering);
+
+  const toDateInputValue = (dStr?: string) => {
+    if (!dStr) return new Date().toISOString().split('T')[0];
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dStr)) return dStr;
+    const d = new Date(dStr);
+    if (isNaN(d.getTime())) return new Date().toISOString().split('T')[0];
+    return d.toISOString().split('T')[0];
+  };
 
   const formatInstallmentDate = (dStr?: string) => {
     if (!dStr) return '';
@@ -124,24 +194,191 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
     });
   };
 
+  const resolveCanonicalWalletName = (rawName?: string) => {
+    const raw = (rawName || '').toLowerCase().trim();
+    const matched = walletOptions.find(
+      (w) =>
+        w.name.toLowerCase().trim() === raw ||
+        (raw.includes('sahil') && w.name.toLowerCase().includes('sahil')) ||
+        (raw.includes('rizwan') && w.name.toLowerCase().includes('rizwan')) ||
+        (raw.includes('bus') && w.name.toLowerCase().includes('bus'))
+    );
+    return matched?.name || rawName || walletOptions[0]?.name || 'Rizwan (Tour)';
+  };
+
+  const handleStartEditEntry = (item: TourPaymentEntry, idx: number) => {
+    setEditingEntryIdx(idx);
+    setConfirmDeleteIdx(null);
+    setEditError('');
+    setEditWalletName(resolveCanonicalWalletName(item.walletName || liveBooking.walletName));
+    setEditPaymentMode(item.paymentMode || 'UPI');
+    setEditAmount(String(Number(item.amount || 0)));
+    setEditDate(toDateInputValue(item.date));
+    setEditNotes(item.notes || '');
+  };
+
+  const handleCancelEditEntry = () => {
+    setEditingEntryIdx(null);
+    setConfirmDeleteIdx(null);
+    setEditError('');
+  };
+
+  const handleSaveEditEntry = async (item: TourPaymentEntry, idx: number) => {
+    setEditError('');
+    const newAmt = Number(editAmount);
+    if (!newAmt || newAmt <= 0) {
+      setEditError('Please enter a valid amount greater than ₹0.');
+      return;
+    }
+
+    const oldAmt = Number(item.amount || 0);
+    const otherEntriesSum = paymentHistoryList.reduce(
+      (sum, h, i) => (i === idx ? sum : sum + Number(h.amount || 0)),
+      0
+    );
+    const projectedAdvance = otherEntriesSum + newAmt;
+    if (projectedAdvance > totalAmount && newAmt > oldAmt) {
+      const maxForEntry = Math.max(0, totalAmount - otherEntriesSum);
+      setEditError(
+        `Total received (${formatCurrency(projectedAdvance)}) cannot exceed package total (${formatCurrency(totalAmount)}). Max for this entry: ${formatCurrency(maxForEntry)}.`
+      );
+      return;
+    }
+
+    setIsSavingEdit(true);
+    try {
+      const method: PaymentMethod =
+        editPaymentMode === 'UPI' || editPaymentMode === 'Online'
+          ? 'UPI'
+          : editPaymentMode === 'Cash'
+          ? 'Cash'
+          : 'Other';
+
+      await updateTourBookingPaymentEntry({
+        bookingId: liveBooking.id,
+        entryIndex: idx,
+        entryId: item.id !== 'initial-advance' ? item.id : undefined,
+        amount: newAmt,
+        walletName: editWalletName,
+        paymentMode: editPaymentMode,
+        paymentMethod: method,
+        paymentDate: editDate ? new Date(editDate).toISOString() : item.date || new Date().toISOString(),
+        notes: editNotes,
+        userEmail: currentUserProfile?.email || user?.email || 'admin@sanzari.com',
+      });
+
+      const oldW = (item.walletName || liveBooking.walletName || '').replace(' (Tour)', '');
+      const newW = editWalletName.replace(' (Tour)', '');
+      const walletChanged = oldW.toLowerCase() !== newW.toLowerCase();
+
+      setActionBanner(
+        walletChanged
+          ? `Payment updated! ${oldW} (-${formatCurrency(oldAmt)}) & ${newW} (+${formatCurrency(newAmt)}) dono accounts sync ho gaye.`
+          : `Payment updated to ${formatCurrency(newAmt)} in ${newW} (${editPaymentMode})! Account balance synced.`
+      );
+      setJustPaidAmount(null);
+      setEditingEntryIdx(null);
+      setConfirmDeleteIdx(null);
+    } catch (err: any) {
+      console.error('Failed to update payment entry:', err);
+      setEditError(err.message || 'Failed to update payment entry.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleDeleteEntry = async (item: TourPaymentEntry, idx: number) => {
+    setEditError('');
+    setIsSavingEdit(true);
+    try {
+      await deleteTourBookingPaymentEntry({
+        bookingId: liveBooking.id,
+        entryIndex: idx,
+        entryId: item.id !== 'initial-advance' ? item.id : undefined,
+        userEmail: currentUserProfile?.email || user?.email || 'admin@sanzari.com',
+      });
+
+      const wLabel = (item.walletName || liveBooking.walletName || '').replace(' (Tour)', '');
+      setActionBanner(
+        `Entry deleted! ${formatCurrency(item.amount)} reversed from ${wLabel} account.`
+      );
+      setJustPaidAmount(null);
+      setEditingEntryIdx(null);
+      setConfirmDeleteIdx(null);
+    } catch (err: any) {
+      console.error('Failed to delete payment entry:', err);
+      setEditError(err.message || 'Failed to delete payment entry.');
+    } finally {
+      setIsSavingEdit(false);
+    }
+  };
+
+  const handleOpenEditDiscount = () => {
+    setEditDiscountAmount(String(appliedDiscount));
+    setEditDiscountType(liveBooking.discountType || 'Discount');
+    setEditDiscountReason(liveBooking.discountReason || '');
+    setDiscountEditError('');
+    setIsEditingDiscount(true);
+  };
+
+  const handleSaveDiscountEdit = async (overrideAmount?: number) => {
+    setDiscountEditError('');
+    const targetAmt = overrideAmount !== undefined ? overrideAmount : Math.max(0, Number(editDiscountAmount || 0));
+    const maxAllowed = Math.max(0, originalTotalAmount - advancePaid);
+    if (targetAmt > maxAllowed) {
+      setDiscountEditError(`Discount cannot exceed ${formatCurrency(maxAllowed)}.`);
+      return;
+    }
+
+    setIsSavingDiscount(true);
+    try {
+      await updateTourBookingDiscount({
+        bookingId: liveBooking.id,
+        discountAmount: targetAmt,
+        discountType: editDiscountType,
+        discountReason: editDiscountReason,
+        userEmail: currentUserProfile?.email || user?.email || 'admin@sanzari.com',
+      });
+      setIsEditingDiscount(false);
+      setActionBanner(
+        targetAmt === 0
+          ? `Discount / Gapchi removed! Package restored to ${formatCurrency(originalTotalAmount)}.`
+          : `${editDiscountType} updated to ${formatCurrency(targetAmt)}! Net package is now ${formatCurrency(originalTotalAmount - targetAmt)}.`
+      );
+      setJustPaidAmount(null);
+    } catch (err: any) {
+      setDiscountEditError(err.message || 'Failed to update discount.');
+    } finally {
+      setIsSavingDiscount(false);
+    }
+  };
+
   const handleReceivePayment = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
 
-    const amt = Number(amountReceived);
-    if (!amt || amt <= 0) {
-      setErrorMsg('Please enter a valid payment amount greater than ₹0.');
+    const amt = Math.max(0, Number(amountReceived || 0));
+    const discAmt = showDiscountBox ? Math.max(0, Number(discountInput || 0)) : 0;
+
+    if (amt <= 0 && discAmt <= 0) {
+      setErrorMsg('Please enter a valid payment amount or discount / gapchi amount.');
       return;
     }
-    if (amt > currentDue && currentDue > 0) {
-      setErrorMsg(`Amount cannot exceed remaining balance due (${formatCurrency(currentDue)}).`);
+    if (amt + discAmt > currentDue && currentDue > 0) {
+      setErrorMsg(
+        `Received (${formatCurrency(amt)}) + Discount/Gapchi (${formatCurrency(discAmt)}) cannot exceed remaining balance due (${formatCurrency(currentDue)}).`
+      );
       return;
     }
 
     setIsSubmitting(true);
     try {
       const method: PaymentMethod =
-        paymentMode === 'UPI' || paymentMode === 'Online' ? 'UPI' : 'Cash';
+        paymentMode === 'UPI' || paymentMode === 'Online'
+          ? 'UPI'
+          : paymentMode === 'Cash'
+          ? 'Cash'
+          : 'Other';
 
       await recordTourBookingPayment({
         bookingId: liveBooking.id,
@@ -151,17 +388,37 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
         paymentMethod: method,
         notes:
           notes.trim() ||
-          (currentDue - amt <= 0
-            ? 'Full & Final Payment Received'
+          (currentDue - (amt + discAmt) <= 0
+            ? discAmt > 0
+              ? `Full & Final Settled (${discountType}: ₹${discAmt.toLocaleString('en-IN')})`
+              : 'Full & Final Payment Received'
             : `Installment #${paymentHistoryList.length + 1} Received`),
         receivedBy: currentUserProfile?.name || user?.displayName || 'Office Staff',
         paymentDate: paymentDate ? new Date(paymentDate).toISOString() : new Date().toISOString(),
         userEmail: currentUserProfile?.email || user?.email || 'admin@sanzari.com',
+        discountAmount: discAmt > 0 ? discAmt : undefined,
+        discountType: discAmt > 0 ? discountType : undefined,
+        discountReason: discAmt > 0 ? discountReason.trim() : undefined,
       });
 
-      setJustPaidAmount(amt);
+      if (amt > 0) {
+        setJustPaidAmount(amt);
+        setActionBanner(
+          discAmt > 0
+            ? `${formatCurrency(amt)} added to ${walletName} + ${formatCurrency(discAmt)} ${discountType} applied (wallet me add nahi hua).`
+            : ''
+        );
+      } else {
+        setJustPaidAmount(null);
+        setActionBanner(
+          `${formatCurrency(discAmt)} ${discountType} applied! Baaki due updated without adding to any wallet.`
+        );
+      }
       setAmountReceived('');
       setNotes('');
+      setShowDiscountBox(false);
+      setDiscountInput('');
+      setDiscountReason('');
     } catch (err: any) {
       console.error('Failed to record tour payment:', err);
       setErrorMsg(err.message || 'Failed to record payment.');
@@ -195,7 +452,11 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
       (lastAmt
         ? `💵 *Latest Payment Received:* ₹${lastAmt.toLocaleString('en-IN')}\n`
         : '') +
-      `💰 *Total Package Amount:* ₹${totalAmount.toLocaleString('en-IN')}\n` +
+      (appliedDiscount > 0
+        ? `📦 *Original Package:* ₹${originalTotalAmount.toLocaleString('en-IN')}\n` +
+          `🏷️ *Discount / Adjustment:* -₹${appliedDiscount.toLocaleString('en-IN')}\n`
+        : '') +
+      `💰 *${appliedDiscount > 0 ? 'Net Package Amount' : 'Total Package Amount'}:* ₹${totalAmount.toLocaleString('en-IN')}\n` +
       `✅ *Total Paid So Far:* ₹${advancePaid.toLocaleString('en-IN')}\n` +
       `${statusLine}\n` +
       (paymentHistoryList.length > 0
@@ -264,6 +525,23 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
 
         {/* Body */}
         <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1 bg-zinc-50/50">
+          {/* Action Sync Banner (when an entry is edited/deleted or discount updated) */}
+          {actionBanner && justPaidAmount === null && (
+            <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-950 border-2 border-emerald-500 flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2 min-w-0">
+                <CheckCircle2 className="w-5 h-5 shrink-0 text-emerald-600" />
+                <span className="font-bold text-xs leading-snug">{actionBanner}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionBanner('')}
+                className="text-emerald-700 hover:text-emerald-950 p-1 cursor-pointer shrink-0"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          )}
+
           {/* Success Banner when payment just recorded */}
           {justPaidAmount !== null && (
             <div className="p-3.5 rounded-2xl bg-emerald-600 text-white border-2 border-emerald-800 shadow-md flex items-center justify-between gap-2 animate-fadeIn">
@@ -274,10 +552,16 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                     ₹{justPaidAmount.toLocaleString('en-IN')} Payment Recorded Successfully!
                   </div>
                   <div className="text-[11px] text-emerald-100 font-medium">
-                    Added to <strong>{walletName}</strong> •{' '}
-                    {currentDue === 0
-                      ? '🎉 Booking is now 100% FULL PAID!'
-                      : `Remaining Due: ${formatCurrency(currentDue)}`}
+                    {actionBanner ? (
+                      actionBanner
+                    ) : (
+                      <>
+                        Added to <strong>{walletName}</strong> •{' '}
+                        {currentDue === 0
+                          ? '🎉 Booking is now 100% FULL PAID!'
+                          : `Remaining Due: ${formatCurrency(currentDue)}`}
+                      </>
+                    )}
                   </div>
                 </div>
               </div>
@@ -324,11 +608,16 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
             <div className="grid grid-cols-3 gap-2 pt-1">
               <div className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 text-center">
                 <span className="text-[10px] font-bold uppercase text-zinc-500 block">
-                  Total Package
+                  {appliedDiscount > 0 ? 'Net Package' : 'Total Package'}
                 </span>
                 <span className="text-sm sm:text-base font-black font-mono text-zinc-950">
                   {formatCurrency(totalAmount)}
                 </span>
+                {appliedDiscount > 0 && (
+                  <span className="text-[9px] font-bold text-zinc-500 block mt-0.5 line-through">
+                    {formatCurrency(originalTotalAmount)}
+                  </span>
+                )}
               </div>
 
               <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-300 text-center">
@@ -374,6 +663,122 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 </span>
               </div>
             </div>
+
+            {/* Applied Discount / Gapchi Strip (with Edit / Remove) */}
+            {appliedDiscount > 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-300 space-y-2">
+                {!isEditingDiscount ? (
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Tag className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                      <div className="min-w-0">
+                        <span className="text-[11px] font-black text-amber-950">
+                          {liveBooking.discountType || 'Discount'}: -{formatCurrency(appliedDiscount)}
+                        </span>
+                        <span className="text-[10px] font-semibold text-amber-800 ml-1.5">
+                          (Original {formatCurrency(originalTotalAmount)} → Net {formatCurrency(totalAmount)})
+                        </span>
+                        {liveBooking.discountReason && (
+                          <div className="text-[10px] text-amber-800 font-medium truncate">
+                            Note: {liveBooking.discountReason}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleOpenEditDiscount}
+                      className="px-2 py-1 rounded-lg bg-white hover:bg-amber-100 text-amber-950 border border-amber-400 font-bold text-[10px] flex items-center gap-1 cursor-pointer shrink-0"
+                    >
+                      <Pencil className="w-3 h-3" />
+                      <span>Edit</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[11px] font-black text-amber-950 flex items-center gap-1">
+                        <Tag className="w-3.5 h-3.5" /> Edit Discount / Gapchi
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingDiscount(false)}
+                        className="text-amber-800 hover:text-black cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    {discountEditError && (
+                      <div className="text-[11px] text-rose-700 font-bold bg-rose-50 border border-rose-200 px-2 py-1 rounded-lg">
+                        {discountEditError}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['Discount', 'Gapchi / Waived'] as const).map((dt) => (
+                        <button
+                          key={dt}
+                          type="button"
+                          onClick={() => setEditDiscountType(dt)}
+                          className={`py-1.5 px-2 rounded-lg text-[11px] font-black border cursor-pointer ${
+                            editDiscountType === dt
+                              ? 'bg-amber-600 text-white border-amber-700'
+                              : 'bg-white text-zinc-800 border-amber-300'
+                          }`}
+                        >
+                          {dt === 'Discount' ? '🏷️ Discount Given' : '⚠️ Gapchi / Waived'}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min={0}
+                        max={Math.max(0, originalTotalAmount - advancePaid)}
+                        value={editDiscountAmount}
+                        onChange={(e) => setEditDiscountAmount(e.target.value)}
+                        placeholder="Discount Amount (₹)"
+                        className="w-full bg-white border border-amber-400 rounded-lg px-2.5 py-1.5 text-zinc-950 font-mono font-black text-xs focus:outline-none"
+                      />
+                      <input
+                        type="text"
+                        value={editDiscountReason}
+                        onChange={(e) => setEditDiscountReason(e.target.value)}
+                        placeholder="Reason (optional)"
+                        className="w-full bg-white border border-amber-400 rounded-lg px-2.5 py-1.5 text-zinc-950 font-semibold text-xs focus:outline-none"
+                      />
+                    </div>
+                    <div className="flex items-center justify-between gap-2 pt-1">
+                      <button
+                        type="button"
+                        disabled={isSavingDiscount}
+                        onClick={() => handleSaveDiscountEdit(0)}
+                        className="px-2.5 py-1 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 font-bold text-[10px] cursor-pointer"
+                      >
+                        Remove (₹0)
+                      </button>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setIsEditingDiscount(false)}
+                          className="px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-700 font-bold text-[10px] cursor-pointer"
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          type="button"
+                          disabled={isSavingDiscount}
+                          onClick={() => handleSaveDiscountEdit()}
+                          className="px-3 py-1 rounded-lg bg-zinc-950 hover:bg-black text-white font-black text-[10px] flex items-center gap-1 cursor-pointer"
+                        >
+                          <Check className="w-3 h-3" />
+                          <span>{isSavingDiscount ? 'Saving...' : 'Update'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* 2. Receive New Installment Form (Only if currentDue > 0) */}
@@ -541,12 +946,11 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <div>
                     <label className="block text-[10px] font-bold text-zinc-600 mb-1">
-                      Enter Received Amount (₹) *
+                      Enter Received Amount (₹) {showDiscountBox && numDiscount > 0 ? '(0 if Full Waive)' : '*'}
                     </label>
                     <input
                       type="number"
-                      required
-                      min={1}
+                      min={0}
                       max={currentDue}
                       placeholder={`Max ₹${currentDue}`}
                       value={amountReceived}
@@ -569,6 +973,166 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 </div>
               </div>
 
+              {/* STEP 4: DISCOUNT / GAPCHI / LAST AMOUNT WAIVE-OFF */}
+              <div className="pt-1 border-t border-zinc-200">
+                {!showDiscountBox ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowDiscountBox(true);
+                      if (numEntering > 0 && leftoverAfterCash > 0) {
+                        setDiscountInput(String(leftoverAfterCash));
+                      }
+                    }}
+                    className={`w-full px-3 py-2 rounded-xl border-2 border-dashed text-left transition-all cursor-pointer flex items-center justify-between gap-2 ${
+                      numEntering > 0 && leftoverAfterCash > 0
+                        ? 'bg-amber-50 border-amber-400 text-amber-950 hover:bg-amber-100'
+                        : 'bg-zinc-50 border-zinc-300 text-zinc-700 hover:border-zinc-900 hover:text-zinc-950'
+                    }`}
+                  >
+                    <span className="flex items-center gap-1.5 font-bold text-[11px]">
+                      <Tag className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                      <span>
+                        {numEntering > 0 && leftoverAfterCash > 0
+                          ? `Baaki ${formatCurrency(leftoverAfterCash)} Discount / Gapchi me close karein?`
+                          : '+ Discount / Gapchi Option (Last ₹1,000 / ₹1,500 kam diya ya maaf kiya)'}
+                      </span>
+                    </span>
+                    <span className="text-[10px] font-black uppercase px-2 py-0.5 rounded bg-white border border-amber-300 text-amber-900 shrink-0">
+                      + Add
+                    </span>
+                  </button>
+                ) : (
+                  <div className="p-3 rounded-xl bg-amber-50 border-2 border-amber-400 space-y-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                        <Tag className="w-3.5 h-3.5 text-amber-700" />
+                        <span>4. Discount / Gapchi (Kam Diya / Waive Off)</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowDiscountBox(false);
+                          setDiscountInput('');
+                          setDiscountReason('');
+                        }}
+                        className="text-[10px] font-bold text-amber-900 hover:text-black flex items-center gap-0.5 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" /> Close
+                      </button>
+                    </div>
+
+                    {/* Type Toggle: Discount vs Gapchi */}
+                    <div className="grid grid-cols-2 gap-2">
+                      {(['Discount', 'Gapchi / Waived'] as const).map((dt) => (
+                        <button
+                          key={dt}
+                          type="button"
+                          onClick={() => setDiscountType(dt)}
+                          className={`py-1.5 px-2.5 rounded-lg border-2 text-[11px] font-black transition-all cursor-pointer ${
+                            discountType === dt
+                              ? 'bg-amber-600 text-white border-amber-800 shadow-2xs'
+                              : 'bg-white text-zinc-800 border-amber-300 hover:border-amber-600'
+                          }`}
+                        >
+                          {dt === 'Discount' ? '🏷️ Discount Diya' : '⚠️ Gapchi / Waived Off'}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Quick Discount / Gapchi Chips */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {numEntering > 0 && leftoverAfterCash > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setDiscountInput(String(leftoverAfterCash))}
+                          className={`px-2 py-1 rounded-lg font-black text-[10px] border cursor-pointer ${
+                            numDiscount === leftoverAfterCash
+                              ? 'bg-zinc-950 text-white border-zinc-950'
+                              : 'bg-white text-amber-950 border-amber-400 hover:bg-amber-100'
+                          }`}
+                        >
+                          Close Baaki ({formatCurrency(leftoverAfterCash)})
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAmountReceived('0');
+                          setDiscountInput(String(currentDue));
+                        }}
+                        className={`px-2 py-1 rounded-lg font-bold text-[10px] border cursor-pointer ${
+                          numEntering === 0 && numDiscount === currentDue
+                            ? 'bg-zinc-950 text-white border-zinc-950'
+                            : 'bg-white text-amber-900 border-amber-300 hover:bg-amber-100'
+                        }`}
+                      >
+                        Full Baaki Maaf ({formatCurrency(currentDue)})
+                      </button>
+                      {[500, 1000, 1500, 2000]
+                        .filter((v) => v <= currentDue)
+                        .map((v) => (
+                          <button
+                            key={v}
+                            type="button"
+                            onClick={() => {
+                              setDiscountInput(String(v));
+                              if (numEntering + v > currentDue) {
+                                setAmountReceived(String(Math.max(0, currentDue - v)));
+                              }
+                            }}
+                            className={`px-2 py-1 rounded-lg font-bold text-[10px] border cursor-pointer ${
+                              numDiscount === v
+                                ? 'bg-amber-700 text-white border-amber-800'
+                                : 'bg-white text-zinc-800 border-amber-300 hover:bg-amber-100'
+                            }`}
+                          >
+                            ₹{v.toLocaleString('en-IN')}
+                          </button>
+                        ))}
+                    </div>
+
+                    {/* Discount Amount + Reason Inputs */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-950 mb-1">
+                          Discount / Gapchi Amount (₹)
+                        </label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={currentDue}
+                          placeholder="e.g. 1000 or 1500"
+                          value={discountInput}
+                          onChange={(e) => setDiscountInput(e.target.value)}
+                          className="w-full bg-white border-2 border-amber-500 rounded-xl px-3 py-1.5 text-amber-950 font-mono font-black text-sm focus:outline-none"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-bold text-amber-950 mb-1">
+                          Reason / Note (Optional)
+                        </label>
+                        <input
+                          type="text"
+                          placeholder={
+                            discountType === 'Gapchi / Waived'
+                              ? 'e.g. Customer last ₹1,500 nahi diya'
+                              : 'e.g. Final settlement discount'
+                          }
+                          value={discountReason}
+                          onChange={(e) => setDiscountReason(e.target.value)}
+                          className="w-full bg-white border border-amber-400 rounded-xl px-3 py-1.5 text-zinc-950 font-semibold text-xs focus:outline-none"
+                        />
+                      </div>
+                    </div>
+
+                    <p className="text-[10px] font-semibold text-amber-900">
+                      Note: Discount / Gapchi amount kisi wallet (Sahil / Rizwan) me add nahi hoga — sirf Baaki Due &amp; Package total se minus hoga.
+                    </p>
+                  </div>
+                )}
+              </div>
+
               {/* Payment Note */}
               <div>
                 <label className="block text-[10px] font-bold text-zinc-600 mb-1">
@@ -583,16 +1147,23 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 />
               </div>
 
-              {/* Live Preview Box showing Account + Mode + Amount */}
-              {numEntering > 0 && (
+              {/* Live Preview Box showing Account + Mode + Amount + Discount */}
+              {(numEntering > 0 || numDiscount > 0) && (
                 <div className="p-3 rounded-xl bg-zinc-950 text-white flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <span className="text-[10px] text-zinc-400 font-bold uppercase block">
-                      Receiving in <strong className="text-white">{walletName}</strong> via{' '}
-                      <strong className="text-emerald-400">{paymentMode}</strong>:
-                    </span>
-                    <span className="text-xs font-black text-emerald-400">
-                      Total Jama: {formatCurrency(previewNewAdvance)} / {formatCurrency(totalAmount)}
+                  <div className="space-y-0.5">
+                    {numEntering > 0 && (
+                      <span className="text-[10px] text-zinc-300 font-bold block">
+                        Wallet Credit → <strong className="text-white">{walletName}</strong> ({paymentMode}):{' '}
+                        <strong className="text-emerald-400">+{formatCurrency(numEntering)}</strong>
+                      </span>
+                    )}
+                    {numDiscount > 0 && (
+                      <span className="text-[10px] text-amber-300 font-bold block">
+                        {discountType}: -{formatCurrency(numDiscount)} (Net Package: {formatCurrency(previewNewTotal)})
+                      </span>
+                    )}
+                    <span className="text-xs font-black text-emerald-400 block">
+                      Total Jama: {formatCurrency(previewNewAdvance)} / {formatCurrency(previewNewTotal)}
                     </span>
                   </div>
                   <div className="text-right">
@@ -620,7 +1191,11 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
                 <span>
                   {isSubmitting
-                    ? 'Saving Payment...'
+                    ? 'Saving...'
+                    : numEntering > 0 && numDiscount > 0
+                    ? `Save ${formatCurrency(numEntering)} in ${walletName.replace(' (Tour)', '')} + ${formatCurrency(numDiscount)} ${discountType === 'Discount' ? 'Discount' : 'Gapchi'}`
+                    : numEntering === 0 && numDiscount > 0
+                    ? `Apply ${formatCurrency(numDiscount)} ${discountType} & Settle`
                     : numEntering > 0
                     ? `Save ${formatCurrency(numEntering)} in ${walletName.replace(' (Tour)', '')} (${paymentMode})`
                     : 'Confirm Payment Received'}
@@ -634,12 +1209,15 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
                 100% Full Payment Received! (Pura Payment Aagaya He)
               </h3>
               <p className="text-xs text-emerald-800 font-medium">
-                All {formatCurrency(totalAmount)} has been collected for this booking. Zero pending due.
+                All {formatCurrency(totalAmount)} has been collected for this booking.
+                {appliedDiscount > 0
+                  ? ` (${formatCurrency(appliedDiscount)} ${liveBooking.discountType || 'Discount'} applied).`
+                  : ' Zero pending due.'}
               </p>
             </div>
           )}
 
-          {/* 3. Payment Installments / Timeline History */}
+          {/* 3. Payment Installments / Timeline History (with Inline Edit & Multi-Account Sync) */}
           <div className="p-4 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
             <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
               <span className="text-xs font-black uppercase tracking-wider text-zinc-950 flex items-center gap-1.5">
@@ -657,41 +1235,255 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
               </p>
             ) : (
               <div className="space-y-2">
-                {paymentHistoryList.map((item, idx) => (
-                  <div
-                    key={item.id || idx}
-                    className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">
-                        {idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-black text-xs text-zinc-950">
-                            {idx === 0 ? '1st Advance' : `Installment #${idx + 1}`}
+                {paymentHistoryList.map((item, idx) => {
+                  const isEditingThis = editingEntryIdx === idx;
+                  const oldAmt = Number(item.amount || 0);
+                  const editNumAmt = Number(editAmount || 0);
+                  const oldWShort = (item.walletName || liveBooking.walletName || 'Rizwan (Tour)').replace(' (Tour)', '');
+                  const newWShort = (editWalletName || '').replace(' (Tour)', '');
+                  const isWalletSwitched =
+                    isEditingThis && oldWShort.toLowerCase() !== newWShort.toLowerCase();
+                  const isAmountChanged = isEditingThis && editNumAmt > 0 && editNumAmt !== oldAmt;
+
+                  if (isEditingThis) {
+                    return (
+                      <div
+                        key={item.id || idx}
+                        className="p-3 rounded-xl bg-zinc-50 border-2 border-zinc-950 space-y-3 shadow-xs"
+                      >
+                        <div className="flex items-center justify-between border-b border-zinc-200 pb-2">
+                          <span className="text-xs font-black text-zinc-950 flex items-center gap-1.5">
+                            <Pencil className="w-3.5 h-3.5 text-zinc-900" />
+                            <span>
+                              Edit {idx === 0 ? '1st Advance' : `Installment #${idx + 1}`}
+                            </span>
                           </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white border border-zinc-300 text-zinc-700">
-                            💳 {item.walletName}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800">
-                            {item.paymentMode}
-                          </span>
+                          <button
+                            type="button"
+                            onClick={handleCancelEditEntry}
+                            className="p-1 rounded-lg hover:bg-zinc-200 text-zinc-600 hover:text-black cursor-pointer"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
-                        <div className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">
-                          📅 {formatInstallmentDate(item.date)}
-                          {item.notes ? ` • ${item.notes}` : ''}
+
+                        {editError && (
+                          <div className="p-2 rounded-lg bg-rose-50 border border-rose-300 text-rose-700 font-bold text-[11px]">
+                            {editError}
+                          </div>
+                        )}
+
+                        {/* Edit Account / Wallet */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-700">
+                            Account / Wallet (Sahil / Rizwan)
+                          </label>
+                          <div className="grid grid-cols-3 gap-1.5">
+                            {walletOptions.map((w) => {
+                              const selected = editWalletName === w.name;
+                              return (
+                                <button
+                                  key={w.id}
+                                  type="button"
+                                  onClick={() => setEditWalletName(w.name)}
+                                  className={`py-1.5 px-2 rounded-lg border-2 text-[11px] font-black transition-all cursor-pointer truncate ${
+                                    selected
+                                      ? 'bg-zinc-950 text-white border-zinc-950'
+                                      : 'bg-white text-zinc-800 border-zinc-300 hover:border-zinc-900'
+                                  }`}
+                                >
+                                  {selected ? '✓ ' : ''}
+                                  {w.name.replace(' (Tour)', '')}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Edit Payment Mode */}
+                        <div className="space-y-1">
+                          <label className="block text-[10px] font-black uppercase tracking-wider text-zinc-700">
+                            Payment Mode
+                          </label>
+                          <div className="grid grid-cols-4 gap-1.5">
+                            {(['UPI', 'Cash', 'Online', 'Offline'] as TourPaymentMode[]).map((m) => (
+                              <button
+                                key={m}
+                                type="button"
+                                onClick={() => setEditPaymentMode(m)}
+                                className={`py-1.5 px-2 rounded-lg border text-[11px] font-bold transition-all cursor-pointer ${
+                                  editPaymentMode === m
+                                    ? 'bg-emerald-600 text-white border-emerald-700'
+                                    : 'bg-white text-zinc-800 border-zinc-300 hover:border-zinc-900'
+                                }`}
+                              >
+                                {m}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Edit Amount & Date */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-600 mb-1">
+                              Amount (₹) *
+                            </label>
+                            <input
+                              type="number"
+                              min={1}
+                              value={editAmount}
+                              onChange={(e) => setEditAmount(e.target.value)}
+                              className="w-full bg-white border-2 border-zinc-900 rounded-lg px-2.5 py-1.5 text-zinc-950 font-mono font-black text-sm focus:outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-zinc-600 mb-1">
+                              Payment Date
+                            </label>
+                            <input
+                              type="date"
+                              value={editDate}
+                              onChange={(e) => setEditDate(e.target.value)}
+                              className="w-full bg-white border-2 border-zinc-900 rounded-lg px-2.5 py-1.5 text-zinc-950 font-bold text-xs focus:outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Edit Notes */}
+                        <div>
+                          <label className="block text-[10px] font-bold text-zinc-600 mb-1">
+                            Note / Reference
+                          </label>
+                          <input
+                            type="text"
+                            value={editNotes}
+                            onChange={(e) => setEditNotes(e.target.value)}
+                            placeholder="Payment note..."
+                            className="w-full bg-white border border-zinc-300 rounded-lg px-2.5 py-1.5 text-zinc-950 font-semibold text-xs focus:border-zinc-900 focus:outline-none"
+                          />
+                        </div>
+
+                        {/* Dual-Account Reconciliation Preview */}
+                        {(isWalletSwitched || isAmountChanged) && editNumAmt > 0 && (
+                          <div className="p-2 rounded-lg bg-zinc-900 text-white text-[10px] font-bold flex items-center gap-1.5 flex-wrap">
+                            <ArrowRightLeft className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                            {isWalletSwitched ? (
+                              <span>
+                                Account Sync: <span className="text-rose-300">{oldWShort} (-{formatCurrency(oldAmt)})</span>{' '}
+                                → <span className="text-emerald-400">{newWShort} (+{formatCurrency(editNumAmt)})</span>
+                              </span>
+                            ) : (
+                              <span>
+                                {newWShort} Account Sync:{' '}
+                                <span className={editNumAmt > oldAmt ? 'text-emerald-400' : 'text-amber-300'}>
+                                  {editNumAmt > oldAmt ? '+' : '-'}
+                                  {formatCurrency(Math.abs(editNumAmt - oldAmt))}
+                                </span>
+                              </span>
+                            )}
+                          </div>
+                        )}
+
+                        {/* Edit Footer Actions */}
+                        <div className="flex items-center justify-between gap-2 pt-1">
+                          {confirmDeleteIdx === idx ? (
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                disabled={isSavingEdit}
+                                onClick={() => handleDeleteEntry(item, idx)}
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] cursor-pointer"
+                              >
+                                {isSavingEdit ? 'Deleting...' : 'Confirm Delete'}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteIdx(null)}
+                                className="px-2 py-1.5 rounded-lg bg-white border border-zinc-300 text-zinc-700 font-bold text-[10px] cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteIdx(idx)}
+                              className="px-2.5 py-1.5 rounded-lg bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                              <span>Delete</span>
+                            </button>
+                          )}
+
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={handleCancelEditEntry}
+                              className="px-3 py-1.5 rounded-lg bg-white border border-zinc-300 text-zinc-700 font-bold text-[11px] hover:bg-zinc-100 cursor-pointer"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={isSavingEdit}
+                              onClick={() => handleSaveEditEntry(item, idx)}
+                              className="px-3.5 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-black text-[11px] flex items-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>{isSavingEdit ? 'Syncing...' : 'Save & Sync'}</span>
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    );
+                  }
 
-                    <div className="text-right shrink-0">
-                      <span className="font-mono font-black text-xs sm:text-sm text-emerald-700">
-                        +{formatCurrency(item.amount)}
-                      </span>
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="w-6 h-6 rounded-lg bg-emerald-600 text-white font-black text-[10px] flex items-center justify-center shrink-0">
+                          {idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-black text-xs text-zinc-950">
+                              {idx === 0 ? '1st Advance' : `Installment #${idx + 1}`}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white border border-zinc-300 text-zinc-700">
+                              💳 {item.walletName}
+                            </span>
+                            <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-50 border border-emerald-200 text-emerald-800">
+                              {item.paymentMode}
+                            </span>
+                          </div>
+                          <div className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">
+                            📅 {formatInstallmentDate(item.date)}
+                            {item.notes ? ` • ${item.notes}` : ''}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="font-mono font-black text-xs sm:text-sm text-emerald-700">
+                          +{formatCurrency(item.amount)}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleStartEditEntry(item, idx)}
+                          className="px-2 py-1 rounded-lg bg-white hover:bg-zinc-950 text-zinc-700 hover:text-white border border-zinc-300 hover:border-zinc-950 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                          title="Edit Account, Mode or Amount"
+                        >
+                          <Pencil className="w-3 h-3" />
+                          <span>Edit</span>
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>

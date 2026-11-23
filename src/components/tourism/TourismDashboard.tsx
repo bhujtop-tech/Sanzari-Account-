@@ -8,13 +8,13 @@ import {
   Share2,
   MapPin,
   AlertCircle,
-  Wallet,
   CheckCircle2,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
-import { TourBatch, TourBooking } from '../../types';
+import { TourBooking } from '../../types';
 import { TourismDashboardSkeleton } from '../common/Skeleton';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
+import { UpcomingRunningToursCard } from './UpcomingRunningToursCard';
 
 interface TourismDashboardProps {
   onNavigateTab: (tab: any) => void;
@@ -28,10 +28,8 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
   const {
     loading,
     tourWallets,
-    setSelectedWalletId,
     tourBatches,
     tourBookings,
-    totalBalance,
     thisMonthTourRevenue,
     thisMonthTourAdvance,
     thisMonthTourPending,
@@ -205,51 +203,13 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
       </div>
 
-      {/* Tour Dedicated Wallets Strip */}
-      <div className="bg-zinc-100/80 rounded-2xl border border-zinc-200/90 p-4 space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Wallet className="w-4 h-4 text-zinc-700" />
-            <h3 className="text-xs font-bold text-zinc-800 uppercase tracking-wider">
-              Tour Accounts &amp; Wallets
-            </h3>
-          </div>
-          <span className="text-[10px] font-bold text-zinc-600 bg-zinc-200/80 px-2 py-0.5 rounded-full">
-            Separate Tour Accounts
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-          {tourWallets.map((w) => (
-              <div
-                key={w.id}
-                onClick={() => {
-                  setSelectedWalletId(w.id);
-                  onNavigateTab('accounts');
-                }}
-                className="p-3 bg-white rounded-xl border border-zinc-200 hover:border-zinc-400 shadow-2xs flex items-center justify-between cursor-pointer transition-all"
-              >
-                <div className="flex items-center gap-2.5">
-                  <div
-                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white font-bold text-xs shadow-2xs"
-                    style={{ backgroundColor: w.color || '#3b82f6' }}
-                  >
-                    {w.name.startsWith('Bus') ? '🚌' : w.name.slice(0, 1)}
-                  </div>
-                  <div>
-                    <span className="text-xs font-bold text-zinc-900 block">{w.name}</span>
-                    <span className="text-[10px] text-zinc-500 font-medium">Tour Wallet</span>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <span className="text-sm font-black text-zinc-950 font-mono">
-                    {formatCurrency(w.currentBalance)}
-                  </span>
-                </div>
-              </div>
-            ))}
-        </div>
-      </div>
+      {/* Unified Upcoming & Running Tours + 2-Day Departure Reminder & Checklist */}
+      <UpcomingRunningToursCard
+        onSelectBatch={onSelectBatch}
+        onOpenPaymentModal={setPaymentModalBooking}
+        onShareBooking={handleShareBooking}
+        onNavigateBookings={() => onNavigateTab('sales')}
+      />
 
       {/* Tour Date Folders (Upcoming Batches) */}
       <div className="bg-white rounded-3xl p-5 sm:p-6 border border-zinc-200 shadow-sm space-y-4">
