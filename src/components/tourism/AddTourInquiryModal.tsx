@@ -216,25 +216,30 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[92vh] flex flex-col">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-white shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
+
         {/* Header - White Background, Black Border */}
-        <div className="bg-white p-5 text-zinc-950 flex items-center justify-between shrink-0 border-b-2 border-zinc-900">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-bold">
+        <div className="bg-white px-4 py-3 sm:p-5 text-zinc-950 flex items-center justify-between gap-2 shrink-0 border-b-2 border-zinc-900">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-bold shrink-0">
               📋
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight text-zinc-950">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black tracking-tight text-zinc-950 truncate">
                 {isEditing ? 'Edit Tour Inquiry' : 'New Tour Inquiry'}
               </h2>
-              <p className="text-xs text-zinc-600 font-medium">
+              <p className="text-[11px] sm:text-xs text-zinc-600 font-medium truncate">
                 Record customer leads from Instagram, WhatsApp &amp; phone calls
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {isEditing && (
               <button
                 type="button"
@@ -261,7 +266,7 @@ export const AddTourInquiryModal: React.FC<AddTourInquiryModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto overscroll-contain space-y-4 flex-1 safe-bottom sm:pb-6">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-xl font-bold">
               {error}

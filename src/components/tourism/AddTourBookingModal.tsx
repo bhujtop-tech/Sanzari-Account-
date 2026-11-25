@@ -683,10 +683,15 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-2xl bg-white text-zinc-950 rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[98vh] sm:max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-2xl bg-white text-zinc-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[95dvh] sm:max-h-[94vh] flex flex-col">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-white shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
+
         {/* Compact Header */}
-        <div className="bg-white px-3.5 py-3 sm:px-5 sm:py-3.5 border-b-2 border-zinc-900 flex items-center justify-between shrink-0">
+        <div className="bg-white px-3.5 py-2.5 sm:px-5 sm:py-3.5 border-b-2 border-zinc-900 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2 sm:gap-2.5 min-w-0">
             <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-black text-xs sm:text-sm shadow-xs shrink-0">
               {editingTourBooking ? <Edit2 className="w-4 h-4" /> : <Plus className="w-5 h-5 stroke-[3]" />}
@@ -711,7 +716,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="p-2.5 sm:p-5 overflow-y-auto space-y-3 text-xs flex-1 bg-zinc-50/50">
+          <div className="p-3 sm:p-5 overflow-y-auto overscroll-contain space-y-3 text-xs flex-1 bg-zinc-50/50">
             {errorMsg && (
               <div className="p-2.5 bg-rose-50 border-2 border-rose-400 text-rose-900 rounded-xl text-xs font-bold">
                 ⚠️ {errorMsg}
@@ -1423,13 +1428,13 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
           </div>
 
           {/* Sticky Footer */}
-          <div className="px-5 py-3 bg-white border-t-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0">
+          <div className="px-3.5 py-2.5 sm:px-5 sm:py-3 bg-white border-t-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0 safe-bottom sm:pb-3">
             {editingTourBooking ? (
               <button
                 type="button"
                 onClick={handleDeleteCurrentBooking}
                 disabled={isSubmitting}
-                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-black flex items-center gap-1.5 cursor-pointer"
+                className="px-3 sm:px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Trash2 size={14} />
                 <span>Delete</span>
@@ -1438,21 +1443,28 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               <div />
             )}
 
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2">
               <button
                 type="button"
                 onClick={handleModalClose}
-                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-black border border-zinc-300 cursor-pointer"
+                className="px-3 sm:px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-black border border-zinc-300 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-4 sm:px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 size={15} />
-                <span>
+                <span className="sm:hidden">
+                  {isSubmitting
+                    ? 'Saving...'
+                    : editingTourBooking
+                    ? 'Update'
+                    : 'Save Booking'}
+                </span>
+                <span className="hidden sm:inline">
                   {isSubmitting
                     ? 'Saving...'
                     : editingTourBooking

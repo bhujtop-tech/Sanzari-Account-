@@ -16,6 +16,9 @@ import {
   X,
   Pencil,
   FolderOpen,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -107,6 +110,10 @@ export const TourMissedCallsView: React.FC = () => {
   // Delete confirmation modal state
   const [callToDelete, setCallToDelete] = useState<MissedCall | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Mobile-only card menu & expand states
+  const [openMenuCallId, setOpenMenuCallId] = useState<string | null>(null);
+  const [expandedCallIds, setExpandedCallIds] = useState<Record<string, boolean>>({});
 
   const userEmail = currentUserProfile?.email || 'sanzaritourism@gmail.com';
 
@@ -385,9 +392,12 @@ export const TourMissedCallsView: React.FC = () => {
     <div className="space-y-4 pb-48 sm:pb-24">
       {/* Save / Edit Customer Name Modal */}
       {callToEditName && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs">
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden">
-            <div className="bg-zinc-950 px-5 py-4 text-white flex items-center justify-between border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden max-h-[92dvh] sm:max-h-[92vh] flex flex-col">
+            <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-zinc-700" />
+            </div>
+            <div className="bg-zinc-950 px-5 py-3.5 sm:py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-emerald-500 text-zinc-950 flex items-center justify-center shadow-sm font-black">
                   <Pencil className="w-4 h-4 stroke-[2.5]" />
@@ -412,7 +422,7 @@ export const TourMissedCallsView: React.FC = () => {
               </button>
             </div>
 
-            <form onSubmit={handleSaveCallerName} className="p-5 space-y-4 text-zinc-800">
+            <form onSubmit={handleSaveCallerName} className="p-4 sm:p-5 space-y-4 text-zinc-800 overflow-y-auto overscroll-contain safe-bottom sm:pb-5">
               <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex items-center justify-between">
                 <div>
                   <div className="text-[10px] font-black uppercase text-zinc-400">
@@ -454,7 +464,7 @@ export const TourMissedCallsView: React.FC = () => {
                 </p>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-end gap-2 pt-1 safe-bottom sm:pb-0">
                 <button
                   type="button"
                   disabled={isSavingCallerName}
@@ -479,9 +489,12 @@ export const TourMissedCallsView: React.FC = () => {
 
       {/* Delete Confirmation Modal */}
       {callToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/65 backdrop-blur-xs">
-          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden">
-            <div className="bg-zinc-950 px-5 py-4 text-white flex items-center justify-between border-b border-zinc-800">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+          <div className="relative w-full max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden max-h-[90dvh] sm:max-h-[90vh] flex flex-col">
+            <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-zinc-700" />
+            </div>
+            <div className="bg-zinc-950 px-5 py-3.5 sm:py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-sm">
                   <Trash2 className="w-4 h-4" />
@@ -500,7 +513,7 @@ export const TourMissedCallsView: React.FC = () => {
               </button>
             </div>
 
-            <div className="p-5 space-y-4 text-zinc-800">
+            <div className="p-4 sm:p-5 space-y-4 text-zinc-800 overflow-y-auto overscroll-contain safe-bottom sm:pb-5">
               <p className="text-xs font-medium text-zinc-600 leading-relaxed">
                 Kya aap sach me is missed call record ko delete karna chahte hain?
               </p>
@@ -528,7 +541,7 @@ export const TourMissedCallsView: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-end gap-2 pt-1 safe-bottom sm:pb-0">
                 <button
                   type="button"
                   disabled={isDeleting}
@@ -666,7 +679,7 @@ export const TourMissedCallsView: React.FC = () => {
             )}
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
             <button
               type="button"
               onClick={() => setSelectedDateFilter('ALL')}
@@ -716,7 +729,7 @@ export const TourMissedCallsView: React.FC = () => {
         </div>
 
         {/* 3. Status Filter Tabs */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
           {[
             { id: 'ALL', label: `All (${kpiStats.total})` },
             { id: 'PENDING', label: `🟡 PENDING (${kpiStats.pending})` },
@@ -989,8 +1002,246 @@ export const TourMissedCallsView: React.FC = () => {
             </table>
           </div>
 
-          {/* Mobile & Tablet Card List View */}
-          <div className="lg:hidden divide-y divide-zinc-200">
+          {/* MOBILE ONLY (< sm): Compact Tour-Folder Style Missed Call Cards + ⋮ Overflow Menu */}
+          <div className="sm:hidden divide-y divide-zinc-200">
+            {filteredCalls.map((call) => {
+              const docId = call.id || call.uniqueCallId;
+              const draftNote =
+                noteDrafts[docId] !== undefined ? noteDrafts[docId] : call.notes || '';
+              const isSavingNote = Boolean(savingNoteIds[docId]);
+              const isSavedNote = Boolean(savedNoteIds[docId]);
+              const isUpdatingStatus = Boolean(updatingStatusIds[docId]);
+              const isContactSaved = hasSavedCallerName(call.callerName);
+              const callCount = Math.max(1, Number(call.callCount || 1));
+              const displayDate = formatMissedCallDateDDMMYY(call.callDate, call.callTimestamp);
+              const displayTime = formatMissedCallTime12Hr(call.callTime, call.callTimestamp);
+              const isExpanded = Boolean(expandedCallIds[docId]);
+              const isMenuOpen = openMenuCallId === docId;
+
+              return (
+                <div
+                  key={`mob-mc-${docId}`}
+                  className={`relative p-3 space-y-2 transition-colors ${
+                    isMenuOpen ? 'z-30' : 'z-0'
+                  } ${isContactSaved ? 'bg-emerald-50/35' : 'bg-white'}`}
+                >
+                  {/* Row 1: Caller Name/Phone + Metadata + Matched 32x32 Expand & ⋮ Buttons */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div
+                      className="min-w-0 flex-1"
+                      onClick={() =>
+                        setExpandedCallIds((prev) => ({ ...prev, [docId]: !prev[docId] }))
+                      }
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <h4
+                          className={`text-[15px] font-black leading-tight truncate ${
+                            isContactSaved ? 'text-emerald-800' : 'text-zinc-950 font-mono'
+                          }`}
+                        >
+                          {isContactSaved ? call.callerName : call.phoneNumber || 'Unknown'}
+                        </h4>
+                        {callCount > 1 && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-orange-600 text-white text-[10px] font-black shrink-0 whitespace-nowrap">
+                            ×{callCount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center flex-wrap gap-x-1.5 text-[11px] text-zinc-500 mt-0.5">
+                        {isContactSaved && (
+                          <>
+                            <span className="font-mono font-semibold text-zinc-700">
+                              {call.phoneNumber}
+                            </span>
+                            <span className="text-zinc-300">·</span>
+                          </>
+                        )}
+                        <span className="font-mono">{displayDate || '—'}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-mono">{displayTime || '—'}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="truncate">{call.employeeName || 'Rizwan'}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setExpandedCallIds((prev) => ({ ...prev, [docId]: !prev[docId] }))
+                        }
+                        aria-label={isExpanded ? 'Collapse notes' : 'Expand notes'}
+                        className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                      >
+                        {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      </button>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setOpenMenuCallId((prev) => (prev === docId ? null : docId))
+                          }
+                          aria-label="Call actions"
+                          className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                        >
+                          <MoreVertical size={15} />
+                        </button>
+
+                        {isMenuOpen && (
+                          <>
+                            <div
+                              className="fixed inset-0 z-30"
+                              onClick={() => setOpenMenuCallId(null)}
+                            />
+                            <div className="absolute right-0 top-9 z-40 w-48 bg-white rounded-2xl border-2 border-zinc-900 shadow-xl py-1.5 overflow-hidden">
+                              <a
+                                href={buildMissedCallWhatsAppUrl(call.phoneNumber)}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => setOpenMenuCallId(null)}
+                                className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2.5"
+                              >
+                                <MessageCircle size={14} className="shrink-0" />
+                                <span>Send WhatsApp</span>
+                              </a>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuCallId(null);
+                                  handleOpenEditNameModal(call);
+                                }}
+                                className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-900 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                              >
+                                <Pencil size={14} className="shrink-0" />
+                                <span>{isContactSaved ? 'Edit Contact Name' : 'Save Contact Name'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuCallId(null);
+                                  handleConvertToInquiry(call);
+                                }}
+                                className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-amber-900 hover:bg-amber-50 flex items-center gap-2.5 cursor-pointer"
+                              >
+                                <UserPlus size={14} className="shrink-0" />
+                                <span>Convert to Inquiry</span>
+                              </button>
+                              <div className="my-1 border-t border-zinc-100" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOpenMenuCallId(null);
+                                  setCallToDelete(call);
+                                }}
+                                className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                              >
+                                <Trash2 size={14} className="shrink-0" />
+                                <span>Delete Call Log</span>
+                              </button>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Optional Note Preview when collapsed */}
+                  {!isExpanded && draftNote && (
+                    <p
+                      onClick={() =>
+                        setExpandedCallIds((prev) => ({ ...prev, [docId]: true }))
+                      }
+                      className="text-[11px] text-zinc-600 bg-zinc-50 px-2.5 py-1.5 rounded-xl border border-zinc-200 line-clamp-1"
+                    >
+                      {draftNote}
+                    </p>
+                  )}
+
+                  {/* Row 2: Inline Status Selector + ONE Primary Call CTA */}
+                  <div className="flex items-center justify-between gap-2 pt-0.5">
+                    <select
+                      value={call.status || 'PENDING'}
+                      disabled={isUpdatingStatus}
+                      onChange={(e) =>
+                        handleStatusChange(call, e.target.value as MissedCallStatus)
+                      }
+                      className={`h-8 text-[11px] font-black px-2.5 rounded-lg border cursor-pointer focus:outline-none ${getStatusBadgeClasses(
+                        call.status || 'PENDING'
+                      )}`}
+                    >
+                      {STATUS_OPTIONS.map((st) => (
+                        <option key={st} value={st} className="bg-white text-zinc-950 font-bold">
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+
+                    <a
+                      href={`tel:${call.phoneNumber}`}
+                      className="h-8 px-3.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[11px] font-black flex items-center gap-1.5 whitespace-nowrap shrink-0 active:scale-95 transition-transform"
+                    >
+                      <PhoneCall size={12} className="shrink-0" />
+                      <span>Call</span>
+                    </a>
+                  </div>
+
+                  {/* Expanded Drawer: Callback Note Editor + Quick Chips */}
+                  {isExpanded && (
+                    <div className="pt-2.5 border-t border-zinc-200/80 space-y-2">
+                      <div className="flex items-center gap-1.5">
+                        <input
+                          type="text"
+                          placeholder="Add callback remark / notes..."
+                          value={draftNote}
+                          onChange={(e) =>
+                            setNoteDrafts((prev) => ({ ...prev, [docId]: e.target.value }))
+                          }
+                          onBlur={() => handleSaveNotes(call)}
+                          className="flex-1 px-3 py-2 text-xs font-medium bg-zinc-50 border border-zinc-300 rounded-xl text-zinc-900 focus:bg-white focus:border-zinc-950 focus:outline-none"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => handleSaveNotes(call, draftNote)}
+                          disabled={isSavingNote}
+                          className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1 cursor-pointer shrink-0 whitespace-nowrap ${
+                            isSavedNote
+                              ? 'bg-emerald-600 text-white border-emerald-600'
+                              : 'bg-zinc-900 text-white border-zinc-900'
+                          }`}
+                        >
+                          {isSavedNote ? <Check size={13} /> : <Save size={13} />}
+                          <span>{isSavedNote ? 'Saved' : 'Save'}</span>
+                        </button>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <a
+                          href={buildMissedCallWhatsAppUrl(call.phoneNumber)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 h-8 rounded-lg bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center gap-1 whitespace-nowrap"
+                        >
+                          <MessageCircle size={12} className="shrink-0" />
+                          <span>WhatsApp</span>
+                        </a>
+                        <button
+                          type="button"
+                          onClick={() => handleConvertToInquiry(call)}
+                          className="flex-1 h-8 rounded-lg bg-zinc-950 text-amber-300 text-[11px] font-black flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                        >
+                          <UserPlus size={12} className="shrink-0" />
+                          <span>Convert Lead</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Tablet Card List View (sm to lg, untouched) */}
+          <div className="hidden sm:block lg:hidden divide-y divide-zinc-200">
             {filteredCalls.map((call) => {
               const docId = call.id || call.uniqueCallId;
               const draftNote =

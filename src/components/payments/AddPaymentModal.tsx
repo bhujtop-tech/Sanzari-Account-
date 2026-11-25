@@ -207,9 +207,9 @@ export const AddPaymentModal: React.FC = () => {
                   </button>
                 </div>
 
-                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-between text-xs">
+                <div className="p-2.5 rounded-xl bg-amber-50 border border-amber-200/60 flex items-center justify-between gap-2 text-xs">
                   <span className="font-semibold text-amber-900">Current Outstanding Due:</span>
-                  <span className="font-black text-amber-900">
+                  <span className="font-mono font-black text-amber-900 tabular-nums whitespace-nowrap">
                     {formatCurrency(selectedCustomer.pendingBalance)}
                   </span>
                 </div>
@@ -268,21 +268,21 @@ export const AddPaymentModal: React.FC = () => {
             <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
               Received In Wallet *
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {activeWallets.map((w) => (
                 <button
                   key={w.id}
                   type="button"
                   onClick={() => setSelectedWalletId(w.id)}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                     selectedWalletId === w.id
                       ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
                       : 'bg-zinc-50 border-zinc-200 text-zinc-800 hover:bg-zinc-100'
                   }`}
                 >
-                  <p className="text-xs font-bold">{w.name}</p>
+                  <p className="text-xs font-bold truncate">{w.name}</p>
                   <p
-                    className={`text-[10px] mt-0.5 truncate ${
+                    className={`text-[10px] mt-0.5 font-mono tabular-nums truncate ${
                       selectedWalletId === w.id ? 'text-zinc-300' : 'text-zinc-500'
                     }`}
                   >

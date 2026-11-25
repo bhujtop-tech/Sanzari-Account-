@@ -107,7 +107,7 @@ export const TransferModal: React.FC = () => {
           )}
 
           {/* Transfer Visual Selectors */}
-          <div className="grid grid-cols-2 gap-3 items-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3 items-center">
             {/* From Wallet */}
             <div>
               <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">

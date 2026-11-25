@@ -219,7 +219,7 @@ export const AddSaleModal: React.FC = () => {
         onClose={() => setIsAddSaleOpen(false)}
         title="Add Sale"
         subtitle="Quick order & payment entry"
-        maxHeight="max-h-[94vh]"
+        maxHeight="max-h-[94dvh] sm:max-h-[94vh]"
       >
         <div className="space-y-5 pb-6">
           {formError && (
@@ -327,7 +327,7 @@ export const AddSaleModal: React.FC = () => {
           </div>
 
           {/* 2. SALES PERSON & WALLET (SEGMENTED CONTROLS) */}
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
             <div>
               <label className="block text-xs font-bold text-zinc-700 mb-1.5 uppercase tracking-wider">
                 Sales Person
@@ -580,7 +580,7 @@ export const AddSaleModal: React.FC = () => {
           <div className="p-4 rounded-2xl bg-zinc-100/70 border border-zinc-200 space-y-2">
             <div className="flex justify-between text-xs text-zinc-600">
               <span>Subtotal</span>
-              <span className="font-semibold">{formatCurrency(subtotal)}</span>
+              <span className="font-mono font-semibold tabular-nums whitespace-nowrap">{formatCurrency(subtotal)}</span>
             </div>
 
             <div className="flex items-center justify-between text-xs text-zinc-600">
@@ -604,7 +604,7 @@ export const AddSaleModal: React.FC = () => {
 
             <div className="pt-2 border-t border-zinc-200 flex justify-between text-sm font-black text-zinc-950">
               <span>Total Bill</span>
-              <span>{formatCurrency(total)}</span>
+              <span className="font-mono tabular-nums whitespace-nowrap">{formatCurrency(total)}</span>
             </div>
           </div>
 
@@ -682,7 +682,7 @@ export const AddSaleModal: React.FC = () => {
                   {paymentStatus}
                 </span>
                 {pendingAmount > 0 && (
-                  <span className="font-bold text-amber-700">
+                  <span className="font-mono font-bold text-amber-700 tabular-nums whitespace-nowrap">
                     (Pending: {formatCurrency(pendingAmount)})
                   </span>
                 )}

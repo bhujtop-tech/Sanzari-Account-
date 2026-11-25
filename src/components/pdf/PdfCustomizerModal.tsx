@@ -135,13 +135,13 @@ export const PdfCustomizerModal: React.FC<PdfCustomizerModalProps> = ({
                   key={type.id}
                   type="button"
                   onClick={() => setDocType(type.id as any)}
-                  className={`p-3 rounded-xl border text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                  className={`p-2.5 sm:p-3 rounded-xl border text-[11px] sm:text-xs font-bold flex items-center gap-1.5 sm:gap-2 text-left leading-tight cursor-pointer transition-all ${
                     isSel
                       ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
                       : 'bg-zinc-50 text-zinc-700 border-zinc-200 hover:bg-zinc-100'
                   }`}
                 >
-                  <Icon size={16} className={isSel ? 'text-amber-400' : 'text-zinc-500'} />
+                  <Icon size={16} className={`shrink-0 ${isSel ? 'text-amber-400' : 'text-zinc-500'}`} />
                   <span>{type.label}</span>
                 </button>
               );

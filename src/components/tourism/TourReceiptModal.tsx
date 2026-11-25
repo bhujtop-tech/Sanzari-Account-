@@ -62,35 +62,43 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-sm overflow-y-auto print:p-0 print:bg-white">
-      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-zinc-200 overflow-hidden my-auto max-h-[92vh] flex flex-col print:border-none print:shadow-none print:max-h-none">
+    <div className="fixed inset-0 z-[80] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-sm overflow-hidden sm:overflow-y-auto print:p-0 print:bg-white">
+      <div className="relative w-full max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-zinc-200 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[92vh] flex flex-col print:border-none print:shadow-none print:max-h-none">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0 print:hidden">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
+
         {/* Modal Controls (Hidden during print) */}
-        <div className="bg-zinc-950 px-6 py-3.5 text-white flex items-center justify-between shrink-0 print:hidden">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-blue-400 animate-pulse" />
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-300">
-              Booking Slip • {booking.bookingNumber}
+        <div className="bg-zinc-950 px-3.5 py-2.5 sm:px-6 sm:py-3.5 text-white flex items-center justify-between gap-2 shrink-0 print:hidden">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+            <span className="w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-blue-400 animate-pulse shrink-0" />
+            <span className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-zinc-300 truncate">
+              <span className="hidden sm:inline">Booking Slip • </span>
+              {booking.bookingNumber}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               onClick={() => {
                 onClose();
                 openEditTourBookingModal(booking);
               }}
-              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-[11px] sm:text-xs font-bold rounded-xl flex items-center gap-1 sm:gap-1.5 shadow transition-colors cursor-pointer"
             >
               <Edit2 className="w-3.5 h-3.5" /> Edit
             </button>
             <button
               onClick={handleWhatsAppShare}
-              className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 shadow transition-colors cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] sm:text-xs font-bold rounded-xl flex items-center gap-1 sm:gap-1.5 shadow transition-colors cursor-pointer"
             >
-              <Share2 className="w-3.5 h-3.5" /> WhatsApp
+              <Share2 className="w-3.5 h-3.5" />
+              <span className="sm:hidden">WA</span>
+              <span className="hidden sm:inline">WhatsApp</span>
             </button>
             <button
               onClick={handlePrint}
-              className="px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-xs font-bold rounded-xl flex items-center gap-1.5 transition-colors border border-zinc-700 cursor-pointer"
+              className="px-2.5 sm:px-3 py-1.5 bg-zinc-800 hover:bg-zinc-700 text-white text-[11px] sm:text-xs font-bold rounded-xl flex items-center gap-1 sm:gap-1.5 transition-colors border border-zinc-700 cursor-pointer"
             >
               <Printer className="w-3.5 h-3.5" /> Print
             </button>
@@ -104,7 +112,7 @@ export const TourReceiptModal: React.FC<TourReceiptModalProps> = ({
         </div>
 
         {/* Printable Ticket Receipt */}
-        <div className="p-6 sm:p-8 space-y-6 text-zinc-900 bg-white flex-1 overflow-y-auto min-h-0" id="tour-printable-slip">
+        <div className="p-4 sm:p-8 space-y-5 sm:space-y-6 text-zinc-900 bg-white flex-1 overflow-y-auto overscroll-contain min-h-0 safe-bottom sm:pb-8" id="tour-printable-slip">
           {/* Header */}
           <div className="flex items-start justify-between border-b pb-5 border-zinc-200">
             <div>

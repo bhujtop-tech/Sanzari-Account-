@@ -244,30 +244,30 @@ export const WalletLedgerModal: React.FC = () => {
     >
       <div className="space-y-5 pb-6">
         {/* Wallet Balance Summary Card */}
-        <div className="p-5 rounded-3xl bg-zinc-950 text-white shadow-xl">
+        <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-zinc-950 text-white shadow-xl">
           <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">
             Current Available Balance
           </span>
-          <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1">
+          <div className="text-2xl sm:text-3xl font-black font-mono tabular-nums whitespace-nowrap tracking-tight text-white mt-1">
             {formatCurrency(displayBalance)}
           </div>
 
-          <div className="grid grid-cols-3 gap-2 mt-4 pt-3 border-t border-zinc-800 text-center">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2 mt-3.5 sm:mt-4 pt-3 border-t border-zinc-800 text-center">
             <div>
               <span className="text-[10px] text-zinc-400 font-semibold uppercase">Opening</span>
-              <p className="text-xs font-bold text-zinc-200 mt-0.5">
+              <p className="text-[11px] sm:text-xs font-bold font-mono tabular-nums whitespace-nowrap text-zinc-200 mt-0.5">
                 {formatCurrency(wallet.openingBalance)}
               </p>
             </div>
             <div>
               <span className="text-[10px] text-emerald-400 font-semibold uppercase">Money In</span>
-              <p className="text-xs font-extrabold text-emerald-400 mt-0.5">
+              <p className="text-[11px] sm:text-xs font-extrabold font-mono tabular-nums whitespace-nowrap text-emerald-400 mt-0.5">
                 +{formatCurrency(moneyIn)}
               </p>
             </div>
             <div>
               <span className="text-[10px] text-rose-400 font-semibold uppercase">Money Out</span>
-              <p className="text-xs font-extrabold text-rose-400 mt-0.5">
+              <p className="text-[11px] sm:text-xs font-extrabold font-mono tabular-nums whitespace-nowrap text-rose-400 mt-0.5">
                 -{formatCurrency(moneyOut)}
               </p>
             </div>
@@ -311,11 +311,11 @@ export const WalletLedgerModal: React.FC = () => {
                       setSelectedSaleId(item.refId);
                     }
                   }}
-                  className={`p-3.5 rounded-2xl bg-white border border-zinc-200/80 shadow-2xs flex items-center justify-between transition-all ${
+                  className={`p-3 sm:p-3.5 rounded-2xl bg-white border border-zinc-200/80 shadow-2xs flex items-center justify-between gap-2 transition-all ${
                     item.refId && item.type === 'sale' ? 'hover:border-zinc-300 cursor-pointer' : ''
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-1 sm:pr-2">
                     <div
                       className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
                         item.isPositive
@@ -327,7 +327,7 @@ export const WalletLedgerModal: React.FC = () => {
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <h5 className="text-xs font-bold text-zinc-900">{item.title}</h5>
+                        <h5 className="text-xs font-bold text-zinc-900 truncate max-w-[180px] sm:max-w-none">{item.title}</h5>
                         {item.isCrossAccount && item.bookingWalletName && (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-purple-50 text-purple-800 border border-purple-200 text-[9px] font-black">
                             <ArrowRightLeft size={9} />
@@ -343,7 +343,7 @@ export const WalletLedgerModal: React.FC = () => {
 
                   <div className="text-right shrink-0 flex flex-col items-end gap-1">
                     <div
-                      className={`text-xs font-extrabold tracking-tight ${
+                      className={`text-xs font-extrabold font-mono tabular-nums whitespace-nowrap tracking-tight ${
                         item.isPositive ? 'text-emerald-600' : 'text-rose-600'
                       }`}
                     >

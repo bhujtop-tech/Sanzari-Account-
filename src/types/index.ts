@@ -200,6 +200,7 @@ export type TourExpenseCategory =
 export interface TourExpense {
   id: string;
   tourBatchId?: string;
+  tourBookingId?: string;
   tourTitle?: string;
   destination?: string;
   category: TourExpenseCategory;

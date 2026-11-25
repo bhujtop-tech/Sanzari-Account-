@@ -69,7 +69,7 @@ export const AllActivityModal: React.FC = () => {
           </div>
 
           {/* Type Filter Pills */}
-          <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
             {[
               { id: 'all', label: 'All' },
               { id: 'sale', label: 'Sales' },
@@ -99,7 +99,7 @@ export const AllActivityModal: React.FC = () => {
             No activity found matching your search.
           </div>
         ) : (
-          <div className="space-y-2 max-h-[60vh] overflow-y-auto pr-1">
+          <div className="space-y-2 max-h-[60dvh] sm:max-h-[60vh] overflow-y-auto overscroll-contain pr-0.5 sm:pr-1">
             {filteredActivity.map((item) => (
               <button
                 key={item.id}
@@ -126,7 +126,7 @@ export const AllActivityModal: React.FC = () => {
 
                 <div className="text-right shrink-0 ml-2">
                   <div
-                    className={`text-xs font-black tracking-tight ${
+                    className={`text-xs font-black font-mono tabular-nums whitespace-nowrap tracking-tight ${
                       item.isPositive ? 'text-emerald-600' : 'text-rose-600'
                     }`}
                   >

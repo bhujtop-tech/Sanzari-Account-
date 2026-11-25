@@ -469,18 +469,21 @@ export const TourCommissionView: React.FC = () => {
 
       {/* Commission Payout Modal */}
       {isPayoutModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/65 backdrop-blur-xs overflow-y-auto">
-          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
-            <div className="bg-zinc-950 px-5 py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-amber-400 text-zinc-950 flex items-center justify-center font-black shadow-sm">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+          <div className="relative w-full max-w-md bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[94vh] flex flex-col">
+            <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-zinc-700" />
+            </div>
+            <div className="bg-zinc-950 px-5 py-3.5 sm:py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-amber-400 text-zinc-950 flex items-center justify-center font-black shadow-sm shrink-0">
                   <IndianRupee className="w-5 h-5 stroke-[2.5]" />
                 </div>
-                <div>
-                  <h3 className="text-base font-black tracking-tight">
+                <div className="min-w-0">
+                  <h3 className="text-sm sm:text-base font-black tracking-tight truncate">
                     Record Commission Payout
                   </h3>
-                  <p className="text-[11px] text-zinc-400">
+                  <p className="text-[11px] text-zinc-400 truncate">
                     Select Date Folder or Private Tour &amp; Paid From Wallet
                   </p>
                 </div>
@@ -488,7 +491,7 @@ export const TourCommissionView: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setIsPayoutModalOpen(false)}
-                className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 cursor-pointer"
+                className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -496,7 +499,7 @@ export const TourCommissionView: React.FC = () => {
 
             <form
               onSubmit={handleRecordPayout}
-              className="p-4 sm:p-5 space-y-4 text-zinc-800 overflow-y-auto flex-1"
+              className="p-4 sm:p-5 space-y-4 text-zinc-800 overflow-y-auto overscroll-contain flex-1 min-h-0 safe-bottom sm:pb-5"
             >
               {payoutError && (
                 <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
@@ -1148,81 +1151,64 @@ export const TourCommissionView: React.FC = () => {
                     onClick={() => toggleExpand(b.id)}
                     className="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-zinc-50 active:bg-zinc-100 transition-colors select-none"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] font-mono font-bold text-zinc-400 shrink-0">
-                        {b.bookingNumber}
-                      </span>
-
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="font-black text-xs text-zinc-950 truncate">
-                            {b.customerName}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
-                              bookedByPerson.toLowerCase().includes('mustak')
-                                ? 'bg-amber-100 text-amber-950 border border-amber-300'
-                                : 'bg-blue-100 text-blue-900 border border-blue-300'
-                            }`}
-                          >
-                            👤 {bookedByPerson}
-                          </span>
-                          <span
-                            className={`px-1.5 py-0.2 rounded text-[9px] font-black ${
-                              folderBadge.isPrivate
-                                ? 'bg-purple-100 text-purple-900 border border-purple-300'
-                                : 'bg-zinc-100 text-zinc-800 border border-zinc-300'
-                            }`}
-                          >
-                            {folderBadge.text}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-zinc-500 font-medium truncate mt-0.5">
-                          📍 {b.destination} • {totalPax} Pax ({billableCount} Billable)
-                        </div>
+                    <div className="min-w-0 flex-1">
+                      <h4 className="font-black text-[14px] text-zinc-950 leading-tight truncate">
+                        {b.customerName}
+                      </h4>
+                      <div className="flex items-center flex-wrap gap-x-1.5 text-[11px] text-zinc-500 mt-0.5">
+                        <span className="font-bold text-zinc-800 truncate">{b.destination}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-bold text-zinc-900">{billableCount}/{totalPax} Pax</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className={bookedByPerson.toLowerCase().includes('mustak') ? 'font-bold text-amber-800' : 'font-bold text-blue-800'}>
+                          {bookedByPerson}
+                        </span>
+                      </div>
+                      <div className="text-[10px] text-zinc-500 truncate mt-0.5">
+                        <span className="font-mono">{b.bookingNumber}</span>
+                        <span className="mx-1 text-zinc-300">·</span>
+                        <span>{folderBadge.isPrivate ? `Private (${b.tourDate})` : folderBadge.text.replace(/^📂\s*/, '')}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <span className="text-xs font-mono font-black text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200">
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="text-xs font-mono tabular-nums font-black text-amber-700 whitespace-nowrap">
                         +{formatCurrency(commAmount)}
                       </span>
-                      <span className="text-zinc-400 text-xs">
-                        {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                      <span className="w-7 h-7 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 flex items-center justify-center">
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </span>
                     </div>
                   </div>
 
-                  {/* Mobile Expanded Details */}
+                  {/* Mobile Expanded Details (Sleek Single-Container Divider) */}
                   {isExpanded && (
-                    <div className="p-3 bg-zinc-50 border-t border-zinc-200 space-y-2 text-xs">
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
-                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">Contact Number</span>
+                    <div className="px-3 pb-3 pt-2.5 bg-zinc-50/80 border-t border-zinc-200 space-y-2 text-xs">
+                      <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden">
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                          <div>
+                            <span className="text-[10px] text-zinc-400 uppercase font-bold block">Contact</span>
+                            <span className="font-mono font-bold text-zinc-900">{b.customerPhone}</span>
+                          </div>
                           <a
                             href={`tel:${b.customerPhone}`}
-                            className="text-blue-600 font-mono font-bold hover:underline flex items-center gap-1 mt-0.5"
+                            className="h-8 px-3 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1 whitespace-nowrap shrink-0"
                           >
-                            📞 {b.customerPhone}
+                            <Phone size={12} className="shrink-0" />
+                            <span>Call</span>
                           </a>
                         </div>
-
-                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
-                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">
-                            {folderBadge.isPrivate ? 'Private Tour Date' : 'Folder Departure Date'}
+                        <div className="px-3 py-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-zinc-500 font-semibold">Tour Date</span>
+                          <span className="font-mono font-bold text-zinc-900">{b.tourDate}</span>
+                        </div>
+                        <div className="px-3 py-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-zinc-500 font-semibold">
+                            {billableCount} billable × ₹{ratePerPax}
                           </span>
-                          <span className="font-bold text-zinc-900 block mt-0.5">{b.tourDate}</span>
-                        </div>
-                      </div>
-
-                      <div className="bg-white p-2.5 rounded-xl border border-zinc-200 flex items-center justify-between text-[11px] font-mono">
-                        <div>
-                          <span className="text-zinc-500 text-[10px] uppercase font-bold block">Commission Formula</span>
-                          <span className="font-bold text-zinc-900">{billableCount} pax × ₹{ratePerPax}</span>
-                        </div>
-                        <div className="text-right">
-                          <span className="text-amber-800 text-[10px] uppercase font-bold block">Total Earned</span>
-                          <span className="font-black text-amber-700 text-sm">{formatCurrency(commAmount)}</span>
+                          <span className="font-mono tabular-nums font-black text-amber-700 whitespace-nowrap">
+                            {formatCurrency(commAmount)}
+                          </span>
                         </div>
                       </div>
                     </div>

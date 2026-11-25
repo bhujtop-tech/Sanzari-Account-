@@ -313,7 +313,7 @@ export const AccountsView: React.FC = () => {
           </p>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="grid grid-cols-3 sm:flex sm:items-center gap-1.5 sm:gap-2 sm:flex-wrap">
           <button
             type="button"
             onClick={() => {
@@ -324,27 +324,29 @@ export const AccountsView: React.FC = () => {
                 setIsAddExpenseOpen(true);
               }
             }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-[11px] sm:text-xs font-black shadow-sm transition-all active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <Plus size={14} className="stroke-[3]" />
-            <span>+ Add Expense</span>
+            <Plus size={14} className="stroke-[3] shrink-0" />
+            <span className="sm:hidden">Expense</span>
+            <span className="hidden sm:inline">+ Add Expense</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsAddWalletOpen(true)}
-            className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 border-2 border-zinc-900 text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3 py-2 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 border-2 border-zinc-900 text-[11px] sm:text-xs font-black shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <Plus size={14} className="stroke-[3]" />
-            <span>+ Account</span>
+            <Plus size={14} className="stroke-[3] shrink-0" />
+            <span className="sm:hidden">Account</span>
+            <span className="hidden sm:inline">+ Account</span>
           </button>
 
           <button
             type="button"
             onClick={() => setIsTransferOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer"
+            className="flex items-center justify-center gap-1 sm:gap-1.5 px-2.5 sm:px-3.5 py-2 rounded-xl bg-zinc-900 hover:bg-black text-white text-[11px] sm:text-xs font-bold shadow-xs transition-all active:scale-95 cursor-pointer whitespace-nowrap"
           >
-            <ArrowRightLeft size={14} />
+            <ArrowRightLeft size={14} className="shrink-0" />
             <span>Transfer</span>
           </button>
         </div>
@@ -352,31 +354,32 @@ export const AccountsView: React.FC = () => {
 
       {/* Hero Overview Card - Strictly Mode Specific Cash */}
       <div
-        className={`p-6 rounded-[28px] text-white shadow-xl ${
+        className={`p-4 sm:p-6 rounded-2xl sm:rounded-[28px] text-white shadow-xl ${
           isTourism
             ? 'bg-gradient-to-br from-amber-950 via-zinc-950 to-zinc-900 border border-amber-900/40'
             : 'bg-gradient-to-br from-zinc-950 to-zinc-900 border border-zinc-800'
         }`}
       >
-        <div className="flex items-center justify-between mb-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-zinc-400">
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-400 truncate">
             {isTourism ? 'Sanzari Tours Total Available Cash' : 'Dry Fruit Store Total Cash'}
           </span>
           <span
-            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 ${
+            className={`text-[10px] font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 shrink-0 whitespace-nowrap ${
               isTourism
                 ? 'text-amber-300 bg-amber-950/80 border border-amber-800/50'
                 : 'text-emerald-400 bg-emerald-950/80 border border-emerald-800/50'
             }`}
           >
             <ShieldCheck size={11} />
-            {isTourism ? 'Tour Accounts Only' : 'Dry Fruit Accounts Only'}
+            <span className="sm:hidden">{isTourism ? 'Tour Only' : 'Store Only'}</span>
+            <span className="hidden sm:inline">{isTourism ? 'Tour Accounts Only' : 'Dry Fruit Accounts Only'}</span>
           </span>
         </div>
-        <div className="text-3xl font-black tracking-tight text-white mt-1 font-mono">
+        <div className="text-2xl sm:text-3xl font-black tracking-tight text-white mt-1 font-mono tabular-nums whitespace-nowrap">
           {formatCurrency(currentTotal)}
         </div>
-        <p className="text-xs text-zinc-400 mt-2">
+        <p className="text-[11px] sm:text-xs text-zinc-400 mt-1.5 sm:mt-2">
           {isTourism
             ? `Live balance across ${currentWallets.length} Tour Wallets (Rizwan, Sahil & Bus)`
             : `Sum across ${currentWallets.length} Store Wallets (Rizwan, Avesh & Sahil)`}
@@ -424,27 +427,27 @@ export const AccountsView: React.FC = () => {
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.05 }}
                 onClick={() => setSelectedWalletId(wallet.id)}
-                className={`p-5 rounded-3xl border shadow-2xs hover:shadow-xs transition-all cursor-pointer ${
+                className={`p-3.5 sm:p-5 rounded-2xl sm:rounded-3xl border shadow-2xs hover:shadow-xs transition-all cursor-pointer ${
                   isTourism
                     ? 'bg-amber-50/40 border-amber-200/90 hover:border-amber-400'
                     : 'bg-white border-zinc-200/80 hover:border-zinc-300'
                 }`}
               >
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
                     <div
-                      className="w-10 h-10 rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs"
+                      className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center font-black text-sm text-white shadow-xs shrink-0"
                       style={{
                         backgroundColor: wallet.color || (isTourism ? '#f59e0b' : '#18181b'),
                       }}
                     >
                       {wallet.name.startsWith('Bus') ? '🚌' : wallet.name.slice(0, 1).toUpperCase()}
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-sm font-extrabold text-zinc-950">{wallet.name}</h4>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
+                        <h4 className="text-sm font-extrabold text-zinc-950 truncate">{wallet.name}</h4>
                         <span
-                          className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
+                          className={`hidden sm:inline-block text-[9px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
                             isTourism
                               ? 'bg-amber-100 text-amber-900 border border-amber-200'
                               : 'bg-zinc-100 text-zinc-600 border border-zinc-200'
@@ -453,39 +456,41 @@ export const AccountsView: React.FC = () => {
                           {isTourism ? 'Tour Account' : 'Dry Fruit Account'}
                         </span>
                       </div>
-                      <p className="text-[11px] text-zinc-600">
+                      <p className="text-[11px] text-zinc-600 truncate font-mono tabular-nums">
                         Opening: {formatCurrency(wallet.openingBalance)}
-                        {isTourism && tourStats ? ` • ${tourStats.recordCount} Records` : ''}
+                        {isTourism && tourStats ? ` · ${tourStats.recordCount} Records` : ''}
                       </p>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
                     <div className="text-right">
-                      <span className="text-base font-black text-zinc-950 tracking-tight font-mono">
+                      <span className="text-sm sm:text-base font-black text-zinc-950 tracking-tight font-mono tabular-nums whitespace-nowrap">
                         {formatCurrency(wallet.currentBalance)}
                       </span>
                       <p className="text-[10px] text-zinc-600 font-semibold">Live Balance</p>
                     </div>
-                    <ChevronRight size={16} className="text-zinc-400" />
+                    <ChevronRight size={16} className="text-zinc-400 shrink-0" />
                   </div>
                 </div>
 
                 {isTourism && tourStats && (tourStats.moneyIn > 0 || tourStats.moneyOut > 0) && (
-                  <div className="grid grid-cols-2 gap-2 pt-3 mt-3 border-t border-amber-200/60 text-xs">
-                    <div className="p-2 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-900 font-bold">
-                        Money In (Bookings)
+                  <div className="grid grid-cols-2 gap-2 pt-2.5 sm:pt-3 mt-2.5 sm:mt-3 border-t border-amber-200/60 text-xs">
+                    <div className="p-2 rounded-xl bg-emerald-50/80 border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+                      <span className="text-[10px] sm:text-[11px] text-emerald-900 font-bold">
+                        <span className="sm:hidden">Money In</span>
+                        <span className="hidden sm:inline">Money In (Bookings)</span>
                       </span>
-                      <span className="font-black font-mono text-emerald-700">
+                      <span className="font-black font-mono tabular-nums whitespace-nowrap text-emerald-700 text-xs sm:text-xs">
                         +{formatCurrency(tourStats.moneyIn)}
                       </span>
                     </div>
-                    <div className="p-2 rounded-xl bg-rose-50/80 border border-rose-200/80 flex items-center justify-between">
-                      <span className="text-[11px] text-rose-900 font-bold">
-                        Money Out (Expenses)
+                    <div className="p-2 rounded-xl bg-rose-50/80 border border-rose-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+                      <span className="text-[10px] sm:text-[11px] text-rose-900 font-bold">
+                        <span className="sm:hidden">Money Out</span>
+                        <span className="hidden sm:inline">Money Out (Expenses)</span>
                       </span>
-                      <span className="font-black font-mono text-rose-700">
+                      <span className="font-black font-mono tabular-nums whitespace-nowrap text-rose-700 text-xs sm:text-xs">
                         -{formatCurrency(tourStats.moneyOut)}
                       </span>
                     </div>
@@ -493,16 +498,16 @@ export const AccountsView: React.FC = () => {
                 )}
 
                 {!isTourism && (walletMonthSales > 0 || walletMonthExpenses > 0) && (
-                  <div className="grid grid-cols-2 gap-2 pt-3 mt-3 border-t border-zinc-100 text-xs">
-                    <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex items-center justify-between">
-                      <span className="text-[11px] text-emerald-800 font-medium">Month Sales</span>
-                      <span className="font-bold text-emerald-700">
+                  <div className="grid grid-cols-2 gap-2 pt-2.5 sm:pt-3 mt-2.5 sm:mt-3 border-t border-zinc-100 text-xs">
+                    <div className="p-2 rounded-xl bg-emerald-50/60 border border-emerald-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+                      <span className="text-[10px] sm:text-[11px] text-emerald-800 font-medium">Month Sales</span>
+                      <span className="font-bold font-mono tabular-nums whitespace-nowrap text-emerald-700">
                         +{formatCurrency(walletMonthSales)}
                       </span>
                     </div>
-                    <div className="p-2 rounded-xl bg-rose-50/60 border border-rose-100 flex items-center justify-between">
-                      <span className="text-[11px] text-rose-800 font-medium">Month Expenses</span>
-                      <span className="font-bold text-rose-700">
+                    <div className="p-2 rounded-xl bg-rose-50/60 border border-rose-100 flex flex-col sm:flex-row sm:items-center justify-between gap-0.5">
+                      <span className="text-[10px] sm:text-[11px] text-rose-800 font-medium">Month Expenses</span>
+                      <span className="font-bold font-mono tabular-nums whitespace-nowrap text-rose-700">
                         -{formatCurrency(walletMonthExpenses)}
                       </span>
                     </div>
@@ -529,7 +534,7 @@ export const AccountsView: React.FC = () => {
             </div>
 
             {/* Account Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
               <button
                 type="button"
                 onClick={() => setFilterWalletId('all')}
@@ -574,7 +579,7 @@ export const AccountsView: React.FC = () => {
           </div>
 
           {/* Sub-filter chips */}
-          <div className="flex items-center gap-1.5 overflow-x-auto px-1">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar px-1">
             {[
               { id: 'all', label: `All Records (${tourUnifiedRecords.length})` },
               {
@@ -629,11 +634,124 @@ export const AccountsView: React.FC = () => {
                   : undefined;
 
                 return (
-                  <div
-                    key={rec.id}
-                    onClick={() => setSelectedWalletId(rec.walletId)}
-                    className="p-4 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs hover:border-zinc-400 transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 cursor-pointer"
-                  >
+                  <div key={rec.id}>
+                    {/* MOBILE COMPACT LEDGER ROW (< sm) */}
+                    <div
+                      onClick={() => setSelectedWalletId(rec.walletId)}
+                      className="sm:hidden p-3 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs active:bg-zinc-50 transition-colors cursor-pointer space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2.5">
+                        <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                          <div
+                            className="w-8 h-8 rounded-xl flex items-center justify-center text-white shrink-0 mt-0.5"
+                            style={{ backgroundColor: targetW?.color || '#18181b' }}
+                          >
+                            {rec.kind === 'transfer' || rec.kind === 'cross_booking' ? (
+                              <ArrowRightLeft size={14} />
+                            ) : rec.isPositive ? (
+                              <ArrowDownLeft size={14} />
+                            ) : (
+                              <ArrowUpRight size={14} />
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="text-[13px] font-black text-zinc-950 leading-snug truncate">
+                              {rec.title}
+                            </p>
+                            <p className="text-[11px] text-zinc-500 font-medium truncate mt-0.5">
+                              {rec.date}
+                              {' · '}
+                              {rec.kind === 'transfer'
+                                ? `${(rec.fromWalletName || '').replace(' (Tour)', '')} → ${(rec.toWalletName || '').replace(' (Tour)', '')}`
+                                : rec.walletName.replace(' (Tour)', '')}
+                              {rec.paymentMode ? ` · ${rec.paymentMode}` : ''}
+                            </p>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <div
+                            className={`text-[13px] font-black font-mono tabular-nums whitespace-nowrap ${
+                              rec.kind === 'transfer'
+                                ? 'text-zinc-950'
+                                : rec.isPositive
+                                ? 'text-emerald-600'
+                                : 'text-rose-600'
+                            }`}
+                          >
+                            {rec.kind === 'transfer' ? '' : rec.isPositive ? '+' : '-'}
+                            {formatCurrency(rec.amount)}
+                          </div>
+                          <span className="text-[10px] font-bold text-zinc-500 block truncate max-w-[115px]">
+                            {rec.kind === 'cross_booking'
+                              ? 'Cross-Account'
+                              : rec.kind === 'transfer'
+                              ? 'Transfer'
+                              : rec.isPositive
+                              ? 'Money In'
+                              : 'Expense'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {rec.subtitle && (
+                        <p className="text-[11px] text-zinc-600 line-clamp-1 pl-[42px]">
+                          {rec.subtitle}
+                        </p>
+                      )}
+
+                      {rec.kind === 'expense_out' && rec.expenseObj && (
+                        <div
+                          className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-zinc-100"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => openEditTourExpenseModal(rec.expenseObj!)}
+                            className="px-2.5 py-1 rounded-lg bg-amber-100 text-zinc-950 border border-amber-300 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+                          >
+                            <Pencil size={10} />
+                            <span>Edit</span>
+                          </button>
+                          {confirmDeleteExpenseId === rec.expenseObj.id ? (
+                            <div className="inline-flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  await deleteTourExpenseById(rec.expenseObj!.id);
+                                  setConfirmDeleteExpenseId(null);
+                                }}
+                                className="px-2 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                              >
+                                Confirm
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteExpenseId(null)}
+                                className="px-2 py-1 rounded-lg bg-zinc-100 text-zinc-700 border border-zinc-300 text-[10px] font-bold cursor-pointer"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteExpenseId(rec.expenseObj!.id)}
+                              className="px-2 py-1 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 text-[10px] font-black inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <Trash2 size={10} />
+                              <span>Delete</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* DESKTOP ROW (sm+) — UNCHANGED */}
+                    <div
+                      onClick={() => setSelectedWalletId(rec.walletId)}
+                      className="hidden sm:flex p-4 rounded-2xl bg-white border border-zinc-200/90 shadow-2xs hover:border-zinc-400 transition-all flex-row items-center justify-between gap-3 cursor-pointer"
+                    >
                     <div className="space-y-1.5 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         {rec.kind === 'transfer' || rec.kind === 'cross_booking' ? (
@@ -768,6 +886,7 @@ export const AccountsView: React.FC = () => {
                       </div>
                     </div>
                   </div>
+                  </div>
                 );
               })}
             </div>
@@ -788,7 +907,7 @@ export const AccountsView: React.FC = () => {
             </div>
 
             {/* Account Filter Pills */}
-            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0 no-scrollbar">
               <button
                 type="button"
                 onClick={() => setFilterWalletId('all')}
@@ -919,8 +1038,11 @@ export const AccountsView: React.FC = () => {
 
       {/* Add New Wallet / Account Modal */}
       {isAddWalletOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-xs">
-          <div className="bg-white rounded-3xl border-2 border-zinc-900 shadow-2xl max-w-sm w-full p-5 space-y-4">
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs overflow-hidden">
+          <div className="bg-white rounded-t-3xl sm:rounded-3xl border-t-2 sm:border-2 border-zinc-900 shadow-2xl max-w-sm w-full p-5 safe-bottom sm:pb-5 space-y-4 max-h-[92dvh] overflow-y-auto overscroll-contain">
+            <div className="sm:hidden flex justify-center -mt-2 pb-0.5">
+              <div className="w-10 h-1 rounded-full bg-zinc-300" />
+            </div>
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center">

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { Users, Search, FileDown, Folder } from 'lucide-react';
+import { Users, Search, FileDown, Folder, Phone, ChevronDown, ChevronUp } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourPDFExportModal } from './TourPDFExportModal';
 
@@ -89,35 +89,35 @@ export const TourPassengersView: React.FC = () => {
   return (
     <div className="space-y-5 pb-36 sm:pb-32">
       {/* Top Banner - Signature Black Theme */}
-      <div className="bg-zinc-950 rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-zinc-850 relative overflow-hidden">
-        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="space-y-1.5">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs font-bold uppercase tracking-wider">
+      <div className="bg-zinc-950 rounded-3xl p-4 sm:p-7 text-white shadow-xl border border-zinc-850 relative overflow-hidden">
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-3.5 sm:gap-4">
+          <div className="space-y-1 sm:space-y-1.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-zinc-900 border border-zinc-800 text-zinc-300 text-[11px] sm:text-xs font-bold uppercase tracking-wider">
               <Users className="w-3.5 h-3.5 text-blue-400" />
               Customers &amp; Passengers
             </div>
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white">
+            <h2 className="text-lg sm:text-2xl font-black tracking-tight text-white">
               Travelers Directory &amp; Group Manifest
             </h2>
-            <p className="text-xs text-zinc-400 max-w-xl">
+            <p className="text-xs text-zinc-400 max-w-xl hidden sm:block">
               All booked passengers, ages, train class, customer contact numbers, and booking payment status across tour groups.
             </p>
           </div>
 
-          <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2.5 sm:gap-3 flex-wrap sm:flex-nowrap">
             <button
               type="button"
               onClick={handleExportGroupPDF}
               disabled={filteredBookings.length === 0}
-              className="px-4 py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95"
+              className="flex-1 sm:flex-initial justify-center px-4 py-2.5 sm:py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-black text-xs flex items-center gap-2 shadow-lg transition-all cursor-pointer active:scale-95 whitespace-nowrap"
             >
-              <FileDown size={16} className="stroke-[2.5]" />
-              <span>Download Group PDF ({filteredBookings.length} Bookings)</span>
+              <FileDown size={16} className="stroke-[2.5] shrink-0" />
+              <span>Group PDF ({filteredBookings.length})</span>
             </button>
 
-            <div className="bg-zinc-900 px-4 py-2.5 rounded-2xl border border-zinc-800 text-center shrink-0">
-              <div className="text-[10px] text-zinc-400 uppercase font-bold">Total Travelers</div>
-              <div className="text-xl font-black font-mono text-white">{allPassengers.length} Members</div>
+            <div className="bg-zinc-900 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-2xl border border-zinc-800 text-center shrink-0">
+              <div className="text-[9px] sm:text-[10px] text-zinc-400 uppercase font-bold">Travelers</div>
+              <div className="text-base sm:text-xl font-black font-mono tabular-nums text-white whitespace-nowrap">{allPassengers.length} Pax</div>
             </div>
           </div>
         </div>
@@ -179,97 +179,95 @@ export const TourPassengersView: React.FC = () => {
                     }
                     className="p-3 flex items-center justify-between gap-2 cursor-pointer hover:bg-zinc-50 active:bg-zinc-100 transition-colors select-none"
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-[10px] font-mono font-bold text-zinc-400 shrink-0">
-                        #{idx + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span
-                            onClick={(e) => copyNameToClipboard(e, p.passengerName)}
-                            onDoubleClick={(e) => copyNameToClipboard(e, p.passengerName)}
-                            title="Click or Double-click to copy name"
-                            className={`font-bold text-xs truncate cursor-pointer select-none transition-colors ${
-                              copiedName === String(p.passengerName || '').trim()
-                                ? 'text-emerald-600'
-                                : 'text-zinc-950 hover:text-emerald-700'
-                            }`}
-                          >
-                            {p.passengerName}
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="text-[10px] font-mono font-bold text-zinc-400 shrink-0">
+                          {idx + 1}.
+                        </span>
+                        <span
+                          onClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                          onDoubleClick={(e) => copyNameToClipboard(e, p.passengerName)}
+                          title="Click to copy name"
+                          className={`font-black text-[14px] truncate cursor-pointer select-none transition-colors ${
+                            copiedName === String(p.passengerName || '').trim()
+                              ? 'text-emerald-600'
+                              : 'text-zinc-950'
+                          }`}
+                        >
+                          {p.passengerName}
+                        </span>
+                        {p.age && (
+                          <span className="text-[11px] font-mono font-semibold text-zinc-500 shrink-0">
+                            {p.age}y
                           </span>
-                          {p.age && (
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 bg-zinc-100 text-zinc-700 rounded border border-zinc-200">
-                              {p.age}y
-                            </span>
-                          )}
-                          <span className="text-[9px] font-bold px-1.5 py-0.2 bg-amber-50 text-amber-900 border border-amber-200 rounded">
-                            {p.travelClass}
-                          </span>
-                        </div>
-                        <div className="text-[10px] text-zinc-500 font-medium truncate">
-                          📍 {p.destination} •{' '}
-                          <span
-                            onClick={(e) => copyNameToClipboard(e, p.customerName)}
-                            onDoubleClick={(e) => copyNameToClipboard(e, p.customerName)}
-                            title="Click or Double-click to copy name"
-                            className="hover:text-emerald-700 cursor-pointer select-none"
-                          >
-                            {p.customerName}
-                          </span>
-                        </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-[11px] text-zinc-500 mt-0.5 truncate">
+                        <span className="font-bold text-zinc-800 truncate">{p.destination}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="truncate">{p.customerName}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-semibold text-zinc-700 shrink-0">{p.travelClass}</span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {isPaid ? (
-                        <span className="text-[10px] font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                          ✅ FULL PAID
-                        </span>
-                      ) : (
-                        <span className="text-[10px] font-black text-rose-600 bg-rose-50 px-2 py-0.5 rounded border border-rose-200">
-                          Due: {formatCurrency(p.dueAmount)}
-                        </span>
-                      )}
-                      <span className="text-zinc-400 text-xs">
-                        {isExpanded ? '▲' : '▼'}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span
+                        className={`text-[11px] font-black font-mono tabular-nums whitespace-nowrap ${
+                          isPaid ? 'text-emerald-700' : 'text-rose-600'
+                        }`}
+                      >
+                        {isPaid ? 'Paid' : formatCurrency(p.dueAmount)}
+                      </span>
+                      <span className="w-7 h-7 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-600 flex items-center justify-center">
+                        {isExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
                       </span>
                     </div>
                   </div>
 
-                  {/* Expanded Mobile Details Card */}
+                  {/* Expanded Sleek Divider Drawer */}
                   {isExpanded && (
-                    <div className="p-3 bg-zinc-50 border-t border-zinc-100 space-y-2 text-xs">
-                      <div className="grid grid-cols-2 gap-2 text-[11px]">
-                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
-                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">Booked By / Customer</span>
-                          <span className="font-bold text-zinc-950 block truncate">{p.customerName}</span>
+                    <div className="px-3 pb-3 pt-2.5 bg-zinc-50/80 border-t border-zinc-200 space-y-2.5 text-xs">
+                      <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden">
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="text-[10px] text-zinc-400 uppercase font-bold block">Booked By</span>
+                            <span className="text-xs font-black text-zinc-950 truncate block">{p.customerName}</span>
+                          </div>
                           <a
                             href={`tel:${p.customerPhone}`}
-                            className="text-blue-600 font-mono font-bold hover:underline flex items-center gap-1 mt-0.5"
+                            className="h-8 px-3 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1.5 whitespace-nowrap shrink-0"
                           >
-                            📞 {p.customerPhone}
+                            <Phone size={12} className="shrink-0" />
+                            <span>Call</span>
                           </a>
                         </div>
-
-                        <div className="bg-white p-2 rounded-xl border border-zinc-200">
-                          <span className="text-[10px] text-zinc-400 uppercase font-bold block">Booking Ref &amp; Date</span>
-                          <span className="font-mono font-bold text-zinc-900 block">{p.bookingNumber}</span>
-                          <span className="text-zinc-600 block text-[10px] font-medium mt-0.5">{p.tourDate}</span>
+                        <div className="px-3 py-2 flex items-center justify-between gap-2 text-[11px]">
+                          <span className="text-zinc-500 font-semibold">Ref &amp; Date</span>
+                          <span className="font-mono font-bold text-zinc-900 whitespace-nowrap">
+                            {p.bookingNumber} · {p.tourDate}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="bg-white p-2 rounded-xl border border-zinc-200 flex items-center justify-between font-mono text-[11px]">
-                        <div>
-                          <span className="text-zinc-500 text-[10px] uppercase font-bold block">Total Fare</span>
-                          <span className="font-bold text-zinc-900">{formatCurrency(p.totalAmount)}</span>
+                      <div className="grid grid-cols-3 divide-x divide-zinc-200 bg-white rounded-xl border border-zinc-200 py-2 text-center">
+                        <div className="px-1 min-w-0">
+                          <span className="text-[9px] font-bold uppercase text-zinc-500 block">Total</span>
+                          <span className="text-xs font-black font-mono tabular-nums text-zinc-950 whitespace-nowrap block truncate">
+                            {formatCurrency(p.totalAmount)}
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-emerald-700 text-[10px] uppercase font-bold block">Advance Paid</span>
-                          <span className="font-bold text-emerald-700">{formatCurrency(p.advancePaid)}</span>
+                        <div className="px-1 min-w-0">
+                          <span className="text-[9px] font-bold uppercase text-emerald-700 block">Advance</span>
+                          <span className="text-xs font-black font-mono tabular-nums text-emerald-700 whitespace-nowrap block truncate">
+                            {formatCurrency(p.advancePaid)}
+                          </span>
                         </div>
-                        <div>
-                          <span className="text-rose-600 text-[10px] uppercase font-bold block">Remaining Baaki</span>
-                          <span className="font-bold text-rose-600">{formatCurrency(p.dueAmount)}</span>
+                        <div className="px-1 min-w-0">
+                          <span className="text-[9px] font-bold uppercase text-rose-600 block">Baaki Due</span>
+                          <span className="text-xs font-black font-mono tabular-nums text-rose-600 whitespace-nowrap block truncate">
+                            {formatCurrency(p.dueAmount)}
+                          </span>
                         </div>
                       </div>
                     </div>

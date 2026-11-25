@@ -124,22 +124,22 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
       </div>
 
       {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-4">
         {/* Total Booked Revenue */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between text-zinc-500 mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-600 truncate">Total Booked Value</span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-zinc-500 mb-1 gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-600 truncate">Total Booked</span>
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
               <Luggage className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl font-black text-zinc-950 font-mono truncate">
+          <div className="text-base sm:text-2xl font-black text-zinc-950 font-mono tabular-nums whitespace-nowrap truncate">
             {formatCurrency(totalTourRevenue)}
           </div>
           <div className="text-[10px] sm:text-[11px] text-zinc-600 font-medium mt-1 flex items-center justify-between flex-wrap gap-1">
             <span className="truncate"><strong className="text-zinc-950">{tourBookings.length}</strong> Bookings</span>
             {thisMonthTourRevenue > 0 && (
-              <span className="text-[9px] sm:text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-bold truncate">
+              <span className="hidden sm:inline text-[9px] sm:text-[10px] text-emerald-700 bg-emerald-50 px-1 py-0.5 rounded font-bold truncate">
                 +{formatCurrency(thisMonthTourRevenue)}
               </span>
             )}
@@ -147,20 +147,20 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         {/* Advance Collected */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between text-emerald-600 mb-1">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-800 truncate">Advance Collected</span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-emerald-600 mb-1 gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-800 truncate">Advance Recd</span>
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center font-bold shrink-0">
               <ArrowDownLeft className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl font-black text-emerald-700 font-mono truncate">
+          <div className="text-base sm:text-2xl font-black text-emerald-700 font-mono tabular-nums whitespace-nowrap truncate">
             {formatCurrency(totalTourAdvance)}
           </div>
           <div className="text-[10px] sm:text-[11px] text-emerald-700 font-semibold mt-1 space-y-0.5">
             <span className="block truncate">Sahil + Rizwan Wallets</span>
             {tourWallets.length > 0 && (
-              <span className="text-[9px] text-emerald-800 font-bold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 block truncate">
+              <span className="hidden sm:block text-[9px] text-emerald-800 font-bold bg-emerald-50 px-1 py-0.5 rounded border border-emerald-200 truncate">
                 {tourWallets
                   .filter((w) => Number(w.currentBalance) > 0)
                   .map((w) => `${w.name.replace(' (Tour)', '')}: ${formatCurrency(w.currentBalance)}`)
@@ -171,14 +171,14 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         {/* Pending Customer Dues */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between text-rose-600 mb-1">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-rose-600 mb-1 gap-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-800 truncate">Remaining Dues</span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center font-bold shrink-0">
               <AlertCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl font-black text-rose-600 font-mono truncate">
+          <div className="text-base sm:text-2xl font-black text-rose-600 font-mono tabular-nums whitespace-nowrap truncate">
             {formatCurrency(totalTourPending)}
           </div>
           <div className="text-[10px] sm:text-[11px] text-rose-600 font-semibold mt-1 truncate">
@@ -187,18 +187,18 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
         </div>
 
         {/* Total Passengers */}
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
-          <div className="flex items-center justify-between text-zinc-900 mb-1">
+        <div className="bg-white p-3 sm:p-5 rounded-2xl border-2 border-zinc-900 shadow-sm relative overflow-hidden flex flex-col justify-between">
+          <div className="flex items-center justify-between text-zinc-900 mb-1 gap-1">
             <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-zinc-600 truncate">Total Travelers</span>
-            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
+            <div className="w-6 h-6 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-zinc-100 text-zinc-900 flex items-center justify-center font-bold shrink-0">
               <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
             </div>
           </div>
-          <div className="text-lg sm:text-2xl font-black text-zinc-950 font-mono truncate">
+          <div className="text-base sm:text-2xl font-black text-zinc-950 font-mono tabular-nums whitespace-nowrap truncate">
             {totalTourPassengers} Pax
           </div>
           <div className="text-[10px] sm:text-[11px] text-zinc-600 font-medium mt-1 truncate">
-            Across {tourBookings.length} confirmed bookings
+            Across {tourBookings.length} bookings
           </div>
         </div>
       </div>
@@ -336,37 +336,87 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
       </div>
 
       {/* Tour Inquiries & Leads Widget (Instagram, WhatsApp & Call) */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border-2 border-zinc-900 shadow-sm space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-bold text-sm">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border-2 border-zinc-900 shadow-sm space-y-3.5 sm:space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 sm:gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-zinc-950 text-white flex items-center justify-center font-bold text-sm shrink-0">
               📋
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-zinc-950">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black text-zinc-950 truncate">
                 Recent Inquiries &amp; Leads
               </h2>
-              <p className="text-xs text-zinc-600">Instagram, WhatsApp &amp; Call inquiries with instant proposal share</p>
+              <p className="text-[11px] sm:text-xs text-zinc-600 truncate">Instagram, WhatsApp &amp; Call inquiries</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between sm:justify-end gap-2">
             <button
               onClick={() => setIsAddTourInquiryOpen(true)}
-              className="px-3 py-1.5 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer transition-all"
+              className="px-3 py-1.5 bg-zinc-950 hover:bg-black text-white rounded-xl text-xs font-black shadow-xs flex items-center gap-1 cursor-pointer transition-all whitespace-nowrap"
             >
               <span>+ New Inquiry</span>
             </button>
             <button
               onClick={() => handleNavigateMore('inquiries')}
-              className="text-xs font-black text-zinc-900 hover:underline flex items-center gap-1"
+              className="text-xs font-black text-zinc-900 hover:underline flex items-center gap-1 whitespace-nowrap"
             >
               View All ({tourInquiries.length}) &rarr;
             </button>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {/* MOBILE ONLY (< sm): Compact Tour-Folder-style Inquiry Cards */}
+        <div className="sm:hidden space-y-2.5">
+          {recentInquiries.map((inq) => (
+            <div
+              key={`mob-inq-${inq.id}`}
+              className="bg-zinc-50/70 border border-zinc-200 rounded-2xl p-3 space-y-2"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <h3 className="text-[14px] font-black text-zinc-950 leading-tight truncate">
+                    {inq.customerName}
+                  </h3>
+                  <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 mt-0.5 truncate">
+                    <span className="font-bold text-zinc-800 truncate">{inq.destination}</span>
+                    <span className="text-zinc-300">·</span>
+                    <span className="font-bold text-zinc-800 shrink-0">{inq.totalPax} Pax</span>
+                    <span className="text-zinc-300">·</span>
+                    <span className="truncate">{inq.source}</span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-mono font-bold text-zinc-500 shrink-0">
+                  {inq.inquiryNumber}
+                </span>
+              </div>
+
+              <p className="text-[11px] text-zinc-700 line-clamp-2 leading-snug">
+                {inq.discussionSummary || 'No discussion notes.'}
+              </p>
+
+              <div className="pt-2 border-t border-zinc-200/80 flex items-center justify-between gap-2">
+                <button
+                  type="button"
+                  onClick={() => handleNavigateMore('inquiries')}
+                  className="text-[11px] font-bold text-zinc-600 hover:text-zinc-950 whitespace-nowrap"
+                >
+                  Open Details &rarr;
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openInquiryPdf(inq)}
+                  className="h-8 px-3 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer active:scale-95 transition-transform"
+                >
+                  <span>Gujarati PDF</span>
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* DESKTOP (sm+): Original untouched 3-column grid */}
+        <div className="hidden sm:grid grid-cols-1 md:grid-cols-3 gap-3">
           {recentInquiries.map((inq) => (
             <div
               key={inq.id}
@@ -418,29 +468,127 @@ export const TourismDashboard: React.FC<TourismDashboardProps> = ({
       </div>
 
       {/* Recent Tour Bookings */}
-      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-zinc-200 shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center">
+      <div className="bg-white rounded-3xl p-4 sm:p-6 border border-zinc-200 shadow-sm space-y-3.5 sm:space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center shrink-0">
               <Luggage className="w-4 h-4" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-bold text-zinc-900">
-                Recent Tour Bookings & Slips
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-bold text-zinc-900 truncate">
+                Recent Tour Bookings &amp; Slips
               </h2>
-              <p className="text-xs text-zinc-500">Customer manifests & advance status</p>
+              <p className="text-[11px] sm:text-xs text-zinc-500 truncate">Customer manifests &amp; advance status</p>
             </div>
           </div>
 
           <button
             onClick={() => onNavigateTab('sales')}
-            className="text-xs font-black text-zinc-900 hover:text-black flex items-center gap-1 cursor-pointer"
+            className="text-xs font-black text-zinc-900 hover:text-black flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
           >
             All Bookings &rarr;
           </button>
         </div>
 
-        <div className="space-y-2.5">
+        {/* MOBILE ONLY (< sm): Compact 3-Row Tour-Folder Style Booking Cards */}
+        <div className="sm:hidden space-y-2.5">
+          {recentBookings.map((b) => {
+            const total = Number(b.totalAmount || 0);
+            const adv = Number(b.advancePaid || 0);
+            const due = Math.max(0, total - adv);
+            const isFullPaid = due === 0 && total > 0;
+
+            return (
+              <div
+                key={`mob-bk-${b.id}`}
+                className={`rounded-2xl border-2 p-3 space-y-2.5 bg-white ${
+                  isFullPaid ? 'border-emerald-600' : 'border-zinc-900'
+                }`}
+              >
+                {/* Row 1: Customer Name + Unboxed metadata */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <h3 className="text-[14px] font-black text-zinc-950 leading-tight truncate">
+                      {b.customerName}
+                    </h3>
+                    <div className="flex items-center gap-1 text-[11px] text-zinc-500 mt-0.5 truncate">
+                      <span className="font-mono font-bold text-zinc-700 shrink-0">{formatDate(b.tourDate)}</span>
+                      <span className="text-zinc-300">·</span>
+                      <span className="font-bold text-zinc-900 shrink-0">{b.membersCount} Pax</span>
+                      <span className="text-zinc-300">·</span>
+                      <span className="truncate">{b.destination}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-zinc-500 shrink-0">
+                    {b.bookingNumber}
+                  </span>
+                </div>
+
+                {/* Row 2: 3-Col Tabular Financial Strip */}
+                <div
+                  onClick={() => setPaymentModalBooking(b)}
+                  className="grid grid-cols-3 divide-x divide-zinc-200 bg-zinc-50/90 rounded-xl border border-zinc-200 py-2 text-center cursor-pointer"
+                >
+                  <div className="px-1 min-w-0">
+                    <span className="text-[9px] font-bold uppercase text-zinc-500 block">Total</span>
+                    <span className="text-xs font-black font-mono tabular-nums text-zinc-950 whitespace-nowrap block truncate">
+                      {formatCurrency(total)}
+                    </span>
+                  </div>
+                  <div className="px-1 min-w-0">
+                    <span className="text-[9px] font-bold uppercase text-emerald-700 block">Received</span>
+                    <span className="text-xs font-black font-mono tabular-nums text-emerald-700 whitespace-nowrap block truncate">
+                      {formatCurrency(adv)}
+                    </span>
+                  </div>
+                  <div className="px-1 min-w-0">
+                    <span className={`text-[9px] font-bold uppercase block ${isFullPaid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {isFullPaid ? 'Status' : 'Baaki Due'}
+                    </span>
+                    <span className={`text-xs font-black font-mono tabular-nums whitespace-nowrap block truncate ${isFullPaid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                      {isFullPaid ? 'Paid' : formatCurrency(due)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Row 3: Slip + Single Primary CTA */}
+                <div className="flex items-center justify-between gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleShareBooking(b)}
+                    className="h-8 px-3 rounded-lg bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-200 text-[11px] font-bold flex items-center gap-1.5 whitespace-nowrap cursor-pointer"
+                  >
+                    <Share2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Slip</span>
+                  </button>
+
+                  {!isFullPaid ? (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalBooking(b)}
+                      className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black flex items-center gap-1 whitespace-nowrap cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5] shrink-0" />
+                      <span>Receive</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setPaymentModalBooking(b)}
+                      className="h-8 px-3 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black flex items-center gap-1 whitespace-nowrap cursor-pointer"
+                    >
+                      <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                      <span>History</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* DESKTOP (sm+): Original untouched rows */}
+        <div className="hidden sm:block space-y-2.5">
           {recentBookings.map((b) => {
             const total = Number(b.totalAmount || 0);
             const adv = Number(b.advancePaid || 0);

@@ -484,14 +484,14 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
             title="Toggle ChatGPT History Sidebar"
           >
             {isSidebarOpen ? <PanelLeftClose size={16} /> : <PanelLeft size={16} />}
-            <span className="text-xs font-bold">History ({threads.length})</span>
+            <span className="hidden sm:inline text-xs font-bold">History ({threads.length})</span>
           </button>
 
           <div className="min-w-0 flex items-center gap-1.5">
             <span className="font-black text-sm sm:text-base tracking-tight text-white truncate">
               Sanzari AI Manager
             </span>
-            <span className="px-2 py-0.5 rounded-md bg-amber-400 text-zinc-950 text-[10px] font-black uppercase tracking-wider shrink-0 flex items-center gap-1">
+            <span className="hidden sm:flex px-2 py-0.5 rounded-md bg-amber-400 text-zinc-950 text-[10px] font-black uppercase tracking-wider shrink-0 items-center gap-1">
               {businessMode === 'tourism' ? (
                 <>
                   <Plane size={10} /> ✈️ Tourism
@@ -505,14 +505,14 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           <button
             onClick={handleNewChat}
-            className="px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-zinc-950 text-xs font-black flex items-center gap-1 shadow-sm transition-transform active:scale-95 cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-amber-400 hover:bg-amber-500 text-zinc-950 text-xs font-black flex items-center gap-1 shadow-sm transition-transform active:scale-95 cursor-pointer"
           >
             <Plus size={14} className="stroke-[3]" />
             <span className="hidden sm:inline">+ New Chat</span>
-            <span className="sm:hidden">+ New</span>
+            <span className="sm:hidden">New</span>
           </button>
 
           <button
@@ -609,7 +609,7 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
         {/* Active Full Screen Chat Conversation Area */}
         <div className="flex-1 flex flex-col justify-between max-w-4xl mx-auto w-full h-full p-3 sm:p-5 overflow-hidden">
           {/* Messages list with Auto Scroll Ref */}
-          <div className="flex-1 overflow-y-auto space-y-4 pr-1 sm:pr-2">
+          <div className="flex-1 overflow-y-auto overscroll-contain space-y-4 pr-1 sm:pr-2">
             {messages.map((m) => (
               <motion.div
                 key={m.id}
@@ -668,7 +668,7 @@ ${products.slice(0, 15).map((p) => `• ${p.name}: ${p.currentStock} ${p.unit} i
           </div>
 
           {/* Full Screen ChatGPT Style Input Box */}
-          <div className="pt-3 pb-2 shrink-0">
+          <div className="pt-3 pb-2 safe-bottom sm:pb-2 shrink-0">
             <form
               onSubmit={(e) => {
                 e.preventDefault();

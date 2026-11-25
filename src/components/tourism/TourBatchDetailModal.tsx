@@ -367,43 +367,100 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-1 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-6xl bg-white rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[98vh] sm:max-h-[94vh] flex flex-col">
-        {/* Clean Header */}
-        <div className="bg-white p-3 sm:p-5 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
+      <div className="relative w-full max-w-6xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto h-[94dvh] sm:h-auto sm:max-h-[94vh] flex flex-col">
+        {/* =========================================================
+            MOBILE-ONLY COMPACT STICKY TOP BAR (< sm)
+            Keeps 88%+ of the mobile screen open for smooth single-scroll!
+            ========================================================= */}
+        <div className="sm:hidden bg-white px-3.5 pt-2 pb-2.5 text-zinc-950 shrink-0 border-b border-zinc-200">
+          <div className="w-10 h-1 rounded-full bg-zinc-300 mx-auto mb-2" />
+          <div className="flex items-center justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[16px] font-black text-zinc-950 tracking-tight leading-tight truncate">
+                {batch.title}
+              </h2>
+              <p className="text-[11px] text-zinc-500 font-semibold truncate mt-0.5">
+                {batch.destination} · {formatDate(batch.departureDate)}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                type="button"
+                onClick={() =>
+                  setActiveView((prev) => (prev === 'account' ? 'manifest' : 'account'))
+                }
+                className={`h-9 px-2.5 rounded-xl border-2 text-[11px] font-black flex items-center gap-1 transition-all cursor-pointer whitespace-nowrap ${
+                  activeView === 'account'
+                    ? 'bg-zinc-950 text-white border-zinc-950'
+                    : 'bg-amber-400 active:bg-amber-500 text-zinc-950 border-zinc-900'
+                }`}
+              >
+                <Wallet size={13} className="stroke-[2.5] shrink-0" />
+                <span>{activeView === 'account' ? 'List' : 'Account'}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsPDFModalOpen(true)}
+                disabled={bookings.length === 0}
+                title="Download Group PDF"
+                className="h-9 px-2.5 rounded-xl bg-emerald-600 active:bg-emerald-700 disabled:opacity-40 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <FileDown size={13} className="stroke-[2.5]" />
+                <span>PDF</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label="Close"
+                className="w-9 h-9 rounded-xl bg-zinc-100 active:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 cursor-pointer shrink-0"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* =========================================================
+            DESKTOP HEADER (sm+ ONLY — 100% UNCHANGED)
+            ========================================================= */}
+        <div className="hidden sm:block bg-white p-5 text-zinc-950 shrink-0 border-b-2 border-zinc-900">
           <div className="flex items-start justify-between gap-2.5 flex-wrap">
             <div>
-              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-                <span className="text-[10px] sm:text-[11px] font-bold text-zinc-900 bg-zinc-100 border border-zinc-300 px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-full">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-bold text-zinc-900 bg-zinc-100 border border-zinc-300 px-2.5 py-0.5 rounded-full">
                   🗓️ Departure: {formatDate(batch.departureDate)}
                 </span>
-                <span className="text-[10px] sm:text-[11px] bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold px-1.5 py-0.5 sm:px-2 sm:py-0.5 rounded-md">
+                <span className="text-[11px] bg-zinc-100 border border-zinc-300 text-zinc-900 font-bold px-2 py-0.5 rounded-md">
                   {batch.tourType}
                 </span>
-                <span className="text-[10px] sm:text-[11px] bg-blue-100 border border-blue-400 text-blue-900 font-black px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg">
+                <span className="text-[11px] bg-blue-100 border border-blue-400 text-blue-900 font-black px-2.5 py-0.5 rounded-lg">
                   🚆 AC: {acStats.acPax} Pax ({acStats.acBookings})
                 </span>
-                <span className="text-[10px] sm:text-[11px] bg-amber-100 border border-amber-400 text-amber-900 font-black px-2 py-0.5 sm:px-2.5 sm:py-0.5 rounded-lg">
+                <span className="text-[11px] bg-amber-100 border border-amber-400 text-amber-900 font-black px-2.5 py-0.5 rounded-lg">
                   🚂 Non-AC: {acStats.nonAcPax} Pax ({acStats.nonAcBookings})
                 </span>
               </div>
-              <h2 className="text-lg sm:text-2xl font-black mt-1 text-zinc-950 tracking-tight leading-tight">
+              <h2 className="text-2xl font-black mt-1 text-zinc-950 tracking-tight leading-tight">
                 {batch.title}
               </h2>
-              <p className="text-[11px] sm:text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
+              <p className="text-xs text-zinc-600 flex items-center gap-1 mt-0.5 font-medium">
                 <MapPin className="w-3.5 h-3.5 text-zinc-900 shrink-0" /> {batch.destination} •{' '}
                 {batch.durationDays} Days ({batch.travelMode})
               </p>
             </div>
 
             {/* Top Action Buttons: Account Button, Download PDF, Delete, Close */}
-            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <button
                 type="button"
                 onClick={() =>
                   setActiveView((prev) => (prev === 'account' ? 'manifest' : 'account'))
                 }
-                className={`px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl border-2 text-[11px] sm:text-xs font-black flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer ${
+                className={`px-3.5 py-2 rounded-xl border-2 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer ${
                   activeView === 'account'
                     ? 'bg-zinc-950 text-white border-zinc-950'
                     : 'bg-amber-400 hover:bg-amber-500 text-zinc-950 border-zinc-900'
@@ -417,7 +474,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                 type="button"
                 onClick={() => setIsPDFModalOpen(true)}
                 disabled={bookings.length === 0}
-                className="px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-[11px] sm:text-xs font-black flex items-center gap-1 sm:gap-1.5 transition-all cursor-pointer"
+                className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white border border-emerald-700 text-xs font-black flex items-center gap-1.5 transition-all cursor-pointer"
               >
                 <FileDown size={13} className="stroke-[2.5]" />
                 <span>Download Group PDF</span>
@@ -426,26 +483,26 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
               <button
                 type="button"
                 onClick={handleDeleteBatch}
-                className="px-2 py-1.5 sm:px-3 sm:py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-[11px] sm:text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+                className="px-3 py-2 rounded-xl bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-300 text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
               >
                 <Trash2 size={12} />
-                <span className="hidden sm:inline">Delete Folder</span>
+                <span>Delete Folder</span>
               </button>
 
               <button
                 onClick={onClose}
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer shrink-0"
+                className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
           </div>
 
-          {/* 4 Summary Cards (Compact 2x2 Grid on Mobile) */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 mt-3 pt-2.5 border-t border-zinc-200 text-xs">
-            <div className="bg-zinc-50 border border-zinc-200 p-2 sm:p-2.5 rounded-xl min-w-0">
-              <span className="text-zinc-500 block text-[10px] sm:text-[11px] font-medium truncate">Seat Capacity</span>
-              <span className="text-xs sm:text-base font-black text-zinc-950 truncate block">
+          {/* 4 Summary Cards */}
+          <div className="grid grid-cols-4 gap-2.5 mt-3 pt-2.5 border-t border-zinc-200 text-xs">
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl min-w-0">
+              <span className="text-zinc-500 block text-[11px] font-medium truncate">Seat Capacity</span>
+              <span className="text-base font-black text-zinc-950 truncate block">
                 {totalPassengers} / {totalSeats} Booked ({percentage}%)
               </span>
               <div className="flex items-center gap-1 mt-1 flex-wrap">
@@ -458,82 +515,127 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
               </div>
             </div>
 
-            <div className="bg-zinc-50 border border-zinc-200 p-2 sm:p-2.5 rounded-xl min-w-0">
-              <span className="text-zinc-500 block text-[10px] sm:text-[11px] font-medium truncate">Total Package Value</span>
-              <span className="text-xs sm:text-base font-black text-zinc-950 truncate block">
+            <div className="bg-zinc-50 border border-zinc-200 p-2.5 rounded-xl min-w-0">
+              <span className="text-zinc-500 block text-[11px] font-medium truncate">Total Package Value</span>
+              <span className="text-base font-black text-zinc-950 truncate block">
                 {formatCurrency(totalRevenue)}
               </span>
             </div>
 
-            <div className="bg-emerald-50/70 border border-emerald-200 p-2 sm:p-2.5 rounded-xl min-w-0">
-              <span className="text-emerald-800 block text-[10px] sm:text-[11px] font-bold truncate">Advance / Received</span>
-              <span className="text-xs sm:text-base font-black text-emerald-700 truncate block">
+            <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl min-w-0">
+              <span className="text-emerald-800 block text-[11px] font-bold truncate">Advance / Received</span>
+              <span className="text-base font-black text-emerald-700 truncate block">
                 {formatCurrency(totalAdvance)}
               </span>
             </div>
 
-            <div className="bg-rose-50/70 border border-rose-200 p-2 sm:p-2.5 rounded-xl min-w-0">
-              <span className="text-rose-800 block text-[10px] sm:text-[11px] font-bold truncate">Remaining Baaki (Due)</span>
-              <span className="text-xs sm:text-base font-black text-rose-600 truncate block">
+            <div className="bg-rose-50/70 border border-rose-200 p-2.5 rounded-xl min-w-0">
+              <span className="text-rose-800 block text-[11px] font-bold truncate">Remaining Baaki (Due)</span>
+              <span className="text-base font-black text-rose-600 truncate block">
                 {formatCurrency(totalPending)}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Scrollable Body */}
+        {/* Single Smooth Scrollable Body */}
         <div
           onClick={() => {
             if (openMenuBookingId) setOpenMenuBookingId(null);
           }}
-          className="p-4 sm:p-5 pb-24 overflow-y-auto space-y-4 flex-1 min-h-0 bg-white text-zinc-900"
+          className="p-3 sm:p-5 pb-20 sm:pb-24 overflow-y-auto overscroll-contain space-y-3 sm:space-y-4 flex-1 min-h-0 bg-zinc-50/50 sm:bg-white text-zinc-900"
         >
+          {/* Mobile-Only Scrollable KPI Summary (scrolls away cleanly while browsing passengers!) */}
+          <div className="sm:hidden space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="bg-white border border-zinc-200 p-2.5 rounded-xl min-w-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] font-semibold text-zinc-500">Seats Booked</span>
+                  <span className="text-[10px] font-black text-zinc-700 font-mono tabular-nums">
+                    {percentage}%
+                  </span>
+                </div>
+                <span className="text-[15px] font-black text-zinc-950 font-mono tabular-nums block mt-0.5">
+                  {totalPassengers} / {totalSeats} Pax
+                </span>
+                <div className="text-[10px] font-bold mt-0.5 flex items-center gap-1.5">
+                  <span className="text-blue-700">AC {acStats.acPax}</span>
+                  <span className="text-zinc-300">·</span>
+                  <span className="text-amber-700">Non-AC {acStats.nonAcPax}</span>
+                </div>
+              </div>
+
+              <div className="bg-white border border-zinc-200 p-2.5 rounded-xl min-w-0">
+                <span className="text-[10px] font-semibold text-zinc-500 block">Package Billing</span>
+                <span className="text-[15px] font-black text-zinc-950 font-mono tabular-nums block mt-0.5 truncate">
+                  {formatCurrency(totalRevenue)}
+                </span>
+                <span className="text-[10px] font-semibold text-zinc-500 block mt-0.5 truncate">
+                  {activeBookings.length} Active · {batch.durationDays}d
+                </span>
+              </div>
+
+              <div className="bg-emerald-50/70 border border-emerald-200 p-2.5 rounded-xl min-w-0">
+                <span className="text-[10px] font-bold text-emerald-800 block">Advance Recd</span>
+                <span className="text-[15px] font-black text-emerald-700 font-mono tabular-nums block mt-0.5 truncate">
+                  {formatCurrency(totalAdvance)}
+                </span>
+              </div>
+
+              <div className="bg-rose-50/70 border border-rose-200 p-2.5 rounded-xl min-w-0">
+                <span className="text-[10px] font-bold text-rose-800 block">Remaining Due</span>
+                <span className="text-[15px] font-black text-rose-600 font-mono tabular-nums block mt-0.5 truncate">
+                  {formatCurrency(totalPending)}
+                </span>
+              </div>
+            </div>
+          </div>
           {activeView === 'account' ? (
             /* =========================================================
                SIMPLE FOLDER ACCOUNT VIEW (CASH IN / CASH OUT + WALLETS)
                ========================================================= */
             <div className="space-y-4">
               {/* Row 1: Kisme Kitna He (Sahil vs Rizwan vs Folder Net Balance) */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 {/* Sahil Box */}
-                <div className="p-3 rounded-2xl bg-purple-50/60 border-2 border-purple-300 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-purple-900 block">
-                      🟣 Sahil Account (Is Folder me)
+                <div className="p-2.5 sm:p-3 rounded-2xl bg-purple-50/60 border-2 border-purple-300 flex items-center justify-between min-w-0">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black uppercase text-purple-900 block truncate">
+                      <span className="sm:hidden">🟣 Sahil Net</span>
+                      <span className="hidden sm:inline">🟣 Sahil Account (Is Folder me)</span>
                     </span>
-                    <span className="text-base sm:text-lg font-black font-mono text-zinc-950">
+                    <span className="text-sm sm:text-lg font-black font-mono tabular-nums text-zinc-950 block truncate">
                       {formatCurrency(folderAccountStats.sahilNet)}
                     </span>
-                    <span className="text-[10px] font-bold text-zinc-600 block">
-                      In: +{formatCurrency(folderAccountStats.sahilIn)} • Out: -
-                      {formatCurrency(folderAccountStats.sahilOut)}
+                    <span className="text-[10px] font-bold text-zinc-600 block truncate">
+                      +{formatCurrency(folderAccountStats.sahilIn)} / -{formatCurrency(folderAccountStats.sahilOut)}
                     </span>
                   </div>
                 </div>
 
                 {/* Rizwan Box */}
-                <div className="p-3 rounded-2xl bg-blue-50/60 border-2 border-blue-300 flex items-center justify-between">
-                  <div>
-                    <span className="text-[10px] font-black uppercase text-blue-900 block">
-                      🔵 Rizwan Account (Is Folder me)
+                <div className="p-2.5 sm:p-3 rounded-2xl bg-blue-50/60 border-2 border-blue-300 flex items-center justify-between min-w-0">
+                  <div className="min-w-0">
+                    <span className="text-[10px] font-black uppercase text-blue-900 block truncate">
+                      <span className="sm:hidden">🔵 Rizwan Net</span>
+                      <span className="hidden sm:inline">🔵 Rizwan Account (Is Folder me)</span>
                     </span>
-                    <span className="text-base sm:text-lg font-black font-mono text-zinc-950">
+                    <span className="text-sm sm:text-lg font-black font-mono tabular-nums text-zinc-950 block truncate">
                       {formatCurrency(folderAccountStats.rizwanNet)}
                     </span>
-                    <span className="text-[10px] font-bold text-zinc-600 block">
-                      In: +{formatCurrency(folderAccountStats.rizwanIn)} • Out: -
-                      {formatCurrency(folderAccountStats.rizwanOut)}
+                    <span className="text-[10px] font-bold text-zinc-600 block truncate">
+                      +{formatCurrency(folderAccountStats.rizwanIn)} / -{formatCurrency(folderAccountStats.rizwanOut)}
                     </span>
                   </div>
                 </div>
 
                 {/* Net Folder Balance */}
-                <div className="p-3 rounded-2xl bg-zinc-950 text-white border-2 border-zinc-950 flex items-center justify-between">
+                <div className="col-span-2 sm:col-span-1 p-3 rounded-2xl bg-zinc-950 text-white border-2 border-zinc-950 flex items-center justify-between">
                   <div>
                     <span className="text-[10px] font-black uppercase text-amber-400 block">
                       💼 Folder Net Balance (In - Out)
                     </span>
-                    <span className="text-base sm:text-lg font-black font-mono text-emerald-400">
+                    <span className="text-base sm:text-lg font-black font-mono tabular-nums text-emerald-400">
                       {formatCurrency(folderAccountStats.netBalance)}
                     </span>
                     <span className="text-[10px] font-bold text-zinc-400 block">
@@ -545,31 +647,47 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
               </div>
 
               {/* Row 2: Simple 2-Button Toggle: Cash In vs Cash Out */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => setCashTab('cash_in')}
-                  className={`py-3 px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  className={`py-2.5 sm:py-3 px-2.5 sm:px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 transition-all cursor-pointer ${
                     cashTab === 'cash_in'
                       ? 'bg-emerald-600 text-white border-emerald-800 shadow-sm'
                       : 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:border-emerald-600'
                   }`}
                 >
-                  <ArrowDownLeft size={16} className="stroke-[3]" />
-                  <span>🟢 Cash In — Customer Wise ({formatCurrency(folderAccountStats.totalCashIn)})</span>
+                  <span className="sm:hidden flex items-center gap-1 text-[11px]">
+                    <ArrowDownLeft size={14} className="stroke-[3]" /> Cash In
+                  </span>
+                  <span className="sm:hidden font-mono tabular-nums text-xs">
+                    {formatCurrency(folderAccountStats.totalCashIn)}
+                  </span>
+                  <span className="hidden sm:inline-flex items-center gap-2">
+                    <ArrowDownLeft size={16} className="stroke-[3]" />
+                    <span>🟢 Cash In — Customer Wise ({formatCurrency(folderAccountStats.totalCashIn)})</span>
+                  </span>
                 </button>
 
                 <button
                   type="button"
                   onClick={() => setCashTab('cash_out')}
-                  className={`py-3 px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer ${
+                  className={`py-2.5 sm:py-3 px-2.5 sm:px-4 rounded-2xl border-2 font-black text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-center gap-0.5 sm:gap-2 transition-all cursor-pointer ${
                     cashTab === 'cash_out'
                       ? 'bg-rose-600 text-white border-rose-800 shadow-sm'
                       : 'bg-rose-50 text-rose-900 border-rose-300 hover:border-rose-600'
                   }`}
                 >
-                  <ArrowUpRight size={16} className="stroke-[3]" />
-                  <span>🔴 Cash Out — Expenses ({formatCurrency(folderAccountStats.totalCashOut)})</span>
+                  <span className="sm:hidden flex items-center gap-1 text-[11px]">
+                    <ArrowUpRight size={14} className="stroke-[3]" /> Cash Out
+                  </span>
+                  <span className="sm:hidden font-mono tabular-nums text-xs">
+                    {formatCurrency(folderAccountStats.totalCashOut)}
+                  </span>
+                  <span className="hidden sm:inline-flex items-center gap-2">
+                    <ArrowUpRight size={16} className="stroke-[3]" />
+                    <span>🔴 Cash Out — Expenses ({formatCurrency(folderAccountStats.totalCashOut)})</span>
+                  </span>
                 </button>
               </div>
 
@@ -674,14 +792,14 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                       + Add Cash Out / Expense (Is Folder ke Liye)
                     </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-12 gap-2">
+                    <div className="grid grid-cols-2 sm:grid-cols-12 gap-2">
                       <input
                         type="text"
                         required
                         placeholder="Expense Name (e.g. Hotel, Train, Bus, Food)"
                         value={expDescription}
                         onChange={(e) => setExpDescription(e.target.value)}
-                        className="sm:col-span-4 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-bold text-zinc-950 focus:outline-none"
+                        className="col-span-2 sm:col-span-4 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-bold text-zinc-950 focus:outline-none"
                       />
 
                       <input
@@ -691,13 +809,13 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                         placeholder="₹ Amount"
                         value={expAmount}
                         onChange={(e) => setExpAmount(e.target.value)}
-                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-black text-rose-700 focus:outline-none"
+                        className="col-span-1 sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-3 py-2 text-xs font-mono font-black text-rose-700 focus:outline-none"
                       />
 
                       <select
                         value={expWalletName}
                         onChange={(e) => setExpWalletName(e.target.value)}
-                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
+                        className="col-span-1 sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
                       >
                         <option value="Rizwan (Tour)">🔵 Rizwan</option>
                         <option value="Sahil (Tour)">🟣 Sahil</option>
@@ -707,7 +825,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                       <select
                         value={expPaymentMode}
                         onChange={(e) => setExpPaymentMode(e.target.value as TourPaymentMode)}
-                        className="sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
+                        className="col-span-1 sm:col-span-2 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-xs font-black text-zinc-950 cursor-pointer focus:outline-none"
                       >
                         <option value="UPI">📱 UPI</option>
                         <option value="Cash">💵 Cash</option>
@@ -717,7 +835,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                       <button
                         type="submit"
                         disabled={isSavingExpense}
-                        className="sm:col-span-2 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs cursor-pointer"
+                        className="col-span-1 sm:col-span-2 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-xs cursor-pointer"
                       >
                         {isSavingExpense ? 'Saving...' : '+ Add Out'}
                       </button>
@@ -790,7 +908,129 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                DEFAULT VIEW: BOOKED PASSENGERS MANIFEST
                ========================================================= */
             <>
-              <div className="space-y-2.5">
+              {/* MOBILE-ONLY COMPACT MANIFEST TOOLBAR (< sm) */}
+              <div className="sm:hidden space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="text-xs font-black text-zinc-950 flex items-center gap-1.5 min-w-0 truncate">
+                    <Users className="w-3.5 h-3.5 text-zinc-800 shrink-0" />
+                    <span className="truncate">
+                      Passengers ({bookings.length} · {totalPassengers} Pax)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {bookings.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const allExpanded = bookings.every((bk) => expandedBookingIds[bk.id]);
+                          if (allExpanded) {
+                            setExpandedBookingIds({});
+                          } else {
+                            const next: Record<string, boolean> = {};
+                            bookings.forEach((bk) => {
+                              next[bk.id] = true;
+                            });
+                            setExpandedBookingIds(next);
+                          }
+                        }}
+                        className="h-7 px-2.5 bg-white text-zinc-700 border border-zinc-300 rounded-lg text-[11px] font-bold cursor-pointer"
+                      >
+                        {bookings.every((bk) => expandedBookingIds[bk.id]) ? 'Collapse' : 'Expand All'}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={handleDeleteBatch}
+                      title="Delete Folder"
+                      className="h-7 w-7 rounded-lg bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center cursor-pointer"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Search + Primary Book CTA on ONE tight row */}
+                <div className="flex items-center gap-2">
+                  <div className="relative flex-1 min-w-0">
+                    <Search className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                    <input
+                      type="text"
+                      value={manifestSearchQuery}
+                      onChange={(e) => setManifestSearchQuery(e.target.value)}
+                      placeholder="Search name, phone, ID..."
+                      className="w-full h-10 pl-8 pr-7 bg-white border border-zinc-300 focus:border-zinc-900 rounded-xl text-xs font-semibold text-zinc-950 placeholder:text-zinc-400 focus:outline-none"
+                    />
+                    {manifestSearchQuery && (
+                      <button
+                        type="button"
+                        onClick={() => setManifestSearchQuery('')}
+                        className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-zinc-400 hover:text-zinc-900 cursor-pointer"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onAddBookingToBatch(batch.id)}
+                    className="h-10 px-3.5 bg-zinc-950 active:bg-black text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-xs shrink-0 whitespace-nowrap cursor-pointer"
+                  >
+                    <Plus className="w-3.5 h-3.5 stroke-[3]" />
+                    <span>Book</span>
+                  </button>
+                </div>
+
+                {/* Single-line Horizontal Scroll Filter Tabs */}
+                <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setClassFilter('ALL')}
+                    className={`h-8 px-3 rounded-lg text-[11px] font-black whitespace-nowrap shrink-0 transition-colors cursor-pointer ${
+                      classFilter === 'ALL'
+                        ? 'bg-zinc-950 text-white'
+                        : 'bg-white text-zinc-700 border border-zinc-200'
+                    }`}
+                  >
+                    All ({totalPassengers})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClassFilter('AC')}
+                    className={`h-8 px-3 rounded-lg text-[11px] font-black whitespace-nowrap shrink-0 transition-colors cursor-pointer border ${
+                      classFilter === 'AC'
+                        ? 'bg-blue-600 text-white border-blue-700'
+                        : 'bg-blue-50 text-blue-900 border-blue-200'
+                    }`}
+                  >
+                    AC ({acStats.acPax})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClassFilter('NON_AC')}
+                    className={`h-8 px-3 rounded-lg text-[11px] font-black whitespace-nowrap shrink-0 transition-colors cursor-pointer border ${
+                      classFilter === 'NON_AC'
+                        ? 'bg-amber-500 text-zinc-950 border-amber-600'
+                        : 'bg-amber-50 text-amber-900 border-amber-200'
+                    }`}
+                  >
+                    Non-AC ({acStats.nonAcPax})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClassFilter('CANCELLED')}
+                    className={`h-8 px-3 rounded-lg text-[11px] font-black whitespace-nowrap shrink-0 transition-colors cursor-pointer border ${
+                      classFilter === 'CANCELLED'
+                        ? 'bg-rose-600 text-white border-rose-700'
+                        : 'bg-rose-50 text-rose-800 border-rose-200'
+                    }`}
+                  >
+                    Cancelled ({cancelledBookings.length})
+                  </button>
+                </div>
+              </div>
+
+              {/* DESKTOP MANIFEST TOOLBAR (sm+ ONLY — 100% UNCHANGED) */}
+              <div className="hidden sm:block space-y-2.5">
                 {/* Top Row: Manifest Title on Left + Search Bar on Right */}
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                   <div>
@@ -959,10 +1199,10 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             setOpenMenuBookingId((prev) => (prev === b.id ? null : b.id));
                           }}
                           title="More Options (Share, Edit, Slip, Cancel / Refund, Delete)"
-                          className={`p-1.5 rounded-lg border transition-colors cursor-pointer ${
+                          className={`w-8 h-8 sm:w-auto sm:h-auto sm:p-1.5 rounded-lg border flex items-center justify-center transition-colors cursor-pointer ${
                             isMenuOpen
                               ? 'bg-zinc-950 text-white border-zinc-950'
-                              : 'bg-zinc-100 hover:bg-zinc-200 text-zinc-800 border-zinc-300'
+                              : 'bg-white sm:bg-zinc-100 hover:bg-zinc-200 text-zinc-700 sm:text-zinc-800 border-zinc-200 sm:border-zinc-300'
                           }`}
                         >
                           <MoreVertical className="w-4 h-4" />
@@ -1071,10 +1311,208 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             : 'bg-white border-zinc-200 hover:border-zinc-400'
                         }`}
                       >
-                        {/* Main Clickable Row (Customer Name, PAX, AC/Non-AC Badge, Ticket Done, Payment Status, Expand & 3-Dot Menu) */}
+                        {/* =========================================================
+                            MOBILE-NATIVE COMPACT PASSENGER CARD (< sm ONLY)
+                            3 crisp breathable rows — razor-sharp native mobile layout
+                            ========================================================= */}
                         <div
                           onClick={() => toggleBookingExpand(b.id)}
-                          className={`p-3.5 sm:p-4 rounded-2xl flex flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
+                          className={`sm:hidden p-3.5 rounded-2xl space-y-2.5 cursor-pointer select-none transition-colors ${
+                            isCancelled
+                              ? 'active:bg-rose-100/50'
+                              : isTicketDone
+                              ? 'active:bg-emerald-100/60'
+                              : 'active:bg-zinc-50'
+                          }`}
+                        >
+                          {/* Row 1: Identity + Pax/Class + Matched 32x32 Expand & 3-Dot Controls */}
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-1.5 min-w-0">
+                                <span
+                                  onClick={(e) => copyNameToClipboard(e, b.customerName)}
+                                  className={`text-[15px] font-black leading-tight tracking-tight truncate ${
+                                    isCancelled
+                                      ? 'line-through text-rose-900/80'
+                                      : copiedName === String(b.customerName || '').trim()
+                                      ? 'text-emerald-600'
+                                      : 'text-zinc-950'
+                                  }`}
+                                >
+                                  {b.customerName}
+                                </span>
+                                {isCancelled && (
+                                  <span className="text-[10px] font-black text-rose-700 uppercase shrink-0">
+                                    Cancelled
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1.5 text-[11px] text-zinc-500 font-semibold mt-1 flex-wrap leading-none">
+                                <span className="font-mono tabular-nums text-zinc-600">{b.customerPhone}</span>
+                                <span className="text-zinc-300">·</span>
+                                <span className="font-mono text-[10px] text-zinc-400">{b.bookingNumber}</span>
+                                <span className="text-zinc-300">·</span>
+                                <span className="font-black text-zinc-900">{b.membersCount} Pax</span>
+                                <span className="text-zinc-300">·</span>
+                                <span
+                                  className={`font-black ${
+                                    isNonAc ? 'text-amber-700' : 'text-blue-600'
+                                  }`}
+                                >
+                                  {isNonAc ? 'Non-AC' : 'AC'}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div
+                              className="flex items-center gap-1.5 shrink-0"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => toggleBookingExpand(b.id)}
+                                aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                                className={`w-8 h-8 rounded-lg border flex items-center justify-center cursor-pointer transition-colors ${
+                                  isExpanded
+                                    ? 'bg-zinc-900 text-white border-zinc-900'
+                                    : 'bg-white text-zinc-700 border-zinc-200'
+                                }`}
+                              >
+                                {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                              </button>
+                              {renderThreeDotMenu()}
+                            </div>
+                          </div>
+
+                          {/* Row 2: Financials Strip (3 Crisp Tabular Columns — Zero Wrapping) */}
+                          {isCancelled && cancelInfo ? (
+                            <div className="grid grid-cols-3 divide-x divide-rose-200/80 bg-white/90 rounded-xl border border-rose-200 py-2 px-1 text-center font-mono tabular-nums">
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-zinc-400 uppercase block">Recd</span>
+                                <strong className="text-[12px] font-black text-zinc-900 block whitespace-nowrap truncate">
+                                  {formatCurrency(cancelInfo.receivedAmount)}
+                                </strong>
+                              </div>
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-rose-500 uppercase block">Refund</span>
+                                <strong className="text-[12px] font-black text-rose-600 block whitespace-nowrap truncate">
+                                  {formatCurrency(cancelInfo.refundAmount)}
+                                </strong>
+                              </div>
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-zinc-400 uppercase block">
+                                  {Number(cancelInfo.netRetained || 0) < 0 ? 'Loss' : 'Retained'}
+                                </span>
+                                <strong
+                                  className={`text-[12px] font-black block whitespace-nowrap truncate ${
+                                    Number(cancelInfo.netRetained || 0) < 0 ? 'text-rose-600' : 'text-emerald-700'
+                                  }`}
+                                >
+                                  {formatCurrency(Math.abs(Number(cancelInfo.netRetained || 0)))}
+                                </strong>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="grid grid-cols-3 divide-x divide-zinc-200/80 bg-zinc-50/90 rounded-xl border border-zinc-200/80 py-2 px-1 text-center font-mono tabular-nums">
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-zinc-400 uppercase block">Total</span>
+                                <strong className="text-[12.5px] font-black text-zinc-950 block whitespace-nowrap truncate mt-0.5">
+                                  {formatCurrency(total)}
+                                </strong>
+                              </div>
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-emerald-700/80 uppercase block">Received</span>
+                                <strong className="text-[12.5px] font-black text-emerald-700 block whitespace-nowrap truncate mt-0.5">
+                                  {formatCurrency(adv)}
+                                </strong>
+                              </div>
+                              <div className="px-1 min-w-0">
+                                <span className="text-[9px] font-sans font-bold tracking-wider text-zinc-400 uppercase block">
+                                  {isFullPaid ? 'Status' : 'Baaki Due'}
+                                </span>
+                                <strong
+                                  className={`text-[12.5px] font-black block whitespace-nowrap truncate mt-0.5 ${
+                                    isFullPaid ? 'text-emerald-700' : 'text-rose-600'
+                                  }`}
+                                >
+                                  {isFullPaid ? 'Full Paid' : formatCurrency(due)}
+                                </strong>
+                              </div>
+                            </div>
+                          )}
+
+                          {/* Row 3: Ticket Segmented Control + Primary Payment Action */}
+                          <div
+                            className="flex items-center justify-between gap-2"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {!isCancelled ? (
+                              <div className="inline-flex items-center gap-0.5 bg-zinc-100 p-0.5 rounded-lg border border-zinc-200/90">
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleTicketStatus(e, '1_WAY')}
+                                  className={`h-7 px-2.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                                    ticketStatus === '1_WAY'
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : 'text-zinc-600'
+                                  }`}
+                                >
+                                  {ticketStatus === '1_WAY' ? '✓ 1 Way' : '1 Way'}
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleToggleTicketStatus(e, '2_WAY')}
+                                  className={`h-7 px-2.5 rounded-md text-[11px] font-extrabold transition-all cursor-pointer whitespace-nowrap ${
+                                    ticketStatus === '2_WAY'
+                                      ? 'bg-emerald-600 text-white shadow-2xs'
+                                      : 'text-zinc-600'
+                                  }`}
+                                >
+                                  {ticketStatus === '2_WAY' ? '✓ 2 Way' : '2 Way'}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[11px] font-bold text-rose-700">
+                                {cancelInfo?.cancelDate || 'Cancelled'}
+                              </span>
+                            )}
+
+                            {isCancelled ? (
+                              <button
+                                type="button"
+                                onClick={() => setCancelModalBooking(b)}
+                                className="h-8 px-3 bg-rose-100 text-rose-900 border border-rose-300 rounded-lg text-[11px] font-black cursor-pointer whitespace-nowrap"
+                              >
+                                Refund Info
+                              </button>
+                            ) : !isFullPaid ? (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentModalBooking(b)}
+                                className="h-8 px-3.5 bg-emerald-600 active:bg-emerald-700 text-white rounded-lg text-[11px] font-black flex items-center gap-1 shadow-2xs cursor-pointer whitespace-nowrap"
+                              >
+                                <ArrowDownLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                                <span>Receive</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setPaymentModalBooking(b)}
+                                className="h-8 px-3 bg-emerald-50 active:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg text-[11px] font-black flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Paid · History</span>
+                              </button>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* =========================================================
+                            DESKTOP MAIN CLICKABLE ROW (sm+ ONLY — 100% UNCHANGED)
+                            ========================================================= */}
+                        <div
+                          onClick={() => toggleBookingExpand(b.id)}
+                          className={`hidden sm:flex p-4 rounded-2xl flex-col lg:flex-row lg:items-center justify-between gap-3 cursor-pointer select-none transition-colors ${
                             isCancelled
                               ? 'hover:bg-rose-100/50'
                               : isTicketDone
@@ -1277,7 +1715,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                             {renderThreeDotMenu()}
                           </div>
 
-                          {/* Mobile Right Action Bar (Payment + Expand Chevron + 3-Dot Menu) */}
+                          {/* Tablet Action Bar (sm..lg) */}
                           <div
                             className="lg:hidden flex items-center gap-1.5 shrink-0 self-end sm:self-auto"
                             onClick={(e) => e.stopPropagation()}
@@ -1314,180 +1752,354 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
                           </div>
                         </div>
 
-                        {/* Expandable Lower Details (Cancellation Summary if cancelled, Members List, Wallet/Mode, Installments, Notes) */}
+                        {/* Expandable Lower Details */}
                         {isExpanded && (
-                          <div className="px-3 sm:px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 rounded-b-2xl space-y-3">
-                            {/* Cancellation & Refund Policy Record Card if Cancelled */}
-                            {isCancelled && cancelInfo && (
-                              <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 space-y-2">
-                                <div className="flex items-center justify-between flex-wrap gap-2">
-                                  <span className="text-xs font-black text-rose-900 uppercase flex items-center gap-1.5">
-                                    <XCircle size={14} className="text-rose-600" />
-                                    Cancellation &amp; Refund Summary ({cancelInfo.cancelDate})
-                                  </span>
-                                  <span className="text-[11px] font-black px-2 py-0.5 rounded bg-white border border-rose-300 text-rose-800">
-                                    📋 Policy: {cancelInfo.policySlab}
-                                  </span>
-                                </div>
-                                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
-                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
-                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Received</span>
-                                    <strong className="text-zinc-950">{formatCurrency(cancelInfo.receivedAmount)}</strong>
-                                  </div>
-                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
-                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Policy Charge</span>
-                                    <strong className="text-amber-800">{formatCurrency(cancelInfo.cancellationCharge)}</strong>
-                                  </div>
-                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
-                                    <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Refund Given</span>
-                                    <strong className="text-rose-700">{formatCurrency(cancelInfo.refundAmount)}</strong>
-                                  </div>
-                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
-                                    <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Ticket/Hotel Loss</span>
-                                    <strong className="text-rose-700">
-                                      {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
-                                    </strong>
-                                  </div>
-                                  <div className="bg-white p-2 rounded-lg border border-rose-200">
-                                    <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">
-                                      {Number(cancelInfo.netRetained || 0) < 0 ? 'Net Loss' : 'Net Retained'}
+                          <>
+                            {/* =========================================================
+                                MOBILE-ONLY EXPANDED DRAWER (< sm)
+                                Clean divider list, crisp non-wrapping WhatsApp chip, zero redundant broken totals
+                                ========================================================= */}
+                            <div className="sm:hidden px-3.5 pb-3.5 pt-3 border-t border-zinc-200/80 bg-zinc-50/80 rounded-b-2xl space-y-2.5">
+                              {/* Cancellation Summary (Mobile Compact) */}
+                              {isCancelled && cancelInfo && (
+                                <div className="bg-rose-50 border border-rose-200 rounded-xl p-2.5 space-y-2">
+                                  <div className="flex items-center justify-between gap-2">
+                                    <span className="text-[11px] font-black text-rose-900 flex items-center gap-1">
+                                      <XCircle size={13} className="text-rose-600 shrink-0" />
+                                      Cancelled · {cancelInfo.cancelDate}
                                     </span>
-                                    <strong
-                                      className={
-                                        Number(cancelInfo.netRetained || 0) < 0
-                                          ? 'text-rose-600'
-                                          : 'text-emerald-700'
-                                      }
-                                    >
-                                      {Number(cancelInfo.netRetained || 0) < 0
-                                        ? `-${formatCurrency(Math.abs(Number(cancelInfo.netRetained || 0)))}`
-                                        : formatCurrency(Number(cancelInfo.netRetained || 0))}
-                                    </strong>
+                                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-white border border-rose-200 text-rose-800 truncate">
+                                      {cancelInfo.policySlab}
+                                    </span>
                                   </div>
-                                </div>
-                                <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] font-bold text-rose-900">
-                                  <span>
-                                    💳 Refund Paid From:{' '}
+                                  <div className="grid grid-cols-2 gap-1.5 text-[11px] font-mono tabular-nums">
+                                    <div className="bg-white px-2.5 py-1.5 rounded-lg border border-rose-100 flex items-center justify-between">
+                                      <span className="font-sans text-[10px] text-zinc-500">Charge</span>
+                                      <strong className="text-amber-800">{formatCurrency(cancelInfo.cancellationCharge)}</strong>
+                                    </div>
+                                    <div className="bg-white px-2.5 py-1.5 rounded-lg border border-rose-100 flex items-center justify-between">
+                                      <span className="font-sans text-[10px] text-rose-600">Loss</span>
+                                      <strong className="text-rose-700">{formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}</strong>
+                                    </div>
+                                  </div>
+                                  <div className="text-[11px] text-rose-900 font-semibold leading-snug">
+                                    Refund from:{' '}
                                     <strong>
                                       {cancelInfo.refundAmount > 0 && cancelInfo.refundWalletName
                                         ? `${cancelInfo.refundWalletName.replace(' (Tour)', '')} (${cancelInfo.refundPaymentMode || 'UPI'})`
-                                        : 'No Refund Outflow (₹0)'}
+                                        : 'No Refund (₹0)'}
                                     </strong>
-                                  </span>
-                                  {cancelInfo.reason && (
-                                    <span>📝 Reason: {cancelInfo.reason}</span>
-                                  )}
+                                    {cancelInfo.reason ? ` · ${cancelInfo.reason}` : ''}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
-                            {/* Members Sub-list */}
-                            <div className="bg-white p-3 rounded-xl border border-zinc-200">
-                              <div className="flex items-center justify-between mb-2">
-                                <span className="text-[11px] font-black text-zinc-700 uppercase">
-                                  👥 All Family Members ({b.membersCount} Pax) • {b.travelClass}
-                                  {b.city ? ` • 📍 ${b.city}` : ''}
-                                </span>
+                              )}
+
+                              {/* Header Row: Members Meta + Crisp WhatsApp Chip (Never Crushes or Wraps!) */}
+                              <div className="flex items-center justify-between gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <span className="text-[11px] font-extrabold text-zinc-700 block truncate">
+                                    Members ({b.membersCount}) · {b.travelClass}
+                                    {b.city ? ` · ${b.city}` : ''}
+                                  </span>
+                                </div>
                                 <button
                                   type="button"
                                   onClick={(e) => handleWhatsAppShareBooking(e, b)}
-                                  className="text-[11px] font-black text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                  className="h-7 px-2.5 rounded-lg bg-emerald-50 active:bg-emerald-100 text-emerald-700 border border-emerald-200 text-[11px] font-black flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer"
                                 >
-                                  <MessageCircle size={12} /> Share Details on WhatsApp
+                                  <MessageCircle size={12} className="shrink-0" />
+                                  <span>WhatsApp</span>
                                 </button>
                               </div>
 
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                              {/* Clean Single-Container Member List (No Double Nested Boxes!) */}
+                              <div className="bg-white rounded-xl border border-zinc-200/90 divide-y divide-zinc-100 overflow-hidden">
                                 {b.members.map((m, mi) => {
                                   const isMemberCopied =
                                     copiedName === String(m.name || '').trim();
+                                  const genderShort =
+                                    String(m.gender || '').toLowerCase() === 'female'
+                                      ? 'F'
+                                      : String(m.gender || '').toLowerCase() === 'male'
+                                      ? 'M'
+                                      : m.gender;
                                   return (
                                     <div
                                       key={mi}
                                       onClick={(e) => copyNameToClipboard(e, m.name)}
-                                      onDoubleClick={(e) => copyNameToClipboard(e, m.name)}
-                                      title="Click or Double-click to copy passenger name"
-                                      className={`p-2.5 rounded-lg border flex justify-between items-center cursor-pointer select-none transition-colors ${
+                                      className={`px-3 py-2 flex items-center justify-between gap-2 cursor-pointer select-none transition-colors ${
                                         isMemberCopied
-                                          ? 'bg-emerald-50 border-emerald-400'
-                                          : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100/80'
+                                          ? 'bg-emerald-50'
+                                          : 'active:bg-zinc-50'
                                       }`}
                                     >
-                                      <span className="font-bold text-zinc-950">
-                                        {mi + 1}.{' '}
+                                      <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="w-5 h-5 rounded-md bg-zinc-100 text-zinc-500 text-[10px] font-black font-mono flex items-center justify-center shrink-0">
+                                          {mi + 1}
+                                        </span>
                                         <span
-                                          className={
-                                            isMemberCopied
-                                              ? 'text-emerald-700 underline decoration-emerald-500'
-                                              : 'hover:text-emerald-700'
-                                          }
+                                          className={`text-[13px] font-bold truncate ${
+                                            isMemberCopied ? 'text-emerald-700' : 'text-zinc-950'
+                                          }`}
                                         >
                                           {m.name}
-                                        </span>{' '}
-                                        ({m.gender})
-                                      </span>
-                                      <span className="text-zinc-600 font-mono font-semibold text-[11px]">
-                                        Age: {m.age || 'Adult'}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1.5 text-[11px] font-mono tabular-nums text-zinc-500 shrink-0 whitespace-nowrap">
+                                        {genderShort && (
+                                          <span className="font-sans font-bold text-zinc-400">
+                                            {genderShort}
+                                          </span>
+                                        )}
+                                        <span className="text-zinc-300">·</span>
+                                        <span className="font-semibold text-zinc-700">
+                                          {m.age ? `${m.age}y` : 'Adult'}
+                                        </span>
                                         {m.seatBerthPreference &&
-                                        m.seatBerthPreference !== 'No Preference'
-                                          ? ` • ${m.seatBerthPreference}`
-                                          : ''}
-                                      </span>
+                                          m.seatBerthPreference !== 'No Preference' && (
+                                            <>
+                                              <span className="text-zinc-300">·</span>
+                                              <span className="font-sans font-bold text-blue-700">
+                                                {m.seatBerthPreference}
+                                              </span>
+                                            </>
+                                          )}
+                                      </div>
                                     </div>
                                   );
                                 })}
                               </div>
 
                               {b.specialNotes && (
-                                <div className="mt-2 pt-2 border-t border-zinc-100 text-xs text-amber-900 font-semibold">
-                                  📝 Special Note: {b.specialNotes}
+                                <div className="px-3 py-2 rounded-xl bg-amber-50/90 border border-amber-200/80 text-[11px] text-amber-900 font-semibold leading-snug">
+                                  Note: {b.specialNotes}
                                 </div>
                               )}
-                            </div>
 
-                            {/* Financial & Installment Details */}
-                            <div className="flex items-center justify-between text-xs flex-wrap gap-2 px-1">
-                              <div className="flex items-center gap-1.5 flex-wrap">
-                                <span className="text-zinc-600 font-semibold">
-                                  Account:{' '}
-                                  <strong className="text-zinc-950">
-                                    {b.walletName || 'Rizwan (Tour)'}
-                                  </strong>{' '}
-                                  • Mode: <strong className="text-zinc-950">{b.paymentMode}</strong>
-                                </span>
-                                {instList.length > 1 &&
-                                  instList.map((inst, iIdx) => (
+                              {/* Installment Breakdown (only if multiple installments) */}
+                              {instList.length > 1 && (
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  {instList.map((inst, iIdx) => (
                                     <span
                                       key={inst.id || iIdx}
-                                      className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]"
+                                      className="px-2 py-0.5 rounded-md bg-emerald-50 border border-emerald-200/80 text-emerald-900 font-mono tabular-nums font-bold text-[10px] whitespace-nowrap"
                                     >
-                                      #{iIdx + 1}: {formatCurrency(inst.amount)} (
-                                      {(inst.walletName || 'Rizwan').replace(' (Tour)', '')} •{' '}
-                                      {inst.paymentMode})
+                                      #{iIdx + 1} {formatCurrency(inst.amount)} ·{' '}
+                                      {(inst.walletName || 'Rizwan').replace(' (Tour)', '')} ({inst.paymentMode})
                                     </span>
                                   ))}
-                              </div>
+                                </div>
+                              )}
 
-                              <div className="flex items-center gap-4 font-mono">
-                                <span>
-                                  Total:{' '}
-                                  <strong className="text-zinc-950 font-black">
-                                    {formatCurrency(total)}
-                                  </strong>
-                                </span>
-                                <span className="text-emerald-700">
-                                  Received:{' '}
-                                  <strong className="font-black">{formatCurrency(adv)}</strong>
-                                </span>
-                                {isFullPaid ? (
-                                  <span className="text-emerald-700 font-black">✅ Full Paid</span>
-                                ) : (
-                                  <span className="text-rose-600 font-black">
-                                    Baaki Due: {formatCurrency(due)}
+                              {/* Clean Footer: Account + Quick Slip/Edit Actions (No Redundant Broken Totals!) */}
+                              <div className="flex items-center justify-between gap-2 pt-0.5">
+                                <div className="text-[11px] text-zinc-500 font-semibold truncate min-w-0">
+                                  <span className="font-bold text-zinc-900">
+                                    {(b.walletName || 'Rizwan (Tour)').replace(' (Tour)', '')}
                                   </span>
-                                )}
+                                  <span className="mx-1 text-zinc-300">·</span>
+                                  <span className="font-bold text-zinc-700">{b.paymentMode}</span>
+                                </div>
+                                <div
+                                  className="flex items-center gap-1.5 shrink-0"
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <button
+                                    type="button"
+                                    onClick={() => handleShareVoucher(b)}
+                                    className="h-7 px-2.5 rounded-lg bg-white active:bg-zinc-100 border border-zinc-200 text-zinc-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                  >
+                                    <Share2 size={11} />
+                                    <span>Slip</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => openEditTourBookingModal(b)}
+                                    className="h-7 px-2.5 rounded-lg bg-white active:bg-zinc-100 border border-zinc-200 text-zinc-700 text-[11px] font-bold flex items-center gap-1 cursor-pointer whitespace-nowrap"
+                                  >
+                                    <Edit2 size={11} />
+                                    <span>Edit</span>
+                                  </button>
+                                </div>
                               </div>
                             </div>
-                          </div>
+
+                            {/* =========================================================
+                                DESKTOP EXPANDED DRAWER (sm+ ONLY — 100% UNCHANGED)
+                                ========================================================= */}
+                            <div className="hidden sm:block px-3 sm:px-4 pb-4 pt-2 border-t border-zinc-200 bg-zinc-50/70 rounded-b-2xl space-y-3">
+                              {/* Cancellation & Refund Policy Record Card if Cancelled */}
+                              {isCancelled && cancelInfo && (
+                                <div className="bg-rose-50 border-2 border-rose-300 rounded-xl p-3 space-y-2">
+                                  <div className="flex items-center justify-between flex-wrap gap-2">
+                                    <span className="text-xs font-black text-rose-900 uppercase flex items-center gap-1.5">
+                                      <XCircle size={14} className="text-rose-600" />
+                                      Cancellation &amp; Refund Summary ({cancelInfo.cancelDate})
+                                    </span>
+                                    <span className="text-[11px] font-black px-2 py-0.5 rounded bg-white border border-rose-300 text-rose-800">
+                                      📋 Policy: {cancelInfo.policySlab}
+                                    </span>
+                                  </div>
+                                  <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-xs font-mono">
+                                    <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                      <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Received</span>
+                                      <strong className="text-zinc-950">{formatCurrency(cancelInfo.receivedAmount)}</strong>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                      <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">Policy Charge</span>
+                                      <strong className="text-amber-800">{formatCurrency(cancelInfo.cancellationCharge)}</strong>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                      <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Refund Given</span>
+                                      <strong className="text-rose-700">{formatCurrency(cancelInfo.refundAmount)}</strong>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                      <span className="text-[9px] font-sans font-bold text-rose-700 uppercase block">Ticket/Hotel Loss</span>
+                                      <strong className="text-rose-700">
+                                        {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
+                                      </strong>
+                                    </div>
+                                    <div className="bg-white p-2 rounded-lg border border-rose-200">
+                                      <span className="text-[9px] font-sans font-bold text-zinc-500 uppercase block">
+                                        {Number(cancelInfo.netRetained || 0) < 0 ? 'Net Loss' : 'Net Retained'}
+                                      </span>
+                                      <strong
+                                        className={
+                                          Number(cancelInfo.netRetained || 0) < 0
+                                            ? 'text-rose-600'
+                                            : 'text-emerald-700'
+                                        }
+                                      >
+                                        {Number(cancelInfo.netRetained || 0) < 0
+                                          ? `-${formatCurrency(Math.abs(Number(cancelInfo.netRetained || 0)))}`
+                                          : formatCurrency(Number(cancelInfo.netRetained || 0))}
+                                      </strong>
+                                    </div>
+                                  </div>
+                                  <div className="flex items-center justify-between flex-wrap gap-2 text-[11px] font-bold text-rose-900">
+                                    <span>
+                                      💳 Refund Paid From:{' '}
+                                      <strong>
+                                        {cancelInfo.refundAmount > 0 && cancelInfo.refundWalletName
+                                          ? `${cancelInfo.refundWalletName.replace(' (Tour)', '')} (${cancelInfo.refundPaymentMode || 'UPI'})`
+                                          : 'No Refund Outflow (₹0)'}
+                                      </strong>
+                                    </span>
+                                    {cancelInfo.reason && (
+                                      <span>📝 Reason: {cancelInfo.reason}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+                              {/* Members Sub-list */}
+                              <div className="bg-white p-3 rounded-xl border border-zinc-200">
+                                <div className="flex items-center justify-between mb-2">
+                                  <span className="text-[11px] font-black text-zinc-700 uppercase">
+                                    👥 All Family Members ({b.membersCount} Pax) • {b.travelClass}
+                                    {b.city ? ` • 📍 ${b.city}` : ''}
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => handleWhatsAppShareBooking(e, b)}
+                                    className="text-[11px] font-black text-emerald-700 hover:underline flex items-center gap-1 cursor-pointer"
+                                  >
+                                    <MessageCircle size={12} /> Share Details on WhatsApp
+                                  </button>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 text-xs">
+                                  {b.members.map((m, mi) => {
+                                    const isMemberCopied =
+                                      copiedName === String(m.name || '').trim();
+                                    return (
+                                      <div
+                                        key={mi}
+                                        onClick={(e) => copyNameToClipboard(e, m.name)}
+                                        onDoubleClick={(e) => copyNameToClipboard(e, m.name)}
+                                        title="Click or Double-click to copy passenger name"
+                                        className={`p-2.5 rounded-lg border flex justify-between items-center cursor-pointer select-none transition-colors ${
+                                          isMemberCopied
+                                            ? 'bg-emerald-50 border-emerald-400'
+                                            : 'bg-zinc-50 border-zinc-200 hover:bg-zinc-100/80'
+                                        }`}
+                                      >
+                                        <span className="font-bold text-zinc-950">
+                                          {mi + 1}.{' '}
+                                          <span
+                                            className={
+                                              isMemberCopied
+                                                ? 'text-emerald-700 underline decoration-emerald-500'
+                                                : 'hover:text-emerald-700'
+                                            }
+                                          >
+                                            {m.name}
+                                          </span>{' '}
+                                          ({m.gender})
+                                        </span>
+                                        <span className="text-zinc-600 font-mono font-semibold text-[11px]">
+                                          Age: {m.age || 'Adult'}
+                                          {m.seatBerthPreference &&
+                                          m.seatBerthPreference !== 'No Preference'
+                                            ? ` • ${m.seatBerthPreference}`
+                                            : ''}
+                                        </span>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {b.specialNotes && (
+                                  <div className="mt-2 pt-2 border-t border-zinc-100 text-xs text-amber-900 font-semibold">
+                                    📝 Special Note: {b.specialNotes}
+                                  </div>
+                                )}
+                              </div>
+
+                              {/* Financial & Installment Details */}
+                              <div className="flex items-center justify-between text-xs flex-wrap gap-2 px-1">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <span className="text-zinc-600 font-semibold">
+                                    Account:{' '}
+                                    <strong className="text-zinc-950">
+                                      {b.walletName || 'Rizwan (Tour)'}
+                                    </strong>{' '}
+                                    • Mode: <strong className="text-zinc-950">{b.paymentMode}</strong>
+                                  </span>
+                                  {instList.length > 1 &&
+                                    instList.map((inst, iIdx) => (
+                                      <span
+                                        key={inst.id || iIdx}
+                                        className="px-2 py-0.5 rounded bg-emerald-100 text-emerald-900 font-bold text-[10px]"
+                                      >
+                                        #{iIdx + 1}: {formatCurrency(inst.amount)} (
+                                        {(inst.walletName || 'Rizwan').replace(' (Tour)', '')} •{' '}
+                                        {inst.paymentMode})
+                                      </span>
+                                    ))}
+                                </div>
+
+                                <div className="flex items-center gap-4 font-mono">
+                                  <span>
+                                    Total:{' '}
+                                    <strong className="text-zinc-950 font-black">
+                                      {formatCurrency(total)}
+                                    </strong>
+                                  </span>
+                                  <span className="text-emerald-700">
+                                    Received:{' '}
+                                    <strong className="font-black">{formatCurrency(adv)}</strong>
+                                  </span>
+                                  {isFullPaid ? (
+                                    <span className="text-emerald-700 font-black">✅ Full Paid</span>
+                                  ) : (
+                                    <span className="text-rose-600 font-black">
+                                      Baaki Due: {formatCurrency(due)}
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          </>
                         )}
                       </div>
                     );

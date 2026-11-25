@@ -256,18 +256,23 @@ export const CancelTourBookingModal: React.FC<CancelTourBookingModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto"
+      className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs overflow-hidden sm:overflow-y-auto"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[95vh] flex flex-col"
+        className="relative w-full max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[95vh] flex flex-col"
       >
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
+
         {/* Header */}
-        <div className="bg-zinc-950 p-4 sm:p-5 text-white flex items-center justify-between gap-3 shrink-0">
+        <div className="bg-zinc-950 px-4 py-3 sm:p-5 text-white flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
-              <XCircle size={22} className="stroke-[2.5]" />
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-md">
+              <XCircle size={20} className="stroke-[2.5]" />
             </div>
             <div className="min-w-0">
               <h3 className="text-base sm:text-lg font-black tracking-tight truncate">
@@ -289,7 +294,7 @@ export const CancelTourBookingModal: React.FC<CancelTourBookingModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleConfirmCancel} className="p-4 sm:p-5 overflow-y-auto space-y-4 flex-1">
+        <form onSubmit={handleConfirmCancel} className="p-3.5 sm:p-5 overflow-y-auto overscroll-contain space-y-4 flex-1 safe-bottom sm:pb-5">
           {/* Top Summary Box */}
           <div className="grid grid-cols-3 gap-2 p-2.5 rounded-2xl bg-rose-50/70 border border-rose-200">
             <div className="bg-white p-2 rounded-xl border border-rose-100 text-center">

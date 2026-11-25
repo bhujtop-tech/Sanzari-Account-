@@ -11,6 +11,7 @@ import {
   Trash2,
   CheckCircle2,
   Sparkles,
+  MoreVertical,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { CustomTourPackage } from '../../types';
@@ -28,6 +29,8 @@ export const CustomTourPackagesView: React.FC = () => {
   } = useData();
 
   const [searchQuery, setSearchQuery] = useState('');
+  const [openMenuPkgId, setOpenMenuPkgId] = useState<string | null>(null);
+  const [confirmDeletePkgId, setConfirmDeletePkgId] = useState<string | null>(null);
 
   const filteredPackages = useMemo(() => {
     return customTourPackages.filter((p) => {
@@ -72,10 +75,11 @@ export const CustomTourPackagesView: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsCustomPackageModalOpen(true)}
-          className="px-4 py-3 bg-zinc-950 hover:bg-black text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+          className="px-4 py-3 bg-zinc-950 hover:bg-black text-white rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
         >
           <Plus size={16} />
-          <span>+ New Package</span>
+          <span className="sm:hidden">New Package</span>
+          <span className="hidden sm:inline">+ New Package</span>
         </button>
       </div>
 
@@ -91,7 +95,168 @@ export const CustomTourPackagesView: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <>
+          {/* MOBILE ONLY (< sm): Compact Tour-Folder Style Package Cards + ⋮ Overflow Menu */}
+          <div className="sm:hidden space-y-2.5">
+            {filteredPackages.map((pkg) => {
+              const isMenuOpen = openMenuPkgId === pkg.id;
+              return (
+                <div
+                  key={`mob-pkg-${pkg.id}`}
+                  className={`relative bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 p-3 space-y-2.5 ${
+                    isMenuOpen ? 'z-30' : 'z-0'
+                  }`}
+                >
+                  {/* Row 1: Title + Unboxed Metadata + ⋮ Menu */}
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-[15px] font-black text-zinc-950 leading-tight truncate">
+                        {pkg.packageName}
+                      </h3>
+                      {pkg.packageNameGujarati && (
+                        <p className="text-[11px] font-semibold text-zinc-600 truncate mt-0.5">
+                          {pkg.packageNameGujarati}
+                        </p>
+                      )}
+                      <div className="flex items-center flex-wrap gap-x-1.5 text-[11px] text-zinc-500 mt-0.5">
+                        <span className="font-bold text-zinc-900 truncate">{pkg.destination}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-semibold text-zinc-700">
+                          {pkg.durationDays}D/{pkg.durationNights}N
+                        </span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-mono text-[10px]">{pkg.packageCode || 'SZ-PKG'}</span>
+                      </div>
+                    </div>
+
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setConfirmDeletePkgId(null);
+                          setOpenMenuPkgId((prev) => (prev === pkg.id ? null : pkg.id));
+                        }}
+                        aria-label="Package actions"
+                        className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                      >
+                        <MoreVertical size={15} />
+                      </button>
+
+                      {isMenuOpen && (
+                        <>
+                          <div
+                            className="fixed inset-0 z-30"
+                            onClick={() => {
+                              setOpenMenuPkgId(null);
+                              setConfirmDeletePkgId(null);
+                            }}
+                          />
+                          <div className="absolute right-0 top-9 z-40 w-44 bg-white rounded-2xl border-2 border-zinc-900 shadow-xl py-1.5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuPkgId(null);
+                                openEditCustomPackageModal(pkg);
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                            >
+                              <Edit2 size={14} className="shrink-0" />
+                              <span>Edit Package</span>
+                            </button>
+                            <div className="my-1 border-t border-zinc-100" />
+                            {confirmDeletePkgId === pkg.id ? (
+                              <div className="px-3 py-2 bg-rose-50 space-y-1.5">
+                                <p className="text-[10px] font-black text-rose-800">Delete package?</p>
+                                <div className="flex items-center gap-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={async () => {
+                                      setOpenMenuPkgId(null);
+                                      setConfirmDeletePkgId(null);
+                                      try {
+                                        await deleteCustomPackageById(pkg.id);
+                                      } catch (err) {
+                                        console.error('Delete package error:', err);
+                                      }
+                                    }}
+                                    className="flex-1 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                                  >
+                                    Yes, Delete
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeletePkgId(null)}
+                                    className="px-2 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-700 text-[10px] font-bold cursor-pointer"
+                                  >
+                                    No
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeletePkgId(pkg.id)}
+                                className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                              >
+                                <Trash2 size={14} className="shrink-0" />
+                                <span>Delete Package</span>
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Row 2: 4-Col Tabular Rate Strip */}
+                  <div className="grid grid-cols-4 divide-x divide-zinc-200 bg-zinc-50/90 rounded-xl border border-zinc-200 py-2 text-center">
+                    <div className="px-1 min-w-0">
+                      <span className="text-[9px] font-bold uppercase text-zinc-500 block">AC</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-950 whitespace-nowrap block truncate">
+                        {pkg.priceAcTrain ? formatCurrency(pkg.priceAcTrain) : '₹18k'}
+                      </span>
+                    </div>
+                    <div className="px-1 min-w-0">
+                      <span className="text-[9px] font-bold uppercase text-zinc-500 block">Non-AC</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 whitespace-nowrap block truncate">
+                        {pkg.priceNonAcTrain ? formatCurrency(pkg.priceNonAcTrain) : '₹14k'}
+                      </span>
+                    </div>
+                    <div className="px-1 min-w-0">
+                      <span className="text-[9px] font-bold uppercase text-zinc-500 block">Flight</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-950 whitespace-nowrap block truncate">
+                        {pkg.priceFlight ? formatCurrency(pkg.priceFlight) : '₹24k'}
+                      </span>
+                    </div>
+                    <div className="px-1 min-w-0">
+                      <span className="text-[9px] font-bold uppercase text-zinc-500 block">Child</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 whitespace-nowrap block truncate">
+                        {pkg.priceChildHalf ? formatCurrency(pkg.priceChildHalf) : '₹8k'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Row 3: Inclusion Preview + ONE Primary Brochure PDF CTA */}
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-[11px] text-zinc-600 truncate min-w-0">
+                      {pkg.inclusionsGujarati?.[0] ? `✓ ${pkg.inclusionsGujarati[0]}` : 'Gujarati Brochure Ready'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => openPackagePdf(pkg)}
+                      className="h-8 px-3.5 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <FileText size={12} className="shrink-0" />
+                      <span>Brochure PDF</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP (sm+): Original untouched 3-column Packages Grid */}
+          <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredPackages.map((pkg) => (
             <div
               key={pkg.id}
@@ -197,6 +362,7 @@ export const CustomTourPackagesView: React.FC = () => {
             </div>
           ))}
         </div>
+        </>
       )}
     </div>
   );

@@ -18,7 +18,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
   title,
   subtitle,
   children,
-  maxHeight = 'max-h-[92vh]',
+  maxHeight = 'max-h-[92dvh] sm:max-h-[92vh]',
   showClose = true,
 }) => {
   // Prevent body scroll and handle Back Button (PopState) & Escape key
@@ -81,16 +81,16 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
 
             {/* Header */}
             {(title || showClose) && (
-              <div className="px-6 py-4 flex items-center justify-between border-b border-zinc-100 bg-white sticky top-0 z-10">
-                <div>
-                  {title && <h3 className="text-lg font-bold text-zinc-900 tracking-tight">{title}</h3>}
-                  {subtitle && <p className="text-xs text-zinc-500 mt-0.5">{subtitle}</p>}
+              <div className="px-4 sm:px-6 py-3.5 sm:py-4 flex items-center justify-between gap-2 border-b border-zinc-100 bg-white sticky top-0 z-10">
+                <div className="min-w-0">
+                  {title && <h3 className="text-base sm:text-lg font-bold text-zinc-900 tracking-tight truncate">{title}</h3>}
+                  {subtitle && <p className="text-[11px] sm:text-xs text-zinc-500 mt-0.5 truncate">{subtitle}</p>}
                 </div>
                 {showClose && (
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200 transition-colors"
+                    className="w-8 h-8 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-500 hover:text-zinc-800 hover:bg-zinc-200 transition-colors shrink-0"
                   >
                     <X size={16} />
                   </button>
@@ -99,7 +99,7 @@ export const BottomSheet: React.FC<BottomSheetProps> = ({
             )}
 
             {/* Content Body */}
-            <div className="overflow-y-auto px-6 py-4 flex-1 overscroll-contain">
+            <div className="overflow-y-auto px-4 sm:px-6 py-4 flex-1 overscroll-contain safe-bottom sm:pb-4">
               {children}
             </div>
           </motion.div>

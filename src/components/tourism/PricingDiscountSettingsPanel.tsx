@@ -66,7 +66,12 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
   };
 
   const content = (
-    <div className="bg-white rounded-3xl border-2 border-zinc-900 shadow-xl overflow-hidden p-5 sm:p-6 space-y-4">
+    <div className={`bg-white ${isModal ? 'rounded-t-3xl sm:rounded-3xl border-t-2 sm:border-2' : 'rounded-3xl border-2'} border-zinc-900 shadow-xl overflow-hidden p-4 sm:p-6 space-y-4 ${isModal ? 'safe-bottom sm:pb-6' : ''}`}>
+      {isModal && (
+        <div className="sm:hidden flex justify-center -mt-1 pb-0.5">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
+      )}
       {/* Top Header */}
       <div className="flex items-center justify-between border-b border-zinc-200 pb-3 gap-3">
         <div className="flex items-center gap-2.5">
@@ -111,7 +116,7 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
 
       {/* 5-Column Responsive Inputs - Matching Screenshot */}
       <div className="space-y-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-3">
           {/* Sleeper Train Package Price */}
           <div className="space-y-1">
             <label className="block text-[11px] font-bold text-zinc-800">
@@ -231,8 +236,8 @@ export const PricingDiscountSettingsPanel: React.FC<PricingDiscountSettingsPanel
 
   if (isModal) {
     return (
-      <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/70 backdrop-blur-xs">
-        <div className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
+      <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/70 backdrop-blur-xs overflow-hidden">
+        <div className="w-full max-w-4xl max-h-[92dvh] sm:max-h-[90vh] overflow-y-auto overscroll-contain">
           {content}
         </div>
       </div>

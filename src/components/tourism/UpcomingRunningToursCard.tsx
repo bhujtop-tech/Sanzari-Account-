@@ -512,9 +512,9 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
         </div>
 
         {/* Interactive Filter Controls */}
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
           {/* Status Segmented Control */}
-          <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200 overflow-x-auto max-w-full">
+          <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200 overflow-x-auto no-scrollbar max-w-full">
             {(
               [
                 { id: 'all', label: `All Active (${counts.all})` },
@@ -546,7 +546,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
           </div>
 
           {/* Group vs Private Segmented Control */}
-          <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200">
+          <div className="grid grid-cols-3 sm:flex items-center gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200">
             {(
               [
                 { id: 'all', label: 'All' },
@@ -560,7 +560,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                   key={tTab.id}
                   type="button"
                   onClick={() => setTypeFilter(tTab.id)}
-                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer text-center ${
                     active
                       ? 'bg-white text-zinc-950 shadow-2xs'
                       : 'text-zinc-600 hover:text-zinc-950'
@@ -740,7 +740,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                   ref={(node) => {
                     cardRefs.current[tour.key] = node;
                   }}
-                  className={`w-[86%] sm:w-[310px] lg:w-[324px] shrink-0 snap-start rounded-2xl p-4 flex flex-col justify-between gap-3.5 transition-colors ${cardSurfaceClass}`}
+                  className={`w-[88%] sm:w-[310px] lg:w-[324px] shrink-0 snap-start rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 sm:gap-3.5 transition-colors ${cardSurfaceClass}`}
                 >
                   {/* Top: Date Callout + Status Kicker & Identity */}
                   <div className="space-y-2.5">
@@ -997,7 +997,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                     return (
                       <div
                         key={item.id}
-                        className={`px-3.5 py-2.5 min-h-[44px] flex flex-col sm:flex-row sm:items-center justify-between gap-2 transition-colors ${
+                        className={`px-3 sm:px-3.5 py-2.5 min-h-[44px] flex items-center justify-between gap-2 transition-colors ${
                           item.done ? 'bg-emerald-50/60' : 'bg-white hover:bg-zinc-50'
                         }`}
                       >
@@ -1068,9 +1068,9 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                               </div>
                             </button>
 
-                            <div className="flex items-center gap-1 self-end sm:self-center shrink-0">
+                            <div className="flex items-center gap-0.5 sm:gap-1 self-center shrink-0">
                               <span
-                                className={`text-[11px] font-bold mr-1.5 ${
+                                className={`hidden sm:inline text-[11px] font-bold mr-1.5 ${
                                   item.done ? 'text-emerald-700' : 'text-zinc-400'
                                 }`}
                               >

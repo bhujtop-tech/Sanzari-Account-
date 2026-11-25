@@ -47,9 +47,9 @@ export const Header: React.FC<HeaderProps> = ({
 
   return (
     <>
-      <header className="sticky top-0 z-30 bg-[#f8f9fa]/95 backdrop-blur-md border-b border-zinc-200/60 px-3 sm:px-8 py-2.5 flex items-center justify-between transition-all">
+      <header className="sticky top-0 z-30 bg-[#f8f9fa]/95 backdrop-blur-md border-b border-zinc-200/60 px-3 sm:px-8 py-2.5 flex items-center justify-between gap-2 transition-all">
         {/* Left: Sidebar Toggle (shown on mobile, or on desktop when Sidebar is hidden) & Brand */}
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0 flex-1">
           {/* Mobile Side Menu Button */}
           <button
             onClick={onOpenMobileSidebar}
@@ -72,13 +72,18 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           )}
 
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <h1 className="font-black text-xs sm:text-base tracking-tight text-zinc-950 flex items-center gap-1.5 truncate">
-                {businessMode === 'tourism' ? 'SANZARI TOURS & TRAVELS' : 'SANZARI DRY FRUITS'}
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h1 className="font-black text-[13px] sm:text-base tracking-tight text-zinc-950 flex items-center gap-1.5 truncate">
+                <span className="sm:hidden truncate">
+                  {businessMode === 'tourism' ? 'SANZARI TOURS' : 'SANZARI DRY FRUITS'}
+                </span>
+                <span className="hidden sm:inline truncate">
+                  {businessMode === 'tourism' ? 'SANZARI TOURS & TRAVELS' : 'SANZARI DRY FRUITS'}
+                </span>
               </h1>
               {/* Active Mode Pill Tag */}
-              <span className="hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-zinc-950 text-white border border-zinc-800">
+              <span className="hidden xs:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider bg-zinc-950 text-white border border-zinc-800 shrink-0">
                 {businessMode === 'tourism' ? '✈️ Tourism' : '🌰 Dry Fruits'}
               </span>
             </div>
@@ -114,10 +119,11 @@ export const Header: React.FC<HeaderProps> = ({
                 </button>
                 <button
                   onClick={() => setIsAddTourBookingOpen(true)}
-                  className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer"
+                  className="px-3 sm:px-3.5 py-2 sm:py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black flex items-center gap-1 shadow-xs transition-transform active:scale-95 cursor-pointer whitespace-nowrap shrink-0"
                 >
-                  <Plus size={14} className="stroke-[3]" />
-                  <span>+ Booking</span>
+                  <Plus size={14} className="stroke-[3] shrink-0" />
+                  <span className="sm:hidden">Booking</span>
+                  <span className="hidden sm:inline">+ Booking</span>
                 </button>
                 <button
                   onClick={() => setIsAddTourBatchOpen(true)}

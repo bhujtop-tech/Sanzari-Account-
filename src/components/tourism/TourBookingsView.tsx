@@ -17,6 +17,9 @@ import {
   FileDown,
   Folder,
   XCircle,
+  MoreVertical,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBooking } from '../../types';
@@ -54,6 +57,13 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   const [cancelModalBooking, setCancelModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [copiedName, setCopiedName] = useState<string | null>(null);
+  const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
+  const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
+  const [confirmDeleteBookingId, setConfirmDeleteBookingId] = useState<string | null>(null);
+
+  const toggleMobileExpand = (id: string) => {
+    setExpandedBookingIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   const copyNameToClipboard = (e: React.MouseEvent, rawName?: string) => {
     e.stopPropagation();
@@ -326,7 +336,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
               onClick={handleExportPDF}
               disabled={filteredBookings.length === 0}
               title="Download Clean Booking-wise Group PDF with Advance & Remaining Due"
-              className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+              className="w-full sm:w-auto justify-center px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-black text-xs flex items-center gap-1.5 shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
             >
               <FileDown size={15} className="stroke-[2.5]" />
               <span>Download Group PDF ({filteredBookings.length})</span>
@@ -335,9 +345,9 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         </div>
 
         {/* Status Filter Pills & View Mode Toggle */}
-        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 overflow-x-auto">
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-100 overflow-x-auto no-scrollbar">
           {/* Status Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto">
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             <button
               onClick={() => setStatusFilter('ALL')}
               className={`px-3 py-1.5 text-xs font-bold rounded-xl border transition-all shrink-0 cursor-pointer ${
@@ -418,8 +428,8 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
             </div>
           </div>
 
-          {/* View Mode Toggle: Cards vs List */}
-          <div className="flex items-center bg-zinc-100 p-0.5 rounded-xl border border-zinc-300 shrink-0">
+          {/* View Mode Toggle: Cards vs List (Desktop only — mobile uses unified compact cards) */}
+          <div className="hidden sm:flex items-center bg-zinc-100 p-0.5 rounded-xl border border-zinc-300 shrink-0">
             <button
               type="button"
               onClick={() => toggleViewMode('card')}
@@ -461,11 +471,373 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
             No tour bookings match your filter. Use the header "+ Booking" button to create a new booking!
           </p>
         </div>
-      ) : viewMode === 'card' ? (
+      ) : (
+        <>
+          {/* MOBILE ONLY (< sm): Compact 3-Row Tour-Folder Style Booking Cards + ⋮ Overflow Menu */}
+          <div className="sm:hidden space-y-2.5">
+            {filteredBookings.map((b) => {
+              const total = Number(b.totalAmount || 0);
+              const adv = Number(b.advancePaid || 0);
+              const due = Math.max(0, total - adv);
+              const isFullPaid = due === 0 && total > 0;
+              const isCancelled = b.bookingStatus === 'Cancelled';
+              const cancelInfo = b.cancellationDetails;
+              const ticketStatus = b.ticketStatus || 'PENDING';
+              const isTicketDone = !isCancelled && (ticketStatus === '1_WAY' || ticketStatus === '2_WAY');
+              const isExpanded = Boolean(expandedBookingIds[b.id]);
+              const isMenuOpen = openMenuBookingId === b.id;
+              const isNonAc =
+                String(b.travelClass || '').toLowerCase().includes('sleeper') ||
+                String(b.travelClass || '').toLowerCase().includes('non-ac') ||
+                String(b.travelClass || '').toLowerCase().includes('non ac');
+              const accountLabel =
+                Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0
+                  ? Array.from(
+                      new Set(
+                        b.paymentHistory.map((p) =>
+                          (p.walletName || b.walletName || 'Rizwan').replace(' (Tour)', '')
+                        )
+                      )
+                    ).join(' + ')
+                  : (b.walletName || 'Rizwan').replace(' (Tour)', '');
+              const modeLabel =
+                Array.isArray(b.paymentHistory) && b.paymentHistory.length > 0
+                  ? Array.from(
+                      new Set(b.paymentHistory.map((p) => p.paymentMode || b.paymentMode || 'Online'))
+                    ).join(' / ')
+                  : b.paymentMode || 'Online';
+
+              return (
+                <div
+                  key={`mob-b-${b.id}`}
+                  className={`relative rounded-2xl border-2 transition-all ${
+                    isMenuOpen ? 'z-30' : 'z-0'
+                  } ${
+                    isCancelled
+                      ? 'bg-rose-50/85 border-rose-400'
+                      : isTicketDone
+                      ? 'bg-emerald-50/75 border-emerald-600'
+                      : isFullPaid
+                      ? 'bg-white border-emerald-600'
+                      : 'bg-white border-zinc-900'
+                  }`}
+                >
+                  <div className="p-3 space-y-2.5">
+                    {/* Row 1: Customer Name + Unboxed Metadata + Matched 32x32 Expand & ⋮ Buttons */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1" onClick={() => toggleMobileExpand(b.id)}>
+                        <h3 className="text-[15px] font-black text-zinc-950 leading-tight truncate">
+                          {b.customerName}
+                        </h3>
+                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] text-zinc-500 mt-0.5">
+                          <a
+                            href={`tel:${b.customerPhone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-mono font-semibold text-zinc-700"
+                          >
+                            {b.customerPhone}
+                          </a>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-mono text-[10px] text-zinc-500">{formatShortDate(b.tourDate) || b.tourDate}</span>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-black text-zinc-900">{b.membersCount} Pax</span>
+                          <span className="text-zinc-300">·</span>
+                          <span className={`font-black ${isNonAc ? 'text-amber-700' : 'text-blue-700'}`}>
+                            {isNonAc ? 'Non-AC' : 'AC'}
+                          </span>
+                        </div>
+                        <div className="text-[11px] text-zinc-500 truncate mt-0.5">
+                          <span className="font-bold text-zinc-800">{b.destination}</span>
+                          <span className="mx-1 text-zinc-300">·</span>
+                          <span className="font-mono text-[10px]">{b.bookingNumber}</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleMobileExpand(b.id)}
+                          aria-label={isExpanded ? 'Collapse details' : 'Expand details'}
+                          className="w-8 h-8 rounded-lg bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                        >
+                          {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setConfirmDeleteBookingId(null);
+                              setOpenMenuBookingId((prev) => (prev === b.id ? null : b.id));
+                            }}
+                            aria-label="Booking actions"
+                            className="w-8 h-8 rounded-lg bg-zinc-50 hover:bg-zinc-100 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => {
+                                  setOpenMenuBookingId(null);
+                                  setConfirmDeleteBookingId(null);
+                                }}
+                              />
+                              <div className="absolute right-0 top-9 z-40 w-48 bg-white rounded-2xl border-2 border-zinc-900 shadow-xl py-1.5 overflow-hidden">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuBookingId(null);
+                                    handleWhatsAppSend(b);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <MessageCircle size={14} className="shrink-0" />
+                                  <span>Share on WhatsApp</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuBookingId(null);
+                                    handleShareReceipt(b);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <FileText size={14} className="shrink-0" />
+                                  <span>Voucher / Slip PDF</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuBookingId(null);
+                                    openEditTourBookingModal(b);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Edit2 size={14} className="shrink-0" />
+                                  <span>Edit Booking</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuBookingId(null);
+                                    setCancelModalBooking(b);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-amber-800 hover:bg-amber-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <XCircle size={14} className="shrink-0" />
+                                  <span>{isCancelled ? 'Edit Cancellation' : 'Cancel & Refund'}</span>
+                                </button>
+                                <div className="my-1 border-t border-zinc-100" />
+                                {confirmDeleteBookingId === b.id ? (
+                                  <div className="px-3 py-2 bg-rose-50 space-y-1.5">
+                                    <p className="text-[10px] font-black text-rose-800">Delete permanently?</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          setOpenMenuBookingId(null);
+                                          setConfirmDeleteBookingId(null);
+                                          try {
+                                            await deleteTourBookingById(b.id);
+                                          } catch (err) {
+                                            console.error('Failed to delete booking:', err);
+                                          }
+                                        }}
+                                        className="flex-1 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                                      >
+                                        Yes, Delete
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteBookingId(null)}
+                                        className="px-2 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-700 text-[10px] font-bold cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteBookingId(b.id)}
+                                    className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} className="shrink-0" />
+                                    <span>Delete Booking</span>
+                                  </button>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 2: 3-Col Tabular Financial Strip */}
+                    <div
+                      onClick={() => setPaymentModalBooking(b)}
+                      className="grid grid-cols-3 divide-x divide-zinc-200 bg-zinc-50/90 rounded-xl border border-zinc-200 py-2 text-center cursor-pointer"
+                    >
+                      <div className="px-1 min-w-0">
+                        <span className="text-[9px] font-bold uppercase text-zinc-500 block">Total</span>
+                        <span className="text-xs font-black font-mono tabular-nums text-zinc-950 whitespace-nowrap block truncate">
+                          {formatCurrency(total)}
+                        </span>
+                      </div>
+                      <div className="px-1 min-w-0">
+                        <span className="text-[9px] font-bold uppercase text-emerald-700 block">Received</span>
+                        <span className="text-xs font-black font-mono tabular-nums text-emerald-700 whitespace-nowrap block truncate">
+                          {formatCurrency(adv)}
+                        </span>
+                      </div>
+                      <div className="px-1 min-w-0">
+                        <span className={`text-[9px] font-bold uppercase block ${isFullPaid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {isFullPaid ? 'Status' : 'Baaki Due'}
+                        </span>
+                        <span className={`text-xs font-black font-mono tabular-nums whitespace-nowrap block truncate ${isFullPaid ? 'text-emerald-700' : 'text-rose-600'}`}>
+                          {isFullPaid ? 'Paid' : formatCurrency(due)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Row 3: 1 Way / 2 Way Segmented Toggle + ONE Primary CTA */}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="inline-flex items-center bg-zinc-100 p-0.5 rounded-lg border border-zinc-200">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = ticketStatus === '1_WAY' ? 'PENDING' : '1_WAY';
+                            updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            ticketStatus === '1_WAY'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-zinc-600 hover:text-zinc-900'
+                          }`}
+                        >
+                          1 Way
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const next = ticketStatus === '2_WAY' ? 'PENDING' : '2_WAY';
+                            updateTourBookingTicketStatus(b.id, next).catch(() => {});
+                          }}
+                          className={`px-2.5 py-1 rounded-md text-[11px] font-bold transition-all cursor-pointer whitespace-nowrap ${
+                            ticketStatus === '2_WAY'
+                              ? 'bg-emerald-600 text-white shadow-2xs'
+                              : 'text-zinc-600 hover:text-zinc-900'
+                          }`}
+                        >
+                          2 Way
+                        </button>
+                      </div>
+
+                      {!isFullPaid ? (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentModalBooking(b)}
+                          className="h-8 px-3.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-black flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer active:scale-95 transition-transform"
+                        >
+                          <ArrowDownLeft size={13} className="stroke-[2.5] shrink-0" />
+                          <span>Receive</span>
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setPaymentModalBooking(b)}
+                          className="h-8 px-3 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300 text-[11px] font-black flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
+                        >
+                          <CheckCircle2 size={13} className="shrink-0" />
+                          <span>Paid · History</span>
+                        </button>
+                      )}
+                    </div>
+
+                    {isCancelled && cancelInfo && (
+                      <div className="pt-2 border-t border-rose-200 text-[11px] font-bold text-rose-900 flex items-center justify-between gap-2">
+                        <span className="truncate">Refund: {formatCurrency(cancelInfo.refundAmount)}</span>
+                        {Number(cancelInfo.ticketOrHotelLoss || 0) > 0 && (
+                          <span className="font-mono tabular-nums whitespace-nowrap shrink-0">
+                            Loss: {formatCurrency(Number(cancelInfo.ticketOrHotelLoss || 0))}
+                          </span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Expanded Sleek Divider Drawer (No Nested Cards, No Broken Rupee Line) */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 pt-2.5 border-t border-zinc-200/90 bg-zinc-50/70 rounded-b-2xl space-y-2.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-[11px] font-black uppercase tracking-wide text-zinc-700 truncate">
+                          Members ({b.membersCount}) {b.city ? `· ${b.city}` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppSend(b)}
+                          className="px-2.5 py-1 rounded-lg bg-emerald-600 text-white text-[11px] font-black flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer"
+                        >
+                          <MessageCircle size={12} className="shrink-0" />
+                          <span>WhatsApp</span>
+                        </button>
+                      </div>
+
+                      <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden">
+                        {(b.members || []).map((m, idx) => (
+                          <div key={idx} className="px-3 py-2 flex items-center justify-between gap-2 text-xs">
+                            <span className="font-bold text-zinc-900 truncate">
+                              {idx + 1}. {m.name} {m.gender ? `(${m.gender})` : ''}
+                            </span>
+                            <span className="text-[11px] font-mono text-zinc-500 shrink-0 whitespace-nowrap">
+                              {m.age ? `Age ${m.age}` : 'Adult'}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2 pt-0.5 text-[11px]">
+                        <div className="text-zinc-600 truncate min-w-0">
+                          <span className="font-semibold">A/C:</span>{' '}
+                          <strong className="text-zinc-900">{accountLabel}</strong>
+                          <span className="mx-1 text-zinc-300">·</span>
+                          <span>{modeLabel}</span>
+                          <span className="mx-1 text-zinc-300">·</span>
+                          <span>By {resolveBookedBy(b)}</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => handleShareReceipt(b)}
+                            className="px-2.5 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-900 text-[11px] font-bold whitespace-nowrap cursor-pointer"
+                          >
+                            Slip
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditTourBookingModal(b)}
+                            className="px-2.5 py-1 rounded-lg bg-zinc-900 text-white text-[11px] font-bold whitespace-nowrap cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP (sm+): Original untouched Card View or List View */}
+          {viewMode === 'card' ? (
         /* ----------------------------------------------------
            VIEW 1: CARD VIEW (Grid of Cards)
            ---------------------------------------------------- */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredBookings.map((b) => {
             const d = new Date(b.tourDate);
             const isValid = !isNaN(d.getTime());
@@ -859,7 +1231,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         /* ----------------------------------------------------
            VIEW 2: LIST VIEW (Clean Table / Rows View)
            ---------------------------------------------------- */
-        <div className="bg-white rounded-2xl border-2 border-zinc-900 shadow-sm overflow-hidden">
+        <div className="hidden sm:block bg-white rounded-2xl border-2 border-zinc-900 shadow-sm overflow-hidden">
           {/* Table Header (Desktop) */}
           <div className="hidden lg:grid grid-cols-12 gap-3 px-4 py-3 bg-zinc-100 border-b-2 border-zinc-900 text-[11px] font-black uppercase tracking-wider text-zinc-700">
             <div className="col-span-2">Date &amp; Code</div>
@@ -1159,6 +1531,8 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
             })}
           </div>
         </div>
+          )}
+        </>
       )}
 
       {/* Receive Payment & Installment History Modal */}

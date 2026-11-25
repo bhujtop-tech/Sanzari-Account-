@@ -114,8 +114,8 @@ export const UsersView: React.FC = () => {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1">
         <div>
-          <h2 className="text-2xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
-            <Users size={24} className="text-indigo-600" />
+          <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 flex items-center gap-2">
+            <Users size={22} className="text-indigo-600 shrink-0" />
             <span>Users &amp; Staff Access Control</span>
           </h2>
           <p className="text-xs text-zinc-600 font-medium">
@@ -129,7 +129,8 @@ export const UsersView: React.FC = () => {
             className="px-4 py-2.5 rounded-xl bg-zinc-900 hover:bg-black text-white text-xs font-extrabold shadow-md transition-all active:scale-95 cursor-pointer flex items-center justify-center gap-1.5"
           >
             <UserPlus size={16} />
-            <span>+ Add Staff / User</span>
+            <span className="sm:hidden">Add Staff / User</span>
+            <span className="hidden sm:inline">+ Add Staff / User</span>
           </button>
         )}
       </div>
@@ -205,12 +206,12 @@ export const UsersView: React.FC = () => {
                 </div>
 
                 {/* Granular Permission Toggles */}
-                <div className="pt-2 border-t border-zinc-100 grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <div className="pt-2 border-t border-zinc-100 grid grid-cols-2 sm:grid-cols-3 gap-1.5 sm:gap-2">
                   {/* Cost Price Visibility */}
                   <button
                     disabled={!isAdmin}
                     onClick={() => handleToggleUserPermission(u, 'canViewCostPrice')}
-                    className={`p-2 rounded-xl text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
+                    className={`p-2 rounded-xl text-[10px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border ${
                       u.permissions?.canViewCostPrice
                         ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
                         : 'bg-zinc-100 text-zinc-500 border-zinc-200'

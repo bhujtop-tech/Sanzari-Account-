@@ -157,7 +157,7 @@ export const BottomNav: React.FC = () => {
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
               transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-              className="relative z-10 bg-white rounded-t-[32px] p-6 max-h-[85vh] overflow-y-auto shadow-2xl"
+              className="relative z-10 bg-white rounded-t-[32px] p-5 pb-6 safe-bottom max-h-[85dvh] overflow-y-auto overscroll-contain shadow-2xl"
             >
               <div className="w-10 h-1.5 bg-zinc-300 rounded-full mx-auto mb-4" />
 

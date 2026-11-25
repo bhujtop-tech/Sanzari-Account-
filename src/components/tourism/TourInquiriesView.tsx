@@ -21,8 +21,10 @@ import {
   AlertTriangle,
   RotateCcw,
   ChevronDown,
+  ChevronUp,
   MessageSquare,
   ChevronRight,
+  MoreVertical,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -54,6 +56,13 @@ export const TourInquiriesView: React.FC = () => {
   // Follow-up Chat & Timeline Modal State
   const [chatModalInquiry, setChatModalInquiry] = useState<TourInquiry | null>(null);
   const [chatModalInitialDate, setChatModalInitialDate] = useState<string>('');
+  const [openMenuInquiryId, setOpenMenuInquiryId] = useState<string | null>(null);
+  const [expandedInquiryIds, setExpandedInquiryIds] = useState<Record<string, boolean>>({});
+  const [confirmDeleteInqId, setConfirmDeleteInqId] = useState<string | null>(null);
+
+  const toggleMobileInqExpand = (id: string) => {
+    setExpandedInquiryIds((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
 
   // Today date string (YYYY-MM-DD)
   const todayStr = useMemo(() => new Date().toISOString().split('T')[0], []);
@@ -447,7 +456,139 @@ export const TourInquiriesView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          {/* MOBILE ONLY (< sm): Compact Priority Follow-up Cards */}
+          <div className="sm:hidden space-y-2.5">
+            {todayFollowUps.map((inq) => {
+              const menuKey = `today-${inq.id}`;
+              const isMenuOpen = openMenuInquiryId === menuKey;
+              return (
+                <div
+                  key={menuKey}
+                  className={`relative bg-white rounded-2xl border-2 border-amber-400 p-3 space-y-2 ${isMenuOpen ? 'z-30' : 'z-0'}`}
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-[14px] font-black text-zinc-950 leading-tight truncate">
+                        {inq.customerName}
+                      </h4>
+                      <div className="flex items-center flex-wrap gap-x-1.5 text-[11px] text-zinc-600 mt-0.5">
+                        <a href={`tel:${inq.customerPhone}`} className="font-mono font-bold text-zinc-800">
+                          {inq.customerPhone}
+                        </a>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-bold text-zinc-900 truncate">{inq.destination}</span>
+                        <span className="text-zinc-300">·</span>
+                        <span className="font-bold">{inq.totalPax || 2} Pax</span>
+                      </div>
+                      <div className="text-[10px] font-mono font-bold text-amber-800 mt-0.5">
+                        Due: {inq.followUpDate} · {inq.status}
+                      </div>
+                    </div>
+
+                    <div className="relative shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => setOpenMenuInquiryId((prev) => (prev === menuKey ? null : menuKey))}
+                        aria-label="Follow-up actions"
+                        className="w-8 h-8 rounded-lg bg-amber-50 border border-amber-300 text-amber-950 flex items-center justify-center cursor-pointer"
+                      >
+                        <MoreVertical size={15} />
+                      </button>
+                      {isMenuOpen && (
+                        <>
+                          <div className="fixed inset-0 z-30" onClick={() => setOpenMenuInquiryId(null)} />
+                          <div className="absolute right-0 top-9 z-40 w-48 bg-white rounded-2xl border-2 border-zinc-900 shadow-xl py-1.5 overflow-hidden">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuInquiryId(null);
+                                handleWhatsAppSend(inq, true);
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <MessageCircle size={14} className="shrink-0" />
+                              <span>WhatsApp Follow-Up</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuInquiryId(null);
+                                handleOpenChatModal(inq, getDateOffset(1));
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2 cursor-pointer"
+                            >
+                              <Calendar size={14} className="shrink-0" />
+                              <span>Reschedule +1 Day</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuInquiryId(null);
+                                handleOpenChatModal(inq, getDateOffset(3));
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2 cursor-pointer"
+                            >
+                              <Calendar size={14} className="shrink-0" />
+                              <span>Reschedule +3 Days</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuInquiryId(null);
+                                handleConvertToBooking(inq);
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <CheckCircle2 size={14} className="shrink-0" />
+                              <span>Convert to Booking</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setOpenMenuInquiryId(null);
+                                handleUpdateStatus(inq.id, 'Lost');
+                              }}
+                              className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2 cursor-pointer"
+                            >
+                              <XCircle size={14} className="shrink-0" />
+                              <span>Mark Lost</span>
+                            </button>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {inq.discussionSummary && (
+                    <p className="text-[11px] text-zinc-700 bg-zinc-50 px-2.5 py-2 rounded-xl border border-zinc-200 line-clamp-2 leading-snug">
+                      {inq.discussionSummary}
+                    </p>
+                  )}
+
+                  <div className="flex items-center justify-between gap-2 pt-1">
+                    <a
+                      href={`tel:${inq.customerPhone}`}
+                      className="h-8 px-3 rounded-lg bg-zinc-100 border border-zinc-200 text-zinc-900 text-[11px] font-bold flex items-center gap-1.5 whitespace-nowrap"
+                    >
+                      <Phone size={12} className="shrink-0" />
+                      <span>Call</span>
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => handleOpenChatModal(inq)}
+                      className="h-8 px-3.5 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer active:scale-95 transition-transform"
+                    >
+                      <MessageSquare size={12} className="shrink-0" />
+                      <span>Follow-Up ({Array.isArray(inq.followUpHistory) ? inq.followUpHistory.length : inq.discussionSummary ? 1 : 0})</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP (sm+): Original untouched Today's Follow-up Cards */}
+          <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 gap-3">
             {todayFollowUps.map((inq) => (
               <div
                 key={`today-${inq.id}`}
@@ -603,10 +744,11 @@ export const TourInquiriesView: React.FC = () => {
         <button
           type="button"
           onClick={() => setIsAddTourInquiryOpen(true)}
-          className="px-4 py-2.5 bg-zinc-950 hover:bg-black text-white rounded-2xl text-xs font-black flex items-center justify-center gap-2 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
+          className="px-4 py-2.5 bg-zinc-950 hover:bg-black text-white rounded-2xl text-xs font-black flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
         >
           <Plus size={16} />
-          <span>+ New Inquiry</span>
+          <span className="sm:hidden">New Inquiry</span>
+          <span className="hidden sm:inline">+ New Inquiry</span>
         </button>
       </div>
 
@@ -672,7 +814,326 @@ export const TourInquiriesView: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+        <>
+          {/* MOBILE ONLY (< sm): Compact Tour-Folder Style Inquiry Cards + ⋮ Overflow Menu */}
+          <div className="sm:hidden space-y-2.5">
+            {filteredInquiries.map((inq) => {
+              const linkedPkg = customTourPackages.find((p) => p.id === inq.linkedPackageId);
+              const isDueToday =
+                inq.followUpDate &&
+                inq.followUpDate <= todayStr &&
+                inq.status !== 'Converted' &&
+                inq.status !== 'Lost';
+              const isExpanded = Boolean(expandedInquiryIds[inq.id]);
+              const isMenuOpen = openMenuInquiryId === inq.id;
+              const historyCount = Array.isArray(inq.followUpHistory)
+                ? inq.followUpHistory.length
+                : inq.discussionSummary
+                ? 1
+                : 0;
+
+              return (
+                <div
+                  key={`mob-inq-${inq.id}`}
+                  className={`relative bg-white rounded-2xl border-2 transition-all ${
+                    isMenuOpen ? 'z-30' : 'z-0'
+                  } ${
+                    inq.status === 'Lost'
+                      ? 'border-zinc-300 opacity-85 bg-zinc-50/70'
+                      : isDueToday
+                      ? 'border-amber-500'
+                      : 'border-zinc-900'
+                  }`}
+                >
+                  <div className="p-3 space-y-2">
+                    {/* Row 1: Customer Name + Unboxed Metadata + Matched 32x32 Expand & ⋮ Buttons */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0 flex-1" onClick={() => toggleMobileInqExpand(inq.id)}>
+                        <h3 className="text-[15px] font-black text-zinc-950 leading-tight truncate">
+                          {inq.customerName}
+                        </h3>
+                        <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 text-[11px] text-zinc-500 mt-0.5">
+                          <a
+                            href={`tel:${inq.customerPhone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="font-mono font-semibold text-zinc-700"
+                          >
+                            {inq.customerPhone}
+                          </a>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-bold text-zinc-900 truncate">{inq.destination}</span>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-black text-zinc-900">{inq.totalPax} Pax</span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-[10px] text-zinc-500 mt-0.5 truncate">
+                          <span className="font-semibold text-zinc-600">{inq.source}</span>
+                          <span className="text-zinc-300">·</span>
+                          <span className="font-mono">{inq.inquiryNumber}</span>
+                          {inq.followUpDate && (
+                            <>
+                              <span className="text-zinc-300">·</span>
+                              <span className={isDueToday ? 'text-amber-700 font-black' : 'text-zinc-600 font-semibold'}>
+                                Due {inq.followUpDate}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          type="button"
+                          onClick={() => toggleMobileInqExpand(inq.id)}
+                          aria-label={isExpanded ? 'Collapse inquiry' : 'Expand inquiry'}
+                          className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                        >
+                          {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setConfirmDeleteInqId(null);
+                              setOpenMenuInquiryId((prev) => (prev === inq.id ? null : inq.id));
+                            }}
+                            aria-label="Inquiry actions"
+                            className="w-8 h-8 rounded-lg bg-zinc-50 border border-zinc-200 text-zinc-700 flex items-center justify-center cursor-pointer"
+                          >
+                            <MoreVertical size={15} />
+                          </button>
+
+                          {isMenuOpen && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-30"
+                                onClick={() => {
+                                  setOpenMenuInquiryId(null);
+                                  setConfirmDeleteInqId(null);
+                                }}
+                              />
+                              <div className="absolute right-0 top-9 z-40 w-48 bg-white rounded-2xl border-2 border-zinc-900 shadow-xl py-1.5 overflow-hidden">
+                                <a
+                                  href={`tel:${inq.customerPhone}`}
+                                  onClick={() => setOpenMenuInquiryId(null)}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-900 hover:bg-zinc-100 flex items-center gap-2.5"
+                                >
+                                  <Phone size={14} className="shrink-0" />
+                                  <span>Call Customer</span>
+                                </a>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    handleWhatsAppSend(inq, false);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Share2 size={14} className="shrink-0" />
+                                  <span>WhatsApp Proposal</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    openInquiryPdf(inq, linkedPkg);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <FileText size={14} className="shrink-0" />
+                                  <span>Brochure PDF</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    handleOpenChatModal(inq, getDateOffset(1));
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Calendar size={14} className="shrink-0" />
+                                  <span>Follow-Up +1 Day</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    handleConvertToBooking(inq);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-emerald-800 hover:bg-emerald-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <CheckCircle2 size={14} className="shrink-0" />
+                                  <span>Convert to Booking</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    openEditTourInquiryModal(inq);
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-zinc-800 hover:bg-zinc-100 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <Edit2 size={14} className="shrink-0" />
+                                  <span>Edit Inquiry</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setOpenMenuInquiryId(null);
+                                    handleUpdateStatus(inq.id, inq.status !== 'Lost' ? 'Lost' : 'Follow-up');
+                                  }}
+                                  className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-amber-800 hover:bg-amber-50 flex items-center gap-2.5 cursor-pointer"
+                                >
+                                  <RotateCcw size={14} className="shrink-0" />
+                                  <span>{inq.status !== 'Lost' ? 'Mark as Lost' : 'Reopen Lead'}</span>
+                                </button>
+                                <div className="my-1 border-t border-zinc-100" />
+                                {confirmDeleteInqId === inq.id ? (
+                                  <div className="px-3 py-2 bg-rose-50 space-y-1.5">
+                                    <p className="text-[10px] font-black text-rose-800">Delete inquiry?</p>
+                                    <div className="flex items-center gap-1.5">
+                                      <button
+                                        type="button"
+                                        onClick={async () => {
+                                          setOpenMenuInquiryId(null);
+                                          setConfirmDeleteInqId(null);
+                                          try {
+                                            await deleteTourInquiryById(inq.id);
+                                          } catch (err) {
+                                            console.error('Delete inquiry error:', err);
+                                          }
+                                        }}
+                                        className="flex-1 py-1 rounded-lg bg-rose-600 text-white text-[10px] font-black cursor-pointer"
+                                      >
+                                        Yes, Delete
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setConfirmDeleteInqId(null)}
+                                        className="px-2 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-700 text-[10px] font-bold cursor-pointer"
+                                      >
+                                        No
+                                      </button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => setConfirmDeleteInqId(inq.id)}
+                                    className="w-full px-3.5 py-2.5 text-left text-xs font-bold text-rose-700 hover:bg-rose-50 flex items-center gap-2.5 cursor-pointer"
+                                  >
+                                    <Trash2 size={14} className="shrink-0" />
+                                    <span>Delete Lead</span>
+                                  </button>
+                                )}
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Row 2: Concise 2-Line Discussion Summary */}
+                    <p
+                      onClick={() => toggleMobileInqExpand(inq.id)}
+                      className="text-[11px] text-zinc-700 bg-zinc-50/90 px-2.5 py-2 rounded-xl border border-zinc-200 line-clamp-2 leading-snug"
+                    >
+                      {inq.discussionSummary || 'No discussion notes yet.'}
+                    </p>
+
+                    {/* Row 3: Inline Status Select + ONE Primary Follow-Up CTA */}
+                    <div className="flex items-center justify-between gap-2">
+                      <select
+                        value={inq.status}
+                        onChange={(e) => handleUpdateStatus(inq.id, e.target.value as InquiryStatus)}
+                        disabled={updatingId === inq.id}
+                        className={`h-8 text-[11px] font-bold px-2.5 rounded-lg border outline-none cursor-pointer ${
+                          inq.status === 'Lost'
+                            ? 'bg-rose-50 text-rose-800 border-rose-300'
+                            : inq.status === 'Converted'
+                            ? 'bg-emerald-50 text-emerald-800 border-emerald-400'
+                            : inq.status === 'Follow-up'
+                            ? 'bg-orange-50 text-orange-900 border-orange-300'
+                            : 'bg-zinc-50 text-zinc-900 border-zinc-300'
+                        }`}
+                      >
+                        <option value="New">New Lead</option>
+                        <option value="In Discussion">Discussion</option>
+                        <option value="Package Sent">PDF Sent</option>
+                        <option value="Follow-up">Follow-up</option>
+                        <option value="Converted">Booked</option>
+                        <option value="Lost">Lost</option>
+                      </select>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenChatModal(inq)}
+                        className="h-8 px-3.5 rounded-lg bg-zinc-950 text-white text-[11px] font-black flex items-center gap-1.5 whitespace-nowrap shrink-0 cursor-pointer active:scale-95 transition-transform"
+                      >
+                        <MessageSquare size={12} className="shrink-0" />
+                        <span>Follow-Up ({historyCount})</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Expanded Drawer */}
+                  {isExpanded && (
+                    <div className="px-3 pb-3 pt-2.5 border-t border-zinc-200 bg-zinc-50/70 rounded-b-2xl space-y-2.5 text-xs">
+                      <div className="bg-white rounded-xl border border-zinc-200 divide-y divide-zinc-100 overflow-hidden">
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-zinc-500 font-semibold">Travelers</span>
+                          <span className="text-[11px] font-bold text-zinc-900 text-right">
+                            {inq.paxAdults} Adults, {inq.paxChildren} Child · {inq.travelClass || 'AC Train'}
+                          </span>
+                        </div>
+                        {inq.preferredDate && (
+                          <div className="px-3 py-2 flex items-center justify-between gap-2">
+                            <span className="text-[11px] text-zinc-500 font-semibold">Preferred Tour</span>
+                            <span className="text-[11px] font-mono font-bold text-zinc-900">{inq.preferredDate}</span>
+                          </div>
+                        )}
+                        <div className="px-3 py-2 flex items-center justify-between gap-2">
+                          <span className="text-[11px] text-zinc-500 font-semibold">Follow-up Date</span>
+                          <input
+                            type="date"
+                            value={inq.followUpDate || ''}
+                            onChange={(e) => handleUpdateFollowUpDate(inq.id, e.target.value)}
+                            className="bg-zinc-50 border border-zinc-300 rounded-lg px-2 py-1 text-[11px] font-mono font-bold text-zinc-900"
+                          />
+                        </div>
+                        {inq.notes && (
+                          <div className="px-3 py-2 text-[11px] text-zinc-700">
+                            <span className="font-bold text-zinc-900">Note:</span> {inq.notes}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center justify-between gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openInquiryPdf(inq, linkedPkg)}
+                          className="flex-1 h-8 rounded-lg bg-white border border-zinc-300 text-zinc-900 text-[11px] font-black flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                        >
+                          <FileText size={12} className="shrink-0" />
+                          <span>Brochure PDF</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleWhatsAppSend(inq, false)}
+                          className="flex-1 h-8 rounded-lg bg-emerald-600 text-white text-[11px] font-black flex items-center justify-center gap-1 whitespace-nowrap cursor-pointer"
+                        >
+                          <Share2 size={12} className="shrink-0" />
+                          <span>WhatsApp</span>
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+
+          {/* DESKTOP (sm+): Original untouched 3-column Inquiries Grid */}
+          <div className="hidden sm:grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredInquiries.map((inq) => {
             const linkedPkg = customTourPackages.find((p) => p.id === inq.linkedPackageId);
             const isDueToday = inq.followUpDate && inq.followUpDate <= todayStr && inq.status !== 'Converted' && inq.status !== 'Lost';
@@ -942,6 +1403,7 @@ export const TourInquiriesView: React.FC = () => {
             );
           })}
         </div>
+        </>
       )}
 
       {/* Follow-up & Chat Timeline Modal */}

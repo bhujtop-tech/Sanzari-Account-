@@ -84,26 +84,31 @@ export const AddTourBatchModal: React.FC<AddTourBatchModalProps> = ({ isOpen, on
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-zinc-950 text-white rounded-3xl shadow-2xl border border-zinc-800 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-zinc-950 text-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-zinc-800 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[92vh] flex flex-col">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-900/90 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
+
         {/* Header - Black Luxury */}
-        <div className="bg-zinc-900/90 px-5 sm:px-6 py-4 border-b border-zinc-800 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold">
+        <div className="bg-zinc-900/90 px-4 sm:px-6 py-3.5 sm:py-4 border-b border-zinc-800 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-blue-600/20 border border-blue-500/30 text-blue-400 flex items-center justify-center font-bold shrink-0">
               <FolderPlus className="w-5 h-5" />
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight text-white">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black tracking-tight text-white truncate">
                 New Tour Date Folder
               </h2>
-              <p className="text-[11px] text-zinc-400 font-medium">
+              <p className="text-[11px] text-zinc-400 font-medium truncate">
                 Create monthly departure date folder (e.g. 10 Oct Kashmir)
               </p>
             </div>
           </div>
           <button
             onClick={onClose}
-            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-full bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-400 hover:text-white transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -111,7 +116,7 @@ export const AddTourBatchModal: React.FC<AddTourBatchModalProps> = ({ isOpen, on
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="p-5 sm:p-6 space-y-4 text-xs flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6 space-y-4 text-xs flex-1 overflow-y-auto overscroll-contain">
             {errorMsg && (
               <div className="p-3 bg-rose-500/10 border border-rose-500/30 text-rose-300 rounded-xl font-semibold">
                 {errorMsg}
@@ -294,7 +299,7 @@ export const AddTourBatchModal: React.FC<AddTourBatchModalProps> = ({ isOpen, on
 
           </div>
 
-          <div className="px-5 sm:px-6 py-3.5 bg-zinc-900 border-t border-zinc-800 flex items-center justify-end gap-2 shrink-0">
+          <div className="px-4 sm:px-6 py-3 sm:py-3.5 bg-zinc-900 border-t border-zinc-800 flex items-center justify-end gap-2 shrink-0 safe-bottom sm:pb-3.5">
             <button
               type="button"
               onClick={onClose}

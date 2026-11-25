@@ -56,6 +56,35 @@ export function matchesTourWallet(
   return false;
 }
 
+/**
+ * Checks whether a TourExpense belongs to a specific Private Package booking,
+ * supporting `PRIVATE_<id>` (from Accounts/Wallet dropdown), explicit `tourBookingId`,
+ * and unlinked expenses whose description/title explicitly mentions the booking number or exact full customer name.
+ */
+export function matchesPrivateTourExpense(
+  exp: Pick<TourExpense, 'tourBatchId' | 'tourBookingId' | 'tourTitle' | 'description' | 'notes'>,
+  booking: Pick<TourBooking, 'id' | 'bookingNumber' | 'customerName'>
+): boolean {
+  if (!exp || !booking) return false;
+  if (exp.tourBookingId && exp.tourBookingId === booking.id) return true;
+  if (exp.tourBatchId && exp.tourBatchId === `PRIVATE_${booking.id}`) return true;
+
+  const hasExplicitLink = Boolean(
+    exp.tourBookingId ||
+      (exp.tourBatchId && exp.tourBatchId !== 'ALL_PRIVATE' && exp.tourBatchId.trim() !== '')
+  );
+  if (!hasExplicitLink) {
+    const haystack = `${exp.description || ''} ${exp.notes || ''} ${exp.tourTitle || ''}`.toLowerCase();
+    const bNum = (booking.bookingNumber || '').trim().toLowerCase();
+    if (bNum && haystack.includes(bNum)) return true;
+
+    const cName = (booking.customerName || '').trim().toLowerCase();
+    if (cName.length >= 5 && haystack.includes(cName)) return true;
+  }
+
+  return false;
+}
+
 export interface NormalizedBookingPayment {
   id: string;
   bookingId: string;

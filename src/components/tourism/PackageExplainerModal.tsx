@@ -189,8 +189,12 @@ ${(
   ];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-zinc-950/85 backdrop-blur-md overflow-y-auto animate-fade-in">
-      <div className="bg-white border-2 border-zinc-950 rounded-3xl shadow-2xl w-full max-w-4xl max-h-[94vh] flex flex-col overflow-hidden my-auto text-zinc-900">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-zinc-950/85 backdrop-blur-md overflow-hidden sm:overflow-y-auto animate-fade-in">
+      <div className="bg-white border-t-2 sm:border-2 border-zinc-950 rounded-t-3xl sm:rounded-3xl shadow-2xl w-full max-w-4xl max-h-[95dvh] sm:max-h-[94vh] flex flex-col overflow-hidden my-0 sm:my-auto text-zinc-900">
+        {/* Mobile grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
         
         {/* Vibrant Gradient Header Bar */}
         <div className="bg-linear-to-r from-zinc-950 via-zinc-900 to-zinc-950 text-white p-3.5 sm:p-5 flex items-center justify-between gap-3 shrink-0 border-b-2 border-amber-400">
@@ -223,15 +227,15 @@ ${(
         </div>
 
         {/* Package Switcher & Top Action Buttons */}
-        <div className="bg-linear-to-r from-amber-500/10 via-zinc-100 to-indigo-500/10 border-b border-zinc-200 px-3 sm:px-5 py-2.5 flex items-center justify-between gap-2 flex-wrap shrink-0">
-          <div className="flex items-center gap-2 flex-1 min-w-[260px]">
+        <div className="bg-linear-to-r from-amber-500/10 via-zinc-100 to-indigo-500/10 border-b border-zinc-200 px-3 sm:px-5 py-2 sm:py-2.5 flex items-center justify-between gap-2 flex-wrap shrink-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0 sm:min-w-[260px]">
             <span className="text-xs font-black text-zinc-950 shrink-0 flex items-center gap-1.5">
-              <Package size={15} className="text-amber-600" /> Package Select:
+              <Package size={15} className="text-amber-600" /> <span className="hidden sm:inline">Package Select:</span>
             </span>
             <select
               value={activePackage?.id || ''}
               onChange={(e) => setSelectedPackageId(e.target.value)}
-              className="flex-1 bg-white border-2 border-zinc-300 rounded-xl px-3 py-1.5 text-xs font-black text-zinc-950 focus:outline-none focus:border-zinc-950 shadow-2xs"
+              className="flex-1 min-w-0 bg-white border-2 border-zinc-300 rounded-xl px-2.5 sm:px-3 py-1.5 text-xs font-black text-zinc-950 focus:outline-none focus:border-zinc-950 shadow-2xs truncate"
             >
               {customTourPackages.map((pkg) => (
                 <option key={pkg.id} value={pkg.id}>
@@ -241,12 +245,12 @@ ${(
             </select>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {activePackage && (
               <button
                 type="button"
                 onClick={() => openEditCustomPackageModal(activePackage)}
-                className="px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-200 border border-zinc-300 text-zinc-900 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
+                className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-white hover:bg-zinc-200 border border-zinc-300 text-zinc-900 text-xs font-bold flex items-center gap-1 cursor-pointer transition-all shadow-2xs"
               >
                 <Edit3 size={13} />
                 <span className="hidden sm:inline">Edit Package</span>
@@ -256,10 +260,11 @@ ${(
             <button
               type="button"
               onClick={() => setIsCustomPackageModalOpen(true)}
-              className="px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-all active:scale-95"
+              className="px-3 sm:px-3.5 py-1.5 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black flex items-center gap-1 shadow-xs cursor-pointer transition-all active:scale-95 whitespace-nowrap"
             >
               <Plus size={14} className="stroke-[3]" />
-              <span>Add New Package</span>
+              <span className="sm:hidden">New</span>
+              <span className="hidden sm:inline">Add New Package</span>
             </button>
           </div>
         </div>
@@ -303,7 +308,7 @@ ${(
         </div>
 
         {/* Main Content Card Body */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 bg-zinc-50/70">
+        <div className="p-4 sm:p-6 overflow-y-auto overscroll-contain min-h-0 flex-1 space-y-5 bg-zinc-50/70">
           {activePackage ? (
             <>
               {/* STEP 1: OVERVIEW */}
@@ -627,54 +632,58 @@ ${(
         </div>
 
         {/* Footer Actions & Step Controls */}
-        <div className="bg-white border-t-2 border-zinc-200 p-3.5 sm:p-4 flex items-center justify-between gap-2 shrink-0 flex-wrap">
-          <div className="flex items-center gap-2">
+        <div className="bg-white border-t-2 border-zinc-200 px-3 py-3 sm:p-4 flex items-center justify-between gap-2 shrink-0 safe-bottom sm:pb-4">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={handleCopyWhatsAppScript}
-              className="px-3.5 sm:px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer"
+              className="px-3 sm:px-4 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs flex items-center gap-1.5 sm:gap-2 shadow-xs transition-transform active:scale-95 cursor-pointer whitespace-nowrap"
             >
-              {copiedScript ? <Check size={16} /> : <Copy size={16} />}
-              <span>{copiedScript ? 'WhatsApp Script Copied!' : 'Copy WhatsApp Pitch'}</span>
+              {copiedScript ? <Check size={15} /> : <Copy size={15} />}
+              <span className="sm:hidden">{copiedScript ? 'Copied!' : 'Copy Pitch'}</span>
+              <span className="hidden sm:inline">{copiedScript ? 'WhatsApp Script Copied!' : 'Copy WhatsApp Pitch'}</span>
             </button>
 
             <button
               type="button"
               onClick={handleCreateInquiry}
-              className="hidden xs:flex px-3.5 py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 font-bold text-xs items-center gap-1.5 cursor-pointer"
+              className="hidden sm:flex px-3.5 py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 font-bold text-xs items-center gap-1.5 cursor-pointer whitespace-nowrap"
             >
               <FileText size={15} />
               <span>+ Inquiry</span>
             </button>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             <button
               type="button"
               disabled={activeStep === 1}
               onClick={() => setActiveStep((prev) => Math.max(1, prev - 1))}
-              className="px-3.5 py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 disabled:opacity-40 cursor-pointer"
+              className="px-2.5 sm:px-3.5 py-2.5 rounded-2xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 font-bold text-xs flex items-center gap-1 disabled:opacity-40 cursor-pointer whitespace-nowrap"
             >
               <ChevronLeft size={16} />
-              <span>Previous</span>
+              <span className="sm:hidden">Prev</span>
+              <span className="hidden sm:inline">Previous</span>
             </button>
 
             {activeStep < 6 ? (
               <button
                 type="button"
                 onClick={() => setActiveStep((prev) => Math.min(6, prev + 1))}
-                className="px-4 py-2.5 rounded-2xl bg-zinc-950 hover:bg-black text-white font-black text-xs flex items-center gap-1 shadow-xs cursor-pointer active:scale-95"
+                className="px-3 sm:px-4 py-2.5 rounded-2xl bg-zinc-950 hover:bg-black text-white font-black text-xs flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 whitespace-nowrap"
               >
-                <span>Next Step</span>
+                <span className="sm:hidden">Next</span>
+                <span className="hidden sm:inline">Next Step</span>
                 <ChevronRight size={16} />
               </button>
             ) : (
               <button
                 type="button"
                 onClick={handleCreateBooking}
-                className="px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95"
+                className="px-3 sm:px-4 py-2.5 rounded-2xl bg-amber-400 hover:bg-amber-300 text-zinc-950 font-black text-xs flex items-center gap-1.5 shadow-md cursor-pointer active:scale-95 whitespace-nowrap"
               >
-                <span>Complete &amp; Book Seat</span>
+                <span className="sm:hidden">Book Seat</span>
+                <span className="hidden sm:inline">Complete &amp; Book Seat</span>
                 <CheckCircle2 size={16} />
               </button>
             )}

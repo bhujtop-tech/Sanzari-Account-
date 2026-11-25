@@ -555,23 +555,23 @@ export const ActivityLogsModal: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto space-y-4 pb-24">
+    <div className="max-w-7xl mx-auto space-y-3.5 sm:space-y-4 pb-32 md:pb-24">
       {/* Full-Screen Page Header (like Tour Reports View) */}
-      <div className="bg-zinc-950 text-white rounded-3xl p-4 sm:p-6 border-2 border-zinc-900 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <div className="w-11 h-11 rounded-2xl bg-emerald-500 text-zinc-950 flex items-center justify-center font-black shadow-sm shrink-0">
-            <History size={22} className="stroke-[2.5]" />
+      <div className="bg-zinc-950 text-white rounded-2xl sm:rounded-3xl p-4 sm:p-6 border-2 border-zinc-900 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-3 sm:gap-3.5">
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-emerald-500 text-zinc-950 flex items-center justify-center font-black shadow-sm shrink-0">
+            <History size={20} className="stroke-[2.5]" />
           </div>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h1 className="text-lg sm:text-xl font-black tracking-tight text-white">
+              <h1 className="text-base sm:text-xl font-black tracking-tight text-white">
                 Activity &amp; Update Logs (Hinglish)
               </h1>
-              <span className="px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-xs font-mono font-bold">
+              <span className="px-2 sm:px-2.5 py-0.5 rounded-lg bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 text-[11px] sm:text-xs font-mono tabular-nums font-bold">
                 {filteredLogs.length} Logs
               </span>
             </div>
-            <p className="text-xs text-zinc-400 font-medium mt-0.5">
+            <p className="text-[11px] sm:text-xs text-zinc-400 font-medium mt-0.5">
               Date-wise record: Jo bhi booking, payment, kharcha ya update aap karte hain uska poora hisaab
             </p>
           </div>
@@ -580,16 +580,16 @@ export const ActivityLogsModal: React.FC = () => {
         <button
           type="button"
           onClick={() => setActiveTab('home')}
-          className="px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto"
+          className="px-3.5 sm:px-4 py-2 rounded-xl bg-white/10 hover:bg-white/20 text-white border border-white/15 text-xs font-black flex items-center gap-1.5 transition-colors cursor-pointer self-start sm:self-auto whitespace-nowrap"
         >
           <span>← Back to Dashboard</span>
         </button>
       </div>
 
       {/* Top Filter Bar Card */}
-      <div className="p-4 sm:p-5 bg-white rounded-3xl border-2 border-zinc-900 shadow-2xs space-y-3">
+      <div className="p-3.5 sm:p-5 bg-white rounded-2xl sm:rounded-3xl border-2 border-zinc-900 shadow-2xs space-y-2.5 sm:space-y-3">
         {/* Row 1: Category Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar pb-0.5">
           <span className="text-[10px] font-black uppercase text-zinc-500 flex items-center gap-1 mr-1 shrink-0">
             <Filter size={11} /> Filter:
           </span>
@@ -654,7 +654,7 @@ export const ActivityLogsModal: React.FC = () => {
                 key={act.id}
                 type="button"
                 onClick={() => setSelectedActionType(act.id)}
-                className={`flex-1 py-2 px-2 rounded-xl text-[11px] font-black transition-all cursor-pointer ${
+                className={`flex-1 py-2 px-1.5 sm:px-2 rounded-xl text-[11px] font-black transition-all cursor-pointer whitespace-nowrap ${
                   selectedActionType === act.id
                     ? 'bg-blue-600 text-white'
                     : 'bg-zinc-50 hover:bg-zinc-100 text-zinc-700 border border-zinc-300'
@@ -711,7 +711,7 @@ export const ActivityLogsModal: React.FC = () => {
                   return (
                     <div
                       key={item.id}
-                      className={`p-3.5 sm:p-4 rounded-2xl bg-white border-2 transition-all flex items-start justify-between gap-3 shadow-2xs ${
+                      className={`p-3 sm:p-4 rounded-2xl bg-white border-2 transition-all flex items-start justify-between gap-2.5 sm:gap-3 shadow-2xs ${
                         isDelete
                           ? 'border-rose-300 bg-rose-50/30'
                           : isUpdate
@@ -719,10 +719,10 @@ export const ActivityLogsModal: React.FC = () => {
                           : 'border-zinc-200 hover:border-zinc-900'
                       }`}
                     >
-                      <div className="flex items-start gap-3 min-w-0">
+                      <div className="flex items-start gap-2.5 sm:gap-3 min-w-0">
                         {/* Icon Badge */}
                         <div
-                          className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
+                          className={`w-8 h-8 sm:w-10 sm:h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 ${
                             isDelete
                               ? 'bg-rose-100 text-rose-700'
                               : isUpdate
@@ -795,7 +795,7 @@ export const ActivityLogsModal: React.FC = () => {
                       {item.amount !== undefined && item.amount > 0 && (
                         <div className="text-right shrink-0">
                           <span
-                            className={`font-mono font-black text-xs sm:text-sm ${
+                            className={`font-mono tabular-nums whitespace-nowrap font-black text-xs sm:text-sm ${
                               item.category === 'expense'
                                 ? 'text-rose-600'
                                 : item.category === 'payment'

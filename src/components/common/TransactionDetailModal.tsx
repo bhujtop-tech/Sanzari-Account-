@@ -202,22 +202,22 @@ export const TransactionDetailModal: React.FC = () => {
         )}
 
         {/* Top Summary Card */}
-        <div className="p-5 rounded-2xl bg-zinc-950 text-white shadow-lg space-y-3">
-          <div className="flex items-center justify-between">
+        <div className="p-4 sm:p-5 rounded-2xl bg-zinc-950 text-white shadow-lg space-y-3">
+          <div className="flex items-center justify-between gap-2">
             <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full border ${badge.bg}`}>
               {badge.label}
             </span>
-            <span className="text-xs text-zinc-400 font-mono flex items-center gap-1">
+            <span className="text-xs text-zinc-400 font-mono flex items-center gap-1 shrink-0">
               <Clock size={12} />
               {item.date}
             </span>
           </div>
 
-          <div className="flex items-baseline justify-between pt-1">
+          <div className="flex items-baseline justify-between gap-2 pt-1">
             <div>
               <p className="text-xs text-zinc-400">Total Amount</p>
               <h2
-                className={`text-2xl sm:text-3xl font-black tracking-tight ${
+                className={`text-2xl sm:text-3xl font-black font-mono tabular-nums whitespace-nowrap tracking-tight ${
                   item.isPositive ? 'text-emerald-400' : 'text-rose-400'
                 }`}
               >

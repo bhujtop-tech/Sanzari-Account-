@@ -75,7 +75,10 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
       setAmount(editingTourExpense.amount || '');
       setDate(editingTourExpense.date || new Date().toISOString().split('T')[0]);
       setPaymentMode((editingTourExpense.paymentMode as TourPaymentMode) || 'UPI');
-      setSelectedBatchId(editingTourExpense.tourBatchId || '');
+      setSelectedBatchId(
+        editingTourExpense.tourBatchId ||
+          (editingTourExpense.tourBookingId ? `PRIVATE_${editingTourExpense.tourBookingId}` : '')
+      );
       setDescription(editingTourExpense.description || '');
 
       const matchedWallet =
@@ -108,8 +111,14 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
   };
 
   const privateTourBookings = useMemo(() => {
-    return tourBookings.filter((b) => isPrivateTourBooking(b, tourBatches));
-  }, [tourBookings, tourBatches]);
+    return tourBookings.filter(
+      (b) =>
+        isPrivateTourBooking(b, tourBatches) &&
+        (b.bookingStatus !== 'Cancelled' ||
+          editingTourExpense?.tourBatchId === `PRIVATE_${b.id}` ||
+          editingTourExpense?.tourBookingId === b.id)
+    );
+  }, [tourBookings, tourBatches, editingTourExpense]);
 
   // Calculate Mustak Commission stats for helper banner when 'Mustak Commission' is selected
   const mustakCommissionSummary = useMemo(() => {
@@ -206,6 +215,7 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
 
     const payload = {
       tourBatchId: selectedBatchId || '',
+      tourBookingId: privBooking ? privBooking.id : '',
       tourTitle: resolvedTourTitle,
       destination: batch?.destination || privBooking?.destination || '',
       category,
@@ -258,13 +268,18 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
   const recentExpenses = tourExpenses.slice(0, 6);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2.5 sm:p-4 bg-black/65 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/65 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[94vh] flex flex-col">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
+
         {/* Header */}
-        <div className="bg-zinc-950 px-5 py-4 text-white flex items-center justify-between border-b border-zinc-800 shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="bg-zinc-950 px-4 py-3 sm:px-5 sm:py-4 text-white flex items-center justify-between gap-2 border-b border-zinc-800 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center text-white shadow-sm ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center text-white shadow-sm shrink-0 ${
                 editingTourExpense ? 'bg-amber-500 text-zinc-950' : 'bg-rose-600'
               }`}
             >
@@ -274,11 +289,11 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
                 <Receipt className="w-5 h-5" />
               )}
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black tracking-tight">
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-black tracking-tight truncate">
                 {editingTourExpense ? '✏️ Edit Expense / Payout' : 'Add Expense / Payout'}
               </h2>
-              <p className="text-[11px] text-zinc-400 font-medium">
+              <p className="text-[11px] text-zinc-400 font-medium truncate">
                 {editingTourExpense
                   ? 'Correct amount, wallet account, category, date or notes'
                   : 'Salary, Rent, Electricity, Mustak Commission & Tour Expenses'}
@@ -288,7 +303,7 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
           <button
             type="button"
             onClick={handleCloseModal}
-            className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 flex items-center justify-center text-zinc-300 transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
@@ -296,7 +311,7 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="p-4 sm:p-5 space-y-4 text-zinc-800 flex-1 overflow-y-auto">
+          <div className="p-3.5 sm:p-5 space-y-4 text-zinc-800 flex-1 overflow-y-auto overscroll-contain">
             {errorMsg && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-rose-700 text-xs font-bold">
                 {errorMsg}
@@ -518,10 +533,10 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
                   ))}
                 </optgroup>
                 {privateTourBookings.length > 0 && (
-                  <optgroup label="🚗 Individual Private Tour Bookings">
+                  <optgroup label="🚗 Individual Private Packages (Pura Hisab)">
                     {privateTourBookings.map((pb) => (
                       <option key={pb.id} value={`PRIVATE_${pb.id}`}>
-                        🚗 Private ({pb.tourDate}) • {pb.customerName} ({pb.destination})
+                        🚗 Private ({pb.tourDate}) • {pb.customerName} • {pb.membersCount || 1} Pax ({pb.destination})
                       </option>
                     ))}
                   </optgroup>
@@ -656,15 +671,15 @@ export const AddTourExpenseModal: React.FC<AddTourExpenseModalProps> = ({ isOpen
             )}
           </div>
 
-          <div className="p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between gap-2 shrink-0">
-            <div className="text-[11px] text-zinc-600 font-bold truncate">
+          <div className="px-3.5 py-3 sm:p-4 bg-zinc-50 border-t border-zinc-200 flex items-center justify-between gap-2 shrink-0 safe-bottom sm:pb-4">
+            <div className="text-[11px] text-zinc-600 font-bold truncate min-w-0">
               From: <span className="text-zinc-950 font-black">{activeWallet.name}</span>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleCloseModal}
-                className="px-4 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-200/80 rounded-xl transition-colors cursor-pointer"
+                className="px-3 sm:px-4 py-2.5 text-xs font-bold text-zinc-600 hover:bg-zinc-200/80 rounded-xl transition-colors cursor-pointer"
               >
                 Cancel
               </button>

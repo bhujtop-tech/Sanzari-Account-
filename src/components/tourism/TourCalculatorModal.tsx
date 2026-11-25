@@ -201,10 +201,14 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex items-center justify-center p-3 bg-black/75 backdrop-blur-xs">
-      <div className="relative w-full max-w-lg bg-white text-zinc-950 rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden">
+    <div className="fixed inset-0 z-[70] flex items-end sm:items-center justify-center p-0 sm:p-3 bg-black/75 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-lg bg-white text-zinc-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden max-h-[94dvh] sm:max-h-[94vh] flex flex-col">
+        {/* Mobile grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-50 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
         {/* Compact Header */}
-        <div className="px-5 py-3.5 border-b border-zinc-200 flex items-center justify-between bg-zinc-50">
+        <div className="px-4 sm:px-5 py-3 sm:py-3.5 border-b border-zinc-200 flex items-center justify-between bg-zinc-50 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-xs">
               <Calculator size={17} className="stroke-[2.5]" />
@@ -234,18 +238,18 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
         </div>
 
         {/* Single-Screen Body */}
-        <div className="p-4 sm:p-5 space-y-3.5">
+        <div className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 overflow-y-auto overscroll-contain flex-1 min-h-0 safe-bottom sm:pb-5">
           {/* 1. Adults, Children & Private Room Counters */}
-          <div className="grid grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5">
             {/* Adults Counter */}
-            <div className="p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col items-center justify-between">
-              <span className="text-[11px] font-black uppercase text-zinc-700">Adults</span>
-              <span className="text-[10px] text-zinc-400 font-semibold mb-1.5">12+ Years</span>
-              <div className="flex items-center gap-2">
+            <div className="p-2 sm:p-3 rounded-2xl bg-zinc-50 border border-zinc-200 flex flex-col items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase text-zinc-700">Adults</span>
+              <span className="text-[9px] sm:text-[10px] text-zinc-400 font-semibold mb-1.5">12+ Years</span>
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setAdultsCount((c) => Math.max(1, c - 1))}
-                  className="w-7 h-7 rounded-lg bg-white border border-zinc-300 hover:bg-zinc-100 font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-white border border-zinc-300 hover:bg-zinc-100 font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   -
                 </button>
@@ -255,12 +259,12 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                   max={50}
                   value={adultsCount}
                   onChange={(e) => setAdultsCount(Math.max(1, Number(e.target.value) || 1))}
-                  className="w-9 text-center font-mono font-black text-sm text-zinc-950 bg-transparent focus:outline-none"
+                  className="w-7 sm:w-9 text-center font-mono tabular-nums font-black text-sm text-zinc-950 bg-transparent focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={() => setAdultsCount((c) => c + 1)}
-                  className="w-7 h-7 rounded-lg bg-zinc-950 text-white font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-zinc-950 text-white font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -268,24 +272,24 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
             </div>
 
             {/* Children Counter */}
-            <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200 flex flex-col items-center justify-between">
-              <span className="text-[11px] font-black uppercase text-amber-950">Children</span>
-              <span className="text-[10px] text-amber-700 font-semibold mb-1.5">Under 12 Yrs</span>
-              <div className="flex items-center gap-2">
+            <div className="p-2 sm:p-3 rounded-2xl bg-amber-50/60 border border-amber-200 flex flex-col items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase text-amber-950">Children</span>
+              <span className="text-[9px] sm:text-[10px] text-amber-700 font-semibold mb-1.5">Under 12 Yrs</span>
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => handleChildrenCountChange(children.length - 1)}
-                  className="w-7 h-7 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-white border border-amber-300 hover:bg-amber-100 text-amber-950 font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   -
                 </button>
-                <span className="w-7 text-center font-mono font-black text-sm text-amber-950">
+                <span className="w-6 sm:w-7 text-center font-mono tabular-nums font-black text-sm text-amber-950">
                   {children.length}
                 </span>
                 <button
                   type="button"
                   onClick={() => handleChildrenCountChange(children.length + 1)}
-                  className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -293,24 +297,24 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
             </div>
 
             {/* Separate Room Counter */}
-            <div className="p-3 rounded-2xl bg-pink-50/60 border border-pink-200 flex flex-col items-center justify-between">
-              <span className="text-[11px] font-black uppercase text-pink-950">Private Room</span>
-              <span className="text-[10px] text-pink-700 font-semibold mb-1.5">+₹{coupleRoomSurcharge}</span>
-              <div className="flex items-center gap-2">
+            <div className="p-2 sm:p-3 rounded-2xl bg-pink-50/60 border border-pink-200 flex flex-col items-center justify-between">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase text-pink-950 text-center leading-tight">Private Room</span>
+              <span className="text-[9px] sm:text-[10px] text-pink-700 font-semibold mb-1.5 font-mono tabular-nums">+₹{coupleRoomSurcharge}</span>
+              <div className="flex items-center gap-1 sm:gap-2">
                 <button
                   type="button"
                   onClick={() => setPrivateRooms((r) => Math.max(0, r - 1))}
-                  className="w-7 h-7 rounded-lg bg-white border border-pink-300 hover:bg-pink-100 text-pink-950 font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-white border border-pink-300 hover:bg-pink-100 text-pink-950 font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   -
                 </button>
-                <span className="w-7 text-center font-mono font-black text-sm text-pink-950">
+                <span className="w-6 sm:w-7 text-center font-mono tabular-nums font-black text-sm text-pink-950">
                   {privateRooms}
                 </span>
                 <button
                   type="button"
                   onClick={() => setPrivateRooms((r) => r + 1)}
-                  className="w-7 h-7 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-black text-sm flex items-center justify-center cursor-pointer"
+                  className="w-7 h-7 rounded-lg bg-pink-600 hover:bg-pink-700 text-white font-black text-sm flex items-center justify-center cursor-pointer shrink-0"
                 >
                   +
                 </button>
@@ -417,7 +421,7 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                   <span className="font-black text-xs block">🚆 3AC Train</span>
                   <span className="text-[10px] text-zinc-500 font-semibold">AC Package</span>
                 </div>
-                <span className="font-mono font-black text-sm text-blue-700">
+                <span className="font-mono tabular-nums whitespace-nowrap font-black text-sm text-blue-700">
                   ₹{(selectedCustomPkg?.priceAcTrain || acTrainPrice).toLocaleString('en-IN')}
                 </span>
               </button>
@@ -438,7 +442,7 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                   <span className="font-black text-xs block">🚂 Sleeper</span>
                   <span className="text-[10px] text-zinc-500 font-semibold">Non-AC Package</span>
                 </div>
-                <span className="font-mono font-black text-sm text-amber-700">
+                <span className="font-mono tabular-nums whitespace-nowrap font-black text-sm text-amber-700">
                   ₹{(selectedCustomPkg?.priceNonAcTrain || sleeperPrice).toLocaleString('en-IN')}
                 </span>
               </button>
@@ -469,7 +473,7 @@ export const TourCalculatorModal: React.FC<TourCalculatorModalProps> = ({
                   Total Package Cost ({adultsCount} Adult{adultsCount > 1 ? 's' : ''}
                   {children.length > 0 ? ` + ${children.length} Kid${children.length > 1 ? 's' : ''}` : ''})
                 </span>
-                <span className="text-2xl font-black font-mono text-emerald-400">
+                <span className="text-2xl font-black font-mono tabular-nums whitespace-nowrap text-emerald-400">
                   ₹{calculation.grandTotal.toLocaleString('en-IN')}
                 </span>
               </div>

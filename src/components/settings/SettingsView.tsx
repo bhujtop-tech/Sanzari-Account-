@@ -124,15 +124,15 @@ export const SettingsView: React.FC = () => {
   };
 
   return (
-    <div className="space-y-5 pb-28 md:pb-12 max-w-3xl mx-auto">
+    <div className="space-y-4 sm:space-y-5 pb-32 md:pb-12 max-w-3xl mx-auto">
       {/* Header */}
       <div className="pt-1">
-        <h2 className="text-2xl font-black tracking-tight text-zinc-950">Settings &amp; Data</h2>
+        <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950">Settings &amp; Data</h2>
         <p className="text-xs text-zinc-600 font-medium">Business configurations and Excel/CSV data exports</p>
       </div>
 
       {/* Store Preferences Form */}
-      <form onSubmit={handleSaveSettings} className="p-5 rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-4">
+      <form onSubmit={handleSaveSettings} className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-4">
         <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider">
           Store Information
         </h3>
@@ -191,7 +191,7 @@ export const SettingsView: React.FC = () => {
       <PricingDiscountSettingsPanel />
 
       {/* Backup & CSV Exports */}
-      <div className="p-5 rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-3">
+      <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-3">
         <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
           <FileSpreadsheet size={15} className="text-emerald-600" />
           <span>Data Export &amp; Backup (CSV / Excel)</span>

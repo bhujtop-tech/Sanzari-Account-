@@ -129,21 +129,21 @@ export const AddExpenseModal: React.FC = () => {
             <label className="block text-xs font-bold text-zinc-700 uppercase tracking-wider mb-1">
               Deduct From Wallet *
             </label>
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
               {dryfruitWallets.map((w) => (
                 <button
                   key={w.id}
                   type="button"
                   onClick={() => setSelectedWalletId(w.id)}
-                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer ${
+                  className={`p-2.5 rounded-xl border text-left transition-all cursor-pointer min-w-0 ${
                     selectedWalletId === w.id
                       ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
                       : 'bg-zinc-50 border-zinc-200 text-zinc-800 hover:bg-zinc-100'
                   }`}
                 >
-                  <p className="text-xs font-bold">{w.name}</p>
+                  <p className="text-xs font-bold truncate">{w.name}</p>
                   <p
-                    className={`text-[10px] mt-0.5 truncate ${
+                    className={`text-[10px] mt-0.5 font-mono tabular-nums truncate ${
                       selectedWalletId === w.id ? 'text-zinc-300' : 'text-zinc-500'
                     }`}
                   >

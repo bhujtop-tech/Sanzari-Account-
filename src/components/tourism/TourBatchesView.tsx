@@ -6,6 +6,7 @@ import {
   ChevronRight,
   Trash2,
   FileDown,
+  X,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { TourBatch } from '../../types';
@@ -30,6 +31,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
 
   const [searchQuery, setSearchQuery] = useState('');
   const [pdfModalBatchId, setPdfModalBatchId] = useState<string | null>(null);
+  const [confirmDeleteBatchId, setConfirmDeleteBatchId] = useState<string | null>(null);
 
   // Filtered Tour Batches (must be above early return to follow Rules of Hooks)
   const filteredBatches = useMemo(() => {
@@ -49,12 +51,15 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
 
   const handleDeleteBatch = async (e: React.MouseEvent, batch: TourBatch) => {
     e.stopPropagation();
-    if (window.confirm(`Are you sure you want to delete tour folder "${batch.title}"? This cannot be undone.`)) {
-      try {
-        await deleteTourBatchById(batch.id);
-      } catch (err) {
-        console.error('Failed to delete tour folder:', err);
-      }
+    if (confirmDeleteBatchId !== batch.id) {
+      setConfirmDeleteBatchId(batch.id);
+      return;
+    }
+    try {
+      await deleteTourBatchById(batch.id);
+      setConfirmDeleteBatchId(null);
+    } catch (err) {
+      console.error('Failed to delete tour folder:', err);
     }
   };
 
@@ -98,23 +103,39 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     };
   };
 
+  const formatShortRate = (val?: number, fallback?: string) => {
+    if (!val) return fallback || '—';
+    if (val >= 1000 && val % 1000 === 0) return `₹${val / 1000}k`;
+    return formatCurrency(val);
+  };
+
   return (
-    <div className="space-y-5 pb-48 sm:pb-24">
+    <div className="space-y-3.5 sm:space-y-5 pb-48 sm:pb-24">
       {/* Search Bar */}
-      <div className="bg-white p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center gap-3">
-        <Search className="w-4 h-4 text-zinc-500 ml-2" />
+      <div className="bg-white px-3 py-2.5 sm:p-3 rounded-2xl border-2 border-zinc-900 shadow-sm flex items-center gap-2.5 sm:gap-3">
+        <Search className="w-4 h-4 text-zinc-500 ml-1 sm:ml-2 shrink-0" />
         <input
           type="text"
-          placeholder="Search by tour date, destination, or title (e.g. 10 Oct)..."
+          placeholder="Search tour date, destination, or title..."
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="w-full text-xs text-zinc-900 focus:outline-none placeholder:text-zinc-400 font-medium"
+          className="w-full text-[13px] sm:text-xs text-zinc-900 focus:outline-none placeholder:text-zinc-400 font-medium bg-transparent"
         />
+        {searchQuery && (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            aria-label="Clear search"
+            className="p-1 rounded-lg text-zinc-400 hover:text-zinc-900 cursor-pointer shrink-0"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
       </div>
 
-      {/* Folders List (2 cards per row on mobile, White Background & Black Border) */}
+      {/* Folders List (1 full-width spacious card per row on mobile; 2-col sm / 3-col lg desktop preserved) */}
       {filteredBatches.length === 0 ? (
-        <div className="bg-white rounded-3xl border-2 border-zinc-900 p-12 text-center space-y-3">
+        <div className="bg-white rounded-3xl border-2 border-zinc-900 p-10 sm:p-12 text-center space-y-3">
           <div className="w-16 h-16 rounded-2xl bg-zinc-100 text-zinc-900 flex items-center justify-center mx-auto border border-zinc-300">
             <Folder className="w-8 h-8" />
           </div>
@@ -124,7 +145,7 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-2.5 sm:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredBatches.map((b) => {
             const stats = getBatchStats(b.id);
 
@@ -136,130 +157,322 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
               ? d.toLocaleString('en-US', { month: 'short' }).toUpperCase()
               : 'OCT';
             const yearNum = isValid ? d.getFullYear() : b.departureDate.split('-')[0] || '2026';
+            const isConfirmingDelete = confirmDeleteBatchId === b.id;
 
             return (
               <div
                 key={b.id}
-                onClick={() => onSelectBatch && onSelectBatch(b.id)}
-                className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-3 sm:p-4 flex flex-col justify-between hover:shadow-md transition-all group cursor-pointer"
+                onClick={() => {
+                  if (confirmDeleteBatchId) setConfirmDeleteBatchId(null);
+                  onSelectBatch && onSelectBatch(b.id);
+                }}
+                className="bg-white text-zinc-950 rounded-2xl border-2 border-zinc-900 shadow-sm p-3.5 sm:p-4 flex flex-col justify-between hover:shadow-md active:scale-[0.99] sm:active:scale-100 transition-all group cursor-pointer"
               >
-                <div>
-                  {/* Folder Top Header - White Background, Black Border & Direct PDF/Delete Option */}
-                  <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2.5">
-                    <span className="text-[10px] font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                      <span>📂</span> Folder
-                    </span>
-                    <div className="flex items-center gap-1">
-                      {stats.bookingsCount > 0 && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleExportBatchPDF(e, b)}
-                          title="Download Group Bookings & Payment PDF"
-                          className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black flex items-center gap-1 transition-colors cursor-pointer"
-                        >
-                          <FileDown size={10} />
-                          <span>PDF</span>
-                        </button>
-                      )}
-                      <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-300 truncate max-w-[70px]">
-                        {b.tourType}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={(e) => handleDeleteBatch(e, b)}
-                        title="Delete Tour Folder"
-                        className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
-                      >
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Highlighted Date & Destination */}
-                  <div className="flex items-center gap-2 mb-2.5">
-                    {/* Big Date Badge - White background, Black border */}
-                    <div className="px-2 py-1 rounded-xl bg-zinc-50 border-2 border-zinc-900 text-center shrink-0 min-w-[44px]">
-                      <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-600 block leading-tight">
+                {/* =========================================================
+                    MOBILE-NATIVE CARD LAYOUT (< sm ONLY)
+                    Full-width breathable layout — zero clipping or wrap bugs
+                    ========================================================= */}
+                <div className="sm:hidden space-y-3">
+                  {/* Top Row: Calendar Date Box + Destination/Title + PDF & Delete */}
+                  <div className="flex items-start gap-3">
+                    <div className="w-[54px] py-1.5 rounded-xl bg-zinc-950 text-white text-center shrink-0">
+                      <span className="text-[9px] font-extrabold uppercase tracking-wider text-zinc-300 block leading-none">
                         {monthShort}
                       </span>
-                      <span className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 block leading-none my-0.5">
+                      <span className="text-[22px] font-black tracking-tight text-white block leading-tight my-0.5 font-mono tabular-nums">
                         {dayNum}
                       </span>
-                      <span className="text-[8px] font-bold text-zinc-500 block leading-tight">
+                      <span className="text-[9px] font-bold text-zinc-400 block leading-none">
                         {yearNum}
                       </span>
                     </div>
 
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1 text-zinc-950">
-                        <MapPin size={12} className="shrink-0 stroke-[2.5]" />
-                        <h3 className="text-xs sm:text-sm font-black text-zinc-950 truncate tracking-tight">
-                          {b.destination}
-                        </h3>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="text-[15px] font-black text-zinc-950 leading-snug truncate">
+                            {b.destination}
+                          </h3>
+                          <p className="text-xs font-semibold text-zinc-600 truncate mt-0.5">
+                            {b.title} <span className="text-zinc-400">·</span>{' '}
+                            <span className="text-zinc-500">{b.tourType}</span>
+                          </p>
+                        </div>
+
+                        {/* Top-Right Compact Actions */}
+                        <div
+                          className="flex items-center gap-1.5 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {isConfirmingDelete ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteBatch(e, b)}
+                                className="px-2.5 py-1.5 rounded-lg bg-rose-600 text-white text-[11px] font-black cursor-pointer"
+                              >
+                                Delete
+                              </button>
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setConfirmDeleteBatchId(null);
+                                }}
+                                className="px-2 py-1.5 rounded-lg bg-zinc-100 text-zinc-700 text-[11px] font-bold cursor-pointer"
+                              >
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <>
+                              {stats.bookingsCount > 0 && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => handleExportBatchPDF(e, b)}
+                                  title="Download Group PDF"
+                                  className="h-8 px-2.5 rounded-lg bg-emerald-600 active:bg-emerald-700 text-white text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                                >
+                                  <FileDown size={13} />
+                                  <span>PDF</span>
+                                </button>
+                              )}
+                              <button
+                                type="button"
+                                onClick={(e) => handleDeleteBatch(e, b)}
+                                title="Delete Tour Folder"
+                                className="w-8 h-8 rounded-lg bg-zinc-100 text-zinc-500 active:bg-rose-50 active:text-rose-600 flex items-center justify-center cursor-pointer"
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </div>
-                      <p className="text-[10px] font-semibold text-zinc-600 truncate mt-0.5">{b.title}</p>
                     </div>
                   </div>
 
-                  {/* Compact Rates Grid - Clean White & Zinc */}
-                  <div className="bg-zinc-50 rounded-xl p-2 border border-zinc-200 my-2 space-y-1">
-                    <div className="text-[9px] font-extrabold uppercase tracking-wider text-zinc-600 flex justify-between items-center">
-                      <span>Rates / Person</span>
+                  {/* Financial Summary Strip: 3 Crisp Non-Wrapping Columns */}
+                  <div className="grid grid-cols-3 divide-x divide-zinc-200 bg-zinc-50 rounded-xl border border-zinc-200 py-2.5 px-1">
+                    <div className="px-2 text-center min-w-0">
+                      <span className="text-[10px] font-semibold text-zinc-500 block">Bookings</span>
+                      <strong className="text-[14px] font-black font-mono tabular-nums text-zinc-950 block mt-0.5 whitespace-nowrap">
+                        {stats.bookingsCount}
+                      </strong>
                     </div>
-                    <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
-                      <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
-                        🚆 AC: {b.priceAcTrain ? formatCurrency(b.priceAcTrain) : formatCurrency(b.basePricePerPerson || 16000)}
-                      </div>
-                      <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
-                        🚞 Non-AC: {b.priceNonAcTrain ? formatCurrency(b.priceNonAcTrain) : '₹14k'}
-                      </div>
-                      <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
-                        ✈️ Flight: {b.priceFlight ? formatCurrency(b.priceFlight) : '₹22k'}
-                      </div>
-                      <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
-                        👶 Child: {b.priceChildHalf ? formatCurrency(b.priceChildHalf) : '₹7k'}
-                      </div>
+                    <div className="px-2 text-center min-w-0">
+                      <span className="text-[10px] font-semibold text-zinc-500 block">Received</span>
+                      <strong className="text-[13px] font-black font-mono tabular-nums text-emerald-700 block mt-0.5 whitespace-nowrap truncate">
+                        {formatCurrency(stats.totalAdvance)}
+                      </strong>
+                    </div>
+                    <div className="px-2 text-center min-w-0">
+                      <span className="text-[10px] font-semibold text-zinc-500 block">Baaki Due</span>
+                      <strong
+                        className={`text-[13px] font-black font-mono tabular-nums block mt-0.5 whitespace-nowrap truncate ${
+                          stats.totalPending > 0 ? 'text-rose-600' : 'text-emerald-700'
+                        }`}
+                      >
+                        {formatCurrency(stats.totalPending)}
+                      </strong>
                     </div>
                   </div>
 
-                  {/* Compact Stats */}
-                  <div className="grid grid-cols-3 gap-1 bg-zinc-50 rounded-xl p-1.5 text-center text-[9px] font-medium border border-zinc-200">
-                    <div>
-                      <span className="text-zinc-500 block text-[9px]">Bookings</span>
-                      <strong className="text-zinc-950 font-bold text-xs">{stats.bookingsCount}</strong>
+                  {/* Clean Readable Rates Row (Zero Truncation!) */}
+                  <div className="grid grid-cols-4 gap-1.5 text-center">
+                    <div className="bg-zinc-50 rounded-lg py-1.5 px-1 border border-zinc-200/80">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase block leading-none">AC</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 block mt-1 whitespace-nowrap">
+                        {formatShortRate(b.priceAcTrain || b.basePricePerPerson || 16000)}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-zinc-500 block text-[9px]">Advance</span>
-                      <strong className="text-emerald-700 font-bold text-xs">{formatCurrency(stats.totalAdvance)}</strong>
+                    <div className="bg-zinc-50 rounded-lg py-1.5 px-1 border border-zinc-200/80">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase block leading-none">Non-AC</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 block mt-1 whitespace-nowrap">
+                        {formatShortRate(b.priceNonAcTrain, '₹14k')}
+                      </span>
                     </div>
-                    <div>
-                      <span className="text-zinc-500 block text-[9px]">Baaki Due</span>
-                      <strong className="text-rose-600 font-bold text-xs">{formatCurrency(stats.totalPending)}</strong>
+                    <div className="bg-zinc-50 rounded-lg py-1.5 px-1 border border-zinc-200/80">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase block leading-none">Flight</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 block mt-1 whitespace-nowrap">
+                        {formatShortRate(b.priceFlight, '₹22k')}
+                      </span>
+                    </div>
+                    <div className="bg-zinc-50 rounded-lg py-1.5 px-1 border border-zinc-200/80">
+                      <span className="text-[9px] font-bold text-zinc-500 uppercase block leading-none">Child</span>
+                      <span className="text-[11px] font-black font-mono tabular-nums text-zinc-900 block mt-1 whitespace-nowrap">
+                        {formatShortRate(b.priceChildHalf, '₹7k')}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Mobile Footer: Clean Pax Breakdown + Open Folder CTA */}
+                  <div className="pt-2.5 border-t border-zinc-200 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-zinc-700 flex-wrap">
+                      <span className="font-black text-zinc-950 font-mono tabular-nums">
+                        {stats.totalPassengers} Pax
+                      </span>
+                      <span className="text-zinc-300">·</span>
+                      <span className="text-blue-700 font-extrabold">AC {stats.acPax}</span>
+                      <span className="text-zinc-300">·</span>
+                      <span className="text-amber-700 font-extrabold">Non-AC {stats.nonAcPax}</span>
+                      {stats.cancelledCount > 0 && (
+                        <>
+                          <span className="text-zinc-300">·</span>
+                          <span className="text-rose-600 font-extrabold">{stats.cancelledCount} Canc</span>
+                        </>
+                      )}
+                    </div>
+                    <div className="text-xs font-black text-zinc-950 flex items-center gap-0.5 shrink-0">
+                      <span>Open</span>
+                      <ChevronRight size={15} className="text-zinc-500" />
                     </div>
                   </div>
                 </div>
 
-                {/* Actions Footer with AC vs Non-AC Pax Breakdown */}
-                <div className="pt-2.5 mt-2.5 border-t border-zinc-200 flex items-center justify-between gap-1.5 flex-wrap">
-                  <div className="flex items-center gap-1 flex-wrap">
-                    <span className="text-[10px] text-zinc-900 font-black">
-                      {stats.totalPassengers} Pax
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 border border-blue-300 text-[9px] font-black">
-                      🚆 AC: {stats.acPax}
-                    </span>
-                    <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
-                      🚂 Non-AC: {stats.nonAcPax}
-                    </span>
-                    {stats.cancelledCount > 0 && (
-                      <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[9px] font-black">
-                        ❌ {stats.cancelledCount} Canc
+                {/* =========================================================
+                    DESKTOP CARD LAYOUT (sm+ ONLY — 100% UNCHANGED)
+                    ========================================================= */}
+                <div className="hidden sm:flex sm:flex-col sm:justify-between sm:flex-1">
+                  <div>
+                    {/* Folder Top Header - White Background, Black Border & Direct PDF/Delete Option */}
+                    <div className="flex items-center justify-between border-b border-zinc-200 pb-2 mb-2.5">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                        <span>📂</span> Folder
                       </span>
-                    )}
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        {isConfirmingDelete ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteBatch(e, b)}
+                              className="px-2 py-0.5 rounded bg-rose-600 text-white text-[9px] font-black cursor-pointer"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteBatchId(null)}
+                              className="px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-700 text-[9px] font-bold cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            {stats.bookingsCount > 0 && (
+                              <button
+                                type="button"
+                                onClick={(e) => handleExportBatchPDF(e, b)}
+                                title="Download Group Bookings & Payment PDF"
+                                className="px-1.5 py-0.5 rounded bg-emerald-600 hover:bg-emerald-700 text-white text-[9px] font-black flex items-center gap-1 transition-colors cursor-pointer"
+                              >
+                                <FileDown size={10} />
+                                <span>PDF</span>
+                              </button>
+                            )}
+                            <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-zinc-100 text-zinc-800 border border-zinc-300 truncate max-w-[70px]">
+                              {b.tourType}
+                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteBatch(e, b)}
+                              title="Delete Tour Folder"
+                              className="p-1 rounded-md text-zinc-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer"
+                            >
+                              <Trash2 size={12} />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Highlighted Date & Destination */}
+                    <div className="flex items-center gap-2 mb-2.5">
+                      {/* Big Date Badge - White background, Black border */}
+                      <div className="px-2 py-1 rounded-xl bg-zinc-50 border-2 border-zinc-900 text-center shrink-0 min-w-[44px]">
+                        <span className="text-[8px] font-extrabold uppercase tracking-wider text-zinc-600 block leading-tight">
+                          {monthShort}
+                        </span>
+                        <span className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950 block leading-none my-0.5">
+                          {dayNum}
+                        </span>
+                        <span className="text-[8px] font-bold text-zinc-500 block leading-tight">
+                          {yearNum}
+                        </span>
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 text-zinc-950">
+                          <MapPin size={12} className="shrink-0 stroke-[2.5]" />
+                          <h3 className="text-xs sm:text-sm font-black text-zinc-950 truncate tracking-tight">
+                            {b.destination}
+                          </h3>
+                        </div>
+                        <p className="text-[10px] font-semibold text-zinc-600 truncate mt-0.5">{b.title}</p>
+                      </div>
+                    </div>
+
+                    {/* Compact Rates Grid - Clean White & Zinc */}
+                    <div className="bg-zinc-50 rounded-xl p-2 border border-zinc-200 my-2 space-y-1">
+                      <div className="text-[9px] font-extrabold uppercase tracking-wider text-zinc-600 flex justify-between items-center">
+                        <span>Rates / Person</span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-1 text-[10px] font-bold">
+                        <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
+                          🚆 AC: {b.priceAcTrain ? formatCurrency(b.priceAcTrain) : formatCurrency(b.basePricePerPerson || 16000)}
+                        </div>
+                        <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
+                          🚞 Non-AC: {b.priceNonAcTrain ? formatCurrency(b.priceNonAcTrain) : '₹14k'}
+                        </div>
+                        <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
+                          ✈️ Flight: {b.priceFlight ? formatCurrency(b.priceFlight) : '₹22k'}
+                        </div>
+                        <div className="bg-white px-1.5 py-0.5 rounded text-zinc-900 border border-zinc-200 truncate">
+                          👶 Child: {b.priceChildHalf ? formatCurrency(b.priceChildHalf) : '₹7k'}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Compact Stats */}
+                    <div className="grid grid-cols-3 gap-1 bg-zinc-50 rounded-xl p-1.5 text-center text-[9px] font-medium border border-zinc-200">
+                      <div>
+                        <span className="text-zinc-500 block text-[9px]">Bookings</span>
+                        <strong className="text-zinc-950 font-bold text-xs">{stats.bookingsCount}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[9px]">Advance</span>
+                        <strong className="text-emerald-700 font-bold text-xs">{formatCurrency(stats.totalAdvance)}</strong>
+                      </div>
+                      <div>
+                        <span className="text-zinc-500 block text-[9px]">Baaki Due</span>
+                        <strong className="text-rose-600 font-bold text-xs">{formatCurrency(stats.totalPending)}</strong>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-[10px] font-bold text-zinc-900 group-hover:text-black flex items-center gap-0.5 transition-colors">
-                    <span>Open &amp; PDF</span>
-                    <ChevronRight size={12} className="text-zinc-500" />
+
+                  {/* Actions Footer with AC vs Non-AC Pax Breakdown */}
+                  <div className="pt-2.5 mt-2.5 border-t border-zinc-200 flex items-center justify-between gap-1.5 flex-wrap">
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <span className="text-[10px] text-zinc-900 font-black">
+                        {stats.totalPassengers} Pax
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-blue-100 text-blue-900 border border-blue-300 text-[9px] font-black">
+                        🚆 AC: {stats.acPax}
+                      </span>
+                      <span className="px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[9px] font-black">
+                        🚂 Non-AC: {stats.nonAcPax}
+                      </span>
+                      {stats.cancelledCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 border border-rose-300 text-[9px] font-black">
+                          ❌ {stats.cancelledCount} Canc
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[10px] font-bold text-zinc-900 group-hover:text-black flex items-center gap-0.5 transition-colors">
+                      <span>Open &amp; PDF</span>
+                      <ChevronRight size={12} className="text-zinc-500" />
+                    </div>
                   </div>
                 </div>
               </div>
@@ -276,4 +489,5 @@ export const TourBatchesView: React.FC<TourBatchesViewProps> = ({
     </div>
   );
 };
+
 

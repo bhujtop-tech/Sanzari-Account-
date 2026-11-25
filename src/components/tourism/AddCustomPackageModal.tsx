@@ -223,10 +223,14 @@ export const AddCustomPackageModal: React.FC<AddCustomPackageModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[92vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-3xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[92vh] flex flex-col">
+        {/* Mobile grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-white shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
         {/* Header */}
-        <div className="bg-white p-5 text-zinc-950 flex items-center justify-between shrink-0 border-b-2 border-zinc-900">
+        <div className="bg-white px-4 py-3 sm:p-5 text-zinc-950 flex items-center justify-between shrink-0 border-b-2 border-zinc-900">
           <div>
             <h2 className="text-base sm:text-lg font-black tracking-tight text-zinc-950 flex items-center gap-2">
               <span>📦</span>
@@ -249,7 +253,7 @@ export const AddCustomPackageModal: React.FC<AddCustomPackageModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto space-y-4 flex-1">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 overflow-y-auto overscroll-contain min-h-0 space-y-4 flex-1 safe-bottom sm:pb-6">
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-300 text-rose-800 text-xs rounded-xl font-bold">
               {error}
@@ -439,7 +443,7 @@ export const AddCustomPackageModal: React.FC<AddCustomPackageModalProps> = ({
                 onClick={handleAddDay}
                 className="px-2.5 py-1 bg-zinc-950 text-white rounded-lg text-xs font-bold flex items-center gap-1 cursor-pointer hover:bg-black"
               >
-                <Plus size={12} /> + દિવસ ઉમેરો
+                <Plus size={12} /> <span className="sm:hidden">દિવસ ઉમેરો</span><span className="hidden sm:inline">+ દિવસ ઉમેરો</span>
               </button>
             </div>
 

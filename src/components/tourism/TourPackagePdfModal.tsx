@@ -108,55 +108,62 @@ export const TourPackagePdfModal: React.FC<TourPackagePdfModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-4xl bg-white rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[95vh] flex flex-col">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-sm overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-4xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[95dvh] sm:max-h-[95vh] flex flex-col">
+        {/* Mobile grab handle */}
+        <div className="no-print sm:hidden flex justify-center pt-2 pb-0.5 bg-zinc-950 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-700" />
+        </div>
         {/* Top Control Bar - Screen only */}
-        <div className="no-print bg-zinc-950 p-4 text-white flex flex-wrap items-center justify-between gap-3 shrink-0 border-b-2 border-zinc-900">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">📄</span>
-            <div>
-              <h2 className="text-sm sm:text-base font-black tracking-tight text-white flex items-center gap-2">
+        <div className="no-print bg-zinc-950 px-3.5 py-3 sm:p-4 text-white flex flex-wrap items-center justify-between gap-2 sm:gap-3 shrink-0 border-b-2 border-zinc-900">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-base sm:text-lg shrink-0">📄</span>
+            <div className="min-w-0">
+              <h2 className="text-xs sm:text-base font-black tracking-tight text-white flex items-center gap-2 truncate">
                 Tour Package Proposal &amp; PDF Brochure
               </h2>
-              <p className="text-[11px] text-zinc-400">
+              <p className="text-[10px] sm:text-[11px] text-zinc-400 truncate">
                 Sanzari Tours (Vadodara) • A4 Print &amp; WhatsApp Share
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto justify-end overflow-x-auto no-scrollbar">
             <button
               onClick={handleCopyText}
               type="button"
-              className="px-3 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-white text-xs font-bold border border-zinc-700 flex items-center gap-1.5 cursor-pointer transition-colors"
+              className="px-2.5 sm:px-3 py-1.5 rounded-xl bg-zinc-850 hover:bg-zinc-800 text-white text-xs font-bold border border-zinc-700 flex items-center gap-1.5 cursor-pointer transition-colors whitespace-nowrap shrink-0"
               title="Copy Proposal Text"
             >
               {copied ? <Check size={14} className="text-emerald-400" /> : <Copy size={14} />}
-              <span>{copied ? 'Copied!' : 'Copy Text'}</span>
+              <span className="sm:hidden">{copied ? 'Copied!' : 'Copy'}</span>
+              <span className="hidden sm:inline">{copied ? 'Copied!' : 'Copy Text'}</span>
             </button>
 
             <button
               onClick={handleShareWhatsApp}
               type="button"
-              className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+              className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors whitespace-nowrap shrink-0"
             >
               <Share2 size={14} />
-              <span>Share on WhatsApp</span>
+              <span className="sm:hidden">WhatsApp</span>
+              <span className="hidden sm:inline">Share on WhatsApp</span>
             </button>
 
             <button
               onClick={handlePrintPdf}
               type="button"
-              className="px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors"
+              className="px-2.5 sm:px-3.5 py-1.5 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-950 text-xs font-black flex items-center gap-1.5 cursor-pointer shadow-sm transition-colors whitespace-nowrap shrink-0"
             >
               <Printer size={14} />
-              <span>Download / Print PDF</span>
+              <span className="sm:hidden">PDF</span>
+              <span className="hidden sm:inline">Download / Print PDF</span>
             </button>
 
             <button
               onClick={onClose}
               type="button"
-              className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              className="w-8 h-8 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-zinc-300 hover:text-white flex items-center justify-center cursor-pointer transition-colors shrink-0"
             >
               <X size={16} />
             </button>
@@ -165,7 +172,7 @@ export const TourPackagePdfModal: React.FC<TourPackagePdfModalProps> = ({
 
         {/* Printable Document Area in Authentic Vadodara Font */}
         <div
-          className="p-4 sm:p-8 overflow-y-auto flex-1 min-h-0 bg-[#ffffff] text-zinc-950"
+          className="p-4 sm:p-8 overflow-y-auto overscroll-contain flex-1 min-h-0 bg-[#ffffff] text-zinc-950 safe-bottom sm:pb-8"
           style={{ fontFamily: "'Hind', 'Noto Sans Devanagari', 'Noto Sans Gujarati', 'Inter', sans-serif" }}
           ref={printRef}
         >

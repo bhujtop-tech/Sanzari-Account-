@@ -23,33 +23,36 @@ export const StickyMobileQuickActions: React.FC = () => {
     return (
       <>
         {/* Mobile Floating Action Bar directly above Bottom Nav */}
-        <div className="fixed bottom-[58px] left-0 right-0 z-30 pointer-events-none flex justify-center px-2 pb-1 md:hidden">
-          <div className="pointer-events-auto bg-zinc-950 text-white p-1.5 rounded-2xl shadow-2xl border-2 border-zinc-900 flex items-center gap-1.5 max-w-[95vw] w-full justify-between">
-            {/* Quick Floating Add Inquiry Button - Lamba & High Visibility */}
+        <div className="fixed bottom-[62px] left-0 right-0 z-30 pointer-events-none flex justify-center px-3 pb-1 md:hidden">
+          <div className="pointer-events-auto bg-zinc-950/95 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-zinc-800 flex items-center gap-1.5 w-full max-w-md justify-between">
+            {/* Quick Floating Add Inquiry Button */}
             <button
+              type="button"
               onClick={() => setIsAddTourInquiryOpen(true)}
-              className="flex-1 py-2 px-2.5 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-black text-xs flex items-center justify-center gap-1 shadow-md active:scale-95 transition-transform cursor-pointer truncate"
+              className="flex-1 min-h-[38px] py-2 px-3 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-transform cursor-pointer whitespace-nowrap"
             >
               <Plus size={14} className="stroke-[3] shrink-0" />
-              <span className="truncate">+ New Inquiry</span>
+              <span>New Inquiry</span>
             </button>
 
             {/* Quick Floating Add Booking Button */}
             <button
+              type="button"
               onClick={() => setIsAddTourBookingOpen(true)}
-              className="py-2 px-2.5 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1 border border-zinc-700 active:scale-95 transition-transform cursor-pointer shrink-0"
+              className="min-h-[38px] py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1 border border-zinc-700 active:scale-[0.98] transition-transform cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <Plus size={13} />
+              <Plus size={13} className="stroke-[2.5] shrink-0" />
               <span>Booking</span>
             </button>
 
             {/* Quick Floating Add Tour Date Button */}
             <button
+              type="button"
               onClick={() => setIsAddTourBatchOpen(true)}
-              className="py-2 px-2.5 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-bold text-xs flex items-center justify-center gap-1 border border-zinc-800 active:scale-95 transition-transform cursor-pointer shrink-0 whitespace-nowrap"
+              className="min-h-[38px] py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-bold text-xs flex items-center justify-center gap-1 border border-zinc-800 active:scale-[0.98] transition-transform cursor-pointer shrink-0 whitespace-nowrap"
             >
-              <FolderPlus size={13} />
-              <span>+ Date</span>
+              <FolderPlus size={13} className="shrink-0" />
+              <span>Date</span>
             </button>
           </div>
         </div>

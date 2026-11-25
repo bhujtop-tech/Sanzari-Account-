@@ -16,16 +16,29 @@ import {
   Check,
   Tag,
   ArrowRightLeft,
+  Receipt,
+  Plus,
+  TrendingUp,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
-import { TourBooking, TourPaymentMode, PaymentMethod, TourPaymentEntry } from '../../types';
+import {
+  TourBooking,
+  TourPaymentMode,
+  PaymentMethod,
+  TourPaymentEntry,
+  TourExpense,
+  TourExpenseCategory,
+} from '../../types';
 import {
   recordTourBookingPayment,
   updateTourBookingPaymentEntry,
   deleteTourBookingPaymentEntry,
   updateTourBookingDiscount,
+  addTourExpense,
 } from '../../services/db';
+import { isPrivateTourBooking } from './TourCommissionView';
+import { matchesPrivateTourExpense } from '../../utils/tourWalletLedger';
 
 interface ReceiveTourPaymentModalProps {
   isOpen: boolean;
@@ -39,9 +52,14 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
   booking,
 }) => {
   const {
+    tourBatches,
     tourBookings,
+    tourExpenses,
     tourWallets,
     formatCurrency,
+    formatDate,
+    openEditTourExpenseModal,
+    deleteTourExpenseById,
     setTourReceiptBooking,
     setIsTourReceiptOpen,
   } = useData();
@@ -88,6 +106,18 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
   const [isSavingEdit, setIsSavingEdit] = useState(false);
   const [confirmDeleteIdx, setConfirmDeleteIdx] = useState<number | null>(null);
 
+  // Inline Private Package Expense state
+  const [showAddExpenseForm, setShowAddExpenseForm] = useState(false);
+  const [expCategory, setExpCategory] = useState<TourExpenseCategory>('Hotel & Stay');
+  const [expDescription, setExpDescription] = useState('');
+  const [expAmount, setExpAmount] = useState('');
+  const [expWalletName, setExpWalletName] = useState('Rizwan (Tour)');
+  const [expPaymentMode, setExpPaymentMode] = useState<TourPaymentMode>('UPI');
+  const [expDate, setExpDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+  const [isSavingExpense, setIsSavingExpense] = useState(false);
+  const [expError, setExpError] = useState('');
+  const [confirmDeleteExpId, setConfirmDeleteExpId] = useState<string | null>(null);
+
   const walletOptions = useMemo(() => {
     if (tourWallets.length > 0) return tourWallets;
     return [
@@ -115,6 +145,14 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
       setEditingEntryIdx(null);
       setConfirmDeleteIdx(null);
       setEditError('');
+      setShowAddExpenseForm(false);
+      setExpCategory('Hotel & Stay');
+      setExpDescription('');
+      setExpAmount('');
+      setExpPaymentMode('UPI');
+      setExpDate(new Date().toISOString().split('T')[0]);
+      setExpError('');
+      setConfirmDeleteExpId(null);
 
       // Default wallet to booking's wallet or current logged-in partner's wallet
       const isSahil =
@@ -123,13 +161,13 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
       const sahilW = tourWallets.find((w) => w.name.toLowerCase().includes('sahil'));
       const rizwanW = tourWallets.find((w) => w.name.toLowerCase().includes('rizwan'));
 
-      if (liveBooking.walletName) {
-        setWalletName(liveBooking.walletName);
-      } else if (isSahil && sahilW) {
-        setWalletName(sahilW.name);
-      } else {
-        setWalletName(rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)');
-      }
+      const defaultWallet = liveBooking.walletName
+        ? liveBooking.walletName
+        : isSahil && sahilW
+        ? sahilW.name
+        : rizwanW?.name || tourWallets[0]?.name || 'Rizwan (Tour)';
+      setWalletName(defaultWallet);
+      setExpWalletName(defaultWallet);
     }
   }, [isOpen, liveBooking?.id]);
 
@@ -165,6 +203,27 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
     }
     return [];
   }, [liveBooking, advancePaid]);
+
+  // Detect Private Package & pull all expenses linked from Wallet/Accounts or directly inside this modal
+  const isPrivatePackage = useMemo(() => {
+    if (!liveBooking) return false;
+    return isPrivateTourBooking(liveBooking, tourBatches);
+  }, [liveBooking, tourBatches]);
+
+  const linkedPrivateExpenses = useMemo(() => {
+    if (!liveBooking) return [];
+    return tourExpenses
+      .filter((exp) => matchesPrivateTourExpense(exp, liveBooking))
+      .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  }, [tourExpenses, liveBooking]);
+
+  const totalPrivateExpenses = useMemo(
+    () => linkedPrivateExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0),
+    [linkedPrivateExpenses]
+  );
+
+  const privateBillingProfit = totalAmount - totalPrivateExpenses;
+  const privateCashBalance = advancePaid - totalPrivateExpenses;
 
   if (!isOpen || !liveBooking) return null;
 
@@ -204,6 +263,79 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
         (raw.includes('bus') && w.name.toLowerCase().includes('bus'))
     );
     return matched?.name || rawName || walletOptions[0]?.name || 'Rizwan (Tour)';
+  };
+
+  const PRIVATE_EXPENSE_CATEGORIES: TourExpenseCategory[] = [
+    'Hotel & Stay',
+    'Train & Transport',
+    'Food & Meals',
+    'Sightseeing & Entry',
+    'Guide & Staff',
+    'Mustak Commission',
+    'Customer Refund',
+    'Other',
+  ];
+
+  const handleAddPrivateExpense = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setExpError('');
+    const amt = Number(expAmount);
+    if (!amt || amt <= 0) {
+      setExpError('Please enter a valid expense amount greater than ₹0.');
+      return;
+    }
+
+    const canonicalWallet = resolveCanonicalWalletName(expWalletName);
+    const matchedWallet = tourWallets.find(
+      (w) => w.name.toLowerCase().trim() === canonicalWallet.toLowerCase().trim()
+    );
+    const userEmail = currentUserProfile?.email || user?.email || 'admin@sanzari.com';
+    const cleanDate = expDate || new Date().toISOString().split('T')[0];
+
+    setIsSavingExpense(true);
+    try {
+      await addTourExpense(
+        {
+          tourBatchId: `PRIVATE_${liveBooking.id}`,
+          tourBookingId: liveBooking.id,
+          tourTitle: `🚗 Private (${liveBooking.tourDate}) • ${liveBooking.customerName}`,
+          destination: liveBooking.destination || '',
+          category: expCategory,
+          amount: amt,
+          walletId: matchedWallet?.id || '',
+          walletName: canonicalWallet,
+          paymentMode: expPaymentMode,
+          paidToPerson: expCategory === 'Mustak Commission' ? 'Mustak' : undefined,
+          date: cleanDate,
+          monthKey: cleanDate.slice(0, 7),
+          description: expDescription.trim() || `${expCategory} • ${liveBooking.customerName}`,
+          notes: `${expPaymentMode} • ${canonicalWallet}`,
+        },
+        userEmail
+      );
+      setExpAmount('');
+      setExpDescription('');
+      setShowAddExpenseForm(false);
+      setActionBanner(`Expense of ${formatCurrency(amt)} added & deducted from ${canonicalWallet}.`);
+    } catch (err: any) {
+      console.error('Failed to add private package expense:', err);
+      setExpError(err?.message || 'Failed to save expense. Please try again.');
+    } finally {
+      setIsSavingExpense(false);
+    }
+  };
+
+  const handleDeletePrivateExpense = async (exp: TourExpense) => {
+    try {
+      await deleteTourExpenseById(exp.id);
+      setConfirmDeleteExpId(null);
+      setActionBanner(
+        `Expense of ${formatCurrency(exp.amount)} deleted & refunded to ${exp.walletName || 'Wallet'}.`
+      );
+    } catch (err: any) {
+      console.error('Failed to delete private package expense:', err);
+      setExpError(err?.message || 'Failed to delete expense.');
+    }
   };
 
   const handleStartEditEntry = (item: TourPaymentEntry, idx: number) => {
@@ -477,13 +609,18 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
   };
 
   return (
-    <div className="fixed inset-0 z-60 flex items-center justify-center p-3 sm:p-4 bg-black/80 backdrop-blur-xs overflow-y-auto">
-      <div className="relative w-full max-w-xl bg-white text-zinc-950 rounded-3xl shadow-2xl border-2 border-zinc-900 overflow-hidden my-auto max-h-[94vh] flex flex-col">
+    <div className="fixed inset-0 z-60 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/80 backdrop-blur-xs overflow-hidden sm:overflow-y-auto">
+      <div className="relative w-full max-w-xl bg-white text-zinc-950 rounded-t-3xl sm:rounded-3xl shadow-2xl border-t-2 sm:border-2 border-zinc-900 overflow-hidden my-0 sm:my-auto max-h-[94dvh] sm:max-h-[94vh] flex flex-col">
+        {/* Mobile bottom-sheet grab handle */}
+        <div className="sm:hidden flex justify-center pt-2 pb-0.5 bg-white shrink-0">
+          <div className="w-10 h-1 rounded-full bg-zinc-300" />
+        </div>
+
         {/* Header */}
-        <div className="bg-white px-5 py-4 border-b-2 border-zinc-900 flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="bg-white px-3.5 py-3 sm:px-5 sm:py-4 border-b-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 flex-1">
             <div
-              className={`w-10 h-10 rounded-2xl flex items-center justify-center font-black shadow-xs ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl flex items-center justify-center font-black shadow-xs shrink-0 ${
                 currentDue === 0
                   ? 'bg-emerald-600 text-white'
                   : 'bg-zinc-950 text-white'
@@ -491,16 +628,16 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
             >
               {currentDue === 0 ? <CheckCircle2 className="w-5 h-5" /> : <IndianRupee className="w-5 h-5" />}
             </div>
-            <div>
-              <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-base sm:text-lg font-black tracking-tight text-zinc-950">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                <h2 className="text-sm sm:text-lg font-black tracking-tight text-zinc-950 leading-tight">
                   {currentDue === 0 ? 'Payment Completed (Full Paid)' : 'Receive Baaki / Due Payment'}
                 </h2>
                 <span className="text-[10px] font-mono font-black bg-zinc-100 text-zinc-900 px-2 py-0.5 rounded-lg border border-zinc-300">
                   {liveBooking.bookingNumber}
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-600 font-semibold flex items-center gap-2 mt-0.5">
+              <p className="text-[11px] text-zinc-600 font-semibold flex items-center flex-wrap gap-x-1.5 gap-y-0.5 sm:gap-2 mt-0.5">
                 <span className="font-black text-zinc-950">{liveBooking.customerName}</span>
                 <span>•</span>
                 <span className="flex items-center gap-0.5">
@@ -517,14 +654,14 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-xl bg-zinc-100 hover:bg-zinc-200 border border-zinc-300 flex items-center justify-center text-zinc-700 hover:text-black transition-colors cursor-pointer shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Body */}
-        <div className="p-4 sm:p-5 overflow-y-auto space-y-4 text-xs flex-1 bg-zinc-50/50">
+        <div className="p-3.5 sm:p-5 overflow-y-auto overscroll-contain space-y-3.5 sm:space-y-4 text-xs flex-1 bg-zinc-50/50">
           {/* Action Sync Banner (when an entry is edited/deleted or discount updated) */}
           {actionBanner && justPaidAmount === null && (
             <div className="p-3 rounded-2xl bg-emerald-50 text-emerald-950 border-2 border-emerald-500 flex items-center justify-between gap-2">
@@ -1487,18 +1624,334 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
               </div>
             )}
           </div>
+
+          {/* 4. PRIVATE PACKAGE EXPENSES & COMPLETE HISAAB */}
+          {(isPrivatePackage || linkedPrivateExpenses.length > 0) && (
+            <div className="bg-white rounded-2xl border-2 border-zinc-900 p-4 space-y-3">
+              <div className="flex items-center justify-between gap-2 pb-2 border-b border-zinc-200 flex-wrap">
+                <div className="flex items-center gap-1.5">
+                  <Receipt className="w-4 h-4 text-rose-600" />
+                  <span className="text-xs font-black text-zinc-950 uppercase tracking-wider">
+                    Private Package Expenses &amp; Hisaab ({linkedPrivateExpenses.length})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-mono tabular-nums font-black text-rose-700">
+                    -{formatCurrency(totalPrivateExpenses)}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowAddExpenseForm((prev) => !prev);
+                      setExpError('');
+                    }}
+                    className={`px-2.5 py-1.5 rounded-lg font-black text-[11px] flex items-center gap-1 transition-colors cursor-pointer ${
+                      showAddExpenseForm
+                        ? 'bg-zinc-200 text-zinc-900 hover:bg-zinc-300'
+                        : 'bg-zinc-950 text-white hover:bg-zinc-800'
+                    }`}
+                  >
+                    {showAddExpenseForm ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+                    <span>{showAddExpenseForm ? 'Close' : 'Add Expense'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 3-Box Package Hisaab Summary */}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-emerald-50/70 border border-emerald-200 px-2.5 py-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 block">
+                    Cash In
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono tabular-nums font-black text-emerald-800 block mt-0.5">
+                    {formatCurrency(advancePaid)}
+                  </span>
+                  <span className="text-[10px] text-emerald-700/80 font-medium block truncate">
+                    Bill: {formatCurrency(totalAmount)}
+                  </span>
+                </div>
+
+                <div className="rounded-xl bg-rose-50/70 border border-rose-200 px-2.5 py-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 block">
+                    Cash Out
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono tabular-nums font-black text-rose-700 block mt-0.5">
+                    {formatCurrency(totalPrivateExpenses)}
+                  </span>
+                  <span className="text-[10px] text-rose-700/80 font-medium block truncate">
+                    {linkedPrivateExpenses.length} {linkedPrivateExpenses.length === 1 ? 'entry' : 'entries'}
+                  </span>
+                </div>
+
+                <div
+                  className={`rounded-xl border px-2.5 py-2 ${
+                    privateBillingProfit >= 0
+                      ? 'bg-zinc-950 border-zinc-900 text-white'
+                      : 'bg-rose-600 border-rose-700 text-white'
+                  }`}
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-300 flex items-center gap-1">
+                    <TrendingUp className="w-3 h-3" />
+                    Net Profit
+                  </span>
+                  <span className="text-xs sm:text-sm font-mono tabular-nums font-black block mt-0.5">
+                    {privateBillingProfit >= 0 ? '+' : ''}
+                    {formatCurrency(privateBillingProfit)}
+                  </span>
+                  <span className="text-[10px] text-zinc-300 font-mono tabular-nums block truncate">
+                    Cash: {privateCashBalance >= 0 ? '+' : ''}
+                    {formatCurrency(privateCashBalance)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Inline Add Expense Form */}
+              {showAddExpenseForm && (
+                <form
+                  onSubmit={handleAddPrivateExpense}
+                  className="p-3 rounded-xl bg-rose-50/50 border border-rose-200 space-y-3"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-black text-rose-900 uppercase tracking-wider">
+                      Add Expense to {liveBooking.customerName}
+                    </span>
+                    <span className="text-[10px] font-bold text-rose-700">
+                      Deducts live from selected wallet
+                    </span>
+                  </div>
+
+                  {expError && (
+                    <div className="px-2.5 py-1.5 rounded-lg bg-rose-100 border border-rose-300 text-rose-800 text-[11px] font-bold">
+                      {expError}
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                        Category
+                      </label>
+                      <select
+                        value={expCategory}
+                        onChange={(e) => setExpCategory(e.target.value as TourExpenseCategory)}
+                        className="w-full px-2.5 py-2 rounded-lg bg-white border border-zinc-300 text-xs font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                      >
+                        {PRIVATE_EXPENSE_CATEGORIES.map((cat) => (
+                          <option key={cat} value={cat}>
+                            {cat}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                        Amount (₹) *
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        step="1"
+                        required
+                        placeholder="e.g. 12500"
+                        value={expAmount}
+                        onChange={(e) => setExpAmount(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-lg bg-white border border-zinc-300 text-xs font-mono font-black text-zinc-900 outline-none focus:border-zinc-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                      Description / Particulars
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Kashmir Hotel, Cab Innova, Train Tickets..."
+                      value={expDescription}
+                      onChange={(e) => setExpDescription(e.target.value)}
+                      className="w-full px-2.5 py-2 rounded-lg bg-white border border-zinc-300 text-xs font-semibold text-zinc-900 outline-none focus:border-zinc-900"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                        Paid From Wallet
+                      </label>
+                      <select
+                        value={expWalletName}
+                        onChange={(e) => setExpWalletName(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-lg bg-white border border-zinc-300 text-xs font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                      >
+                        {walletOptions.map((w) => (
+                          <option key={w.id} value={w.name}>
+                            {w.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                        Mode
+                      </label>
+                      <div className="grid grid-cols-3 gap-1">
+                        {(['UPI', 'Cash', 'Online'] as TourPaymentMode[]).map((m) => (
+                          <button
+                            key={m}
+                            type="button"
+                            onClick={() => setExpPaymentMode(m)}
+                            className={`py-2 rounded-lg text-[10px] font-black border transition-colors cursor-pointer ${
+                              expPaymentMode === m
+                                ? 'bg-zinc-950 text-white border-zinc-950'
+                                : 'bg-white text-zinc-700 border-zinc-300 hover:bg-zinc-100'
+                            }`}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="text-[10px] font-bold text-zinc-600 uppercase block mb-1">
+                        Date
+                      </label>
+                      <input
+                        type="date"
+                        value={expDate}
+                        onChange={(e) => setExpDate(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-lg bg-white border border-zinc-300 text-xs font-bold text-zinc-900 outline-none focus:border-zinc-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-end gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddExpenseForm(false);
+                        setExpError('');
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-white border border-zinc-300 text-zinc-700 font-bold text-[11px] hover:bg-zinc-100 cursor-pointer"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={isSavingExpense}
+                      className="px-3.5 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white font-black text-[11px] flex items-center gap-1 cursor-pointer"
+                    >
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>{isSavingExpense ? 'Saving...' : 'Save Expense'}</span>
+                    </button>
+                  </div>
+                </form>
+              )}
+
+              {/* Linked Expenses List */}
+              {linkedPrivateExpenses.length === 0 ? (
+                <div className="py-4 px-3 rounded-xl bg-zinc-50 border border-dashed border-zinc-300 text-center">
+                  <p className="text-xs font-semibold text-zinc-500">
+                    No expenses linked to this Private Package yet.
+                  </p>
+                  <p className="text-[11px] text-zinc-400 mt-0.5">
+                    Click &ldquo;Add Expense&rdquo; above or link from Accounts / Wallet to track full profit &amp; hisaab.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {linkedPrivateExpenses.map((exp) => (
+                    <div
+                      key={exp.id}
+                      className="p-2.5 rounded-xl bg-zinc-50 border border-zinc-200 flex items-center justify-between gap-2"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-black text-xs text-zinc-950 truncate">
+                            {exp.description || exp.category}
+                          </span>
+                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-white border border-zinc-300 text-zinc-700">
+                            {exp.category}
+                          </span>
+                        </div>
+                        <div className="text-[10px] text-zinc-500 font-medium mt-0.5 flex items-center gap-1.5 flex-wrap">
+                          <span>{formatDate(exp.date)}</span>
+                          <span>•</span>
+                          <span className="font-bold text-zinc-700">{exp.walletName || 'Wallet'}</span>
+                          {exp.paymentMode && (
+                            <>
+                              <span>•</span>
+                              <span>{exp.paymentMode}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="font-mono tabular-nums font-black text-xs sm:text-sm text-rose-700">
+                          -{formatCurrency(exp.amount)}
+                        </span>
+
+                        {confirmDeleteExpId === exp.id ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDeletePrivateExpense(exp)}
+                              className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 text-white font-black text-[10px] cursor-pointer"
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteExpId(null)}
+                              className="px-1.5 py-1 rounded-lg bg-white border border-zinc-300 text-zinc-700 font-bold text-[10px] cursor-pointer"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => openEditTourExpenseModal(exp)}
+                              className="px-2 py-1 rounded-lg bg-white hover:bg-zinc-950 text-zinc-700 hover:text-white border border-zinc-300 hover:border-zinc-950 font-bold text-[10px] flex items-center gap-1 transition-colors cursor-pointer"
+                              title="Edit Expense"
+                            >
+                              <Pencil className="w-3 h-3" />
+                              <span className="hidden sm:inline">Edit</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteExpId(exp.id)}
+                              className="p-1 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 hover:border-rose-600 transition-colors cursor-pointer"
+                              title="Delete Expense"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div className="bg-white px-5 py-3 border-t-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0">
-          <div className="flex items-center gap-2">
+        <div className="bg-white px-3.5 py-2.5 sm:px-5 sm:py-3 border-t-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0 safe-bottom sm:pb-3">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             <button
               type="button"
               onClick={() => handleWhatsAppPaymentReceipt()}
               className="px-3 py-2 rounded-xl bg-[#25D366] hover:bg-[#20ba59] text-white font-black text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
             >
               <MessageCircle size={14} />
-              <span>WhatsApp Payment Status</span>
+              <span className="sm:hidden">WhatsApp</span>
+              <span className="hidden sm:inline">WhatsApp Payment Status</span>
             </button>
 
             <button
@@ -1507,14 +1960,15 @@ export const ReceiveTourPaymentModal: React.FC<ReceiveTourPaymentModalProps> = (
               className="px-3 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-900 border border-zinc-300 font-bold text-xs flex items-center gap-1.5 cursor-pointer transition-all"
             >
               <FileText size={14} />
-              <span>Voucher Slip</span>
+              <span className="sm:hidden">Slip</span>
+              <span className="hidden sm:inline">Voucher Slip</span>
             </button>
           </div>
 
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 bg-zinc-900 hover:bg-black text-white font-bold rounded-xl text-xs transition-colors cursor-pointer"
+            className="px-4 py-2 bg-zinc-900 hover:bg-black text-white font-bold rounded-xl text-xs transition-colors cursor-pointer shrink-0"
           >
             Done
           </button>
