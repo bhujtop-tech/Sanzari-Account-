@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   X,
   Plus,
@@ -16,6 +16,8 @@ import {
   Lock,
   Car,
   Settings,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { useData } from '../../context/DataContext';
 import { useAuth } from '../../context/AuthContext';
@@ -199,6 +201,10 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  // Mobile-only 3-step wizard state (PC always shows all sections at once)
+  const [mobileStep, setMobileStep] = useState<1 | 2 | 3>(1);
+  const formScrollRef = useRef<HTMLDivElement | null>(null);
+
   // Dynamic Pricing Rates from Firestore
   const currentSleeperPrice = tourPricingSettings?.sleeperPrice ?? 13999;
   const currentAcTrainPrice = tourPricingSettings?.acTrainPrice ?? 15999;
@@ -295,6 +301,8 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
   useEffect(() => {
     if (!isOpen) return;
     setMemberDobInputs({});
+    setMobileStep(1);
+    setErrorMsg('');
 
     if (editingTourBooking) {
       setTourType(editingTourBooking.tourType || 'Group Tour');
@@ -378,7 +386,45 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
   const handleModalClose = () => {
     setEditingTourBooking(null);
+    setMobileStep(1);
     onClose();
+  };
+
+  const goToMobileStep = (step: 1 | 2 | 3) => {
+    setErrorMsg('');
+    setMobileStep(step);
+    requestAnimationFrame(() => {
+      if (formScrollRef.current) {
+        formScrollRef.current.scrollTop = 0;
+      }
+    });
+  };
+
+  const handleMobileNext = () => {
+    setErrorMsg('');
+    if (mobileStep === 1) {
+      if (tourType === 'Group Tour' && !selectedBatchId) {
+        setErrorMsg('Please select a Tour Date Folder for Group Tour.');
+        return;
+      }
+      if (!destination.trim()) {
+        setErrorMsg('Destination is required.');
+        return;
+      }
+      if (!customerName.trim()) {
+        setErrorMsg('Customer Name is required.');
+        return;
+      }
+      if (!customerPhone.trim()) {
+        setErrorMsg('Customer Mobile Number is required.');
+        return;
+      }
+      goToMobileStep(2);
+      return;
+    }
+    if (mobileStep === 2) {
+      goToMobileStep(3);
+    }
   };
 
   const handleBatchSelect = (batchId: string) => {
@@ -545,22 +591,27 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
     if (!customerName.trim()) {
       setErrorMsg('Customer Name is required.');
+      setMobileStep(1);
       return;
     }
     if (!customerPhone.trim()) {
       setErrorMsg('Customer Mobile Number is required.');
+      setMobileStep(1);
       return;
     }
     if (!destination.trim()) {
       setErrorMsg('Destination is required.');
+      setMobileStep(1);
       return;
     }
     if (tourType === 'Group Tour' && !selectedBatchId) {
       setErrorMsg('Please select a Tour Date Folder for Group Tour.');
+      setMobileStep(1);
       return;
     }
     if (numTotal <= 0) {
       setErrorMsg('Please enter a valid Total Amount.');
+      setMobileStep(3);
       return;
     }
 
@@ -714,54 +765,104 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
           </button>
         </div>
 
+        {/* Mobile 3-Step Compact Progress Bar (Hidden on PC) */}
+        <div className="sm:hidden px-3 py-2 bg-zinc-50 border-b border-zinc-200 grid grid-cols-3 gap-1.5 shrink-0">
+          {(
+            [
+              { step: 1 as const, label: 'Tour & Cust' },
+              { step: 2 as const, label: `Pax (${members.length})` },
+              { step: 3 as const, label: 'Payment' },
+            ] as const
+          ).map((item) => {
+            const isActive = mobileStep === item.step;
+            const isDone = mobileStep > item.step;
+            return (
+              <button
+                key={item.step}
+                type="button"
+                onClick={() => goToMobileStep(item.step)}
+                className={`py-1.5 px-2 rounded-xl text-[11px] font-black flex items-center justify-center gap-1.5 transition-all cursor-pointer border ${
+                  isActive
+                    ? 'bg-zinc-950 text-white border-zinc-950 shadow-2xs'
+                    : isDone
+                    ? 'bg-emerald-50 text-emerald-900 border-emerald-300'
+                    : 'bg-white text-zinc-600 border-zinc-200'
+                }`}
+              >
+                <span
+                  className={`w-4 h-4 rounded-full text-[10px] font-mono font-black flex items-center justify-center shrink-0 ${
+                    isActive
+                      ? 'bg-white text-zinc-950'
+                      : isDone
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-zinc-200 text-zinc-700'
+                  }`}
+                >
+                  {isDone ? '✓' : item.step}
+                </span>
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0">
-          <div className="p-3 sm:p-5 overflow-y-auto overscroll-contain space-y-3 text-xs flex-1 bg-zinc-50/50">
+        <form onSubmit={handleSubmit} noValidate className="flex-1 flex flex-col min-h-0">
+          <div
+            ref={formScrollRef}
+            className="p-3 sm:p-5 overflow-y-auto overscroll-contain space-y-2.5 sm:space-y-3 text-xs flex-1 bg-zinc-50/50"
+          >
             {errorMsg && (
-              <div className="p-2.5 bg-rose-50 border-2 border-rose-400 text-rose-900 rounded-xl text-xs font-bold">
+              <div className="p-2.5 bg-rose-50 border border-rose-400 sm:border-2 text-rose-900 rounded-xl text-xs font-bold">
                 ⚠️ {errorMsg}
               </div>
             )}
 
-            {/* 1. Tour Type & Batch Selection */}
-            <div className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
+            {/* STEP 1 ON MOBILE (Always visible on PC): 1. Tour Type & Batch Selection */}
+            <div
+              className={`${
+                mobileStep === 1 ? 'block' : 'hidden sm:block'
+              } p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-zinc-200 sm:border-2 sm:border-zinc-900 shadow-2xs sm:shadow-xs space-y-2.5`}
+            >
               <div className="flex items-center justify-between gap-2 flex-wrap">
-                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                  <Folder className="w-4 h-4 text-blue-600" />
-                  1. Tour Batch &amp; Date
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Folder className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600" />
+                  <span>1. Tour Batch &amp; Date</span>
                 </span>
 
                 {/* Compact Group vs Private Toggle */}
-                <div className="flex items-center gap-1.5 bg-zinc-100 p-1 rounded-xl border border-zinc-300">
+                <div className="flex items-center gap-1 sm:gap-1.5 bg-zinc-100 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-zinc-200 sm:border-zinc-300">
                   <button
                     type="button"
                     onClick={() => handleTourTypeChange('Group Tour')}
-                    className={`py-1 px-2.5 rounded-lg font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`py-1 px-2 sm:px-2.5 rounded-md sm:rounded-lg font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
                       tourType === 'Group Tour'
                         ? 'bg-zinc-950 text-white shadow-2xs'
                         : 'text-zinc-600 hover:text-zinc-950'
                     }`}
                   >
                     <Users size={12} />
-                    <span>Group Tour</span>
+                    <span className="sm:hidden">Group</span>
+                    <span className="hidden sm:inline">Group Tour</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => handleTourTypeChange('Private Tour')}
-                    className={`py-1 px-2.5 rounded-lg font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
+                    className={`py-1 px-2 sm:px-2.5 rounded-md sm:rounded-lg font-black text-[11px] flex items-center gap-1 transition-all cursor-pointer ${
                       tourType === 'Private Tour'
                         ? 'bg-zinc-950 text-white shadow-2xs'
                         : 'text-zinc-600 hover:text-zinc-950'
                     }`}
                   >
                     <Car size={12} />
-                    <span>Private Tour</span>
+                    <span className="sm:hidden">Private</span>
+                    <span className="hidden sm:inline">Private Tour</span>
                   </button>
                 </div>
               </div>
 
               {tourType === 'Group Tour' ? (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-2.5">
                   <div className="sm:col-span-2">
                     <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase">
                       Tour Date Folder *
@@ -769,7 +870,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     <select
                       value={selectedBatchId}
                       onChange={(e) => handleBatchSelect(e.target.value)}
-                      className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-2 text-zinc-950 font-bold focus:outline-none"
+                      className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-2 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                     >
                       <option value="">-- Select Tour Date Folder --</option>
                       {tourBatches.map((b) => (
@@ -786,16 +887,15 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      required
                       placeholder="e.g. Kashmir"
                       value={destination}
                       onChange={(e) => setDestination(e.target.value)}
-                      className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                      className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                     />
                   </div>
                 </div>
               ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                   <div>
                     <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase flex items-center gap-1">
                       <Calendar size={12} className="text-blue-600" />
@@ -803,13 +903,12 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     </label>
                     <input
                       type="date"
-                      required
                       value={tourDate}
                       onChange={(e) => {
                         setTourDate(e.target.value);
                         setTourBatchTitle(`Private Tour - ${e.target.value}`);
                       }}
-                      className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-black focus:outline-none"
+                      className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2 sm:px-2.5 py-1.5 text-zinc-950 font-black focus:border-zinc-900 focus:outline-none"
                     />
                   </div>
 
@@ -819,22 +918,25 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     </label>
                     <input
                       type="text"
-                      required
-                      placeholder="e.g. Kashmir / Kerala"
+                      placeholder="e.g. Kashmir"
                       value={destination}
                       onChange={(e) => setDestination(e.target.value)}
-                      className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                      className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                     />
                   </div>
                 </div>
               )}
             </div>
 
-            {/* 2. Customer Contact & City */}
-            <div className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
-              <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                <User className="w-4 h-4 text-emerald-600" />
-                2. Customer Details
+            {/* STEP 1 ON MOBILE (Always visible on PC): 2. Customer Contact & City */}
+            <div
+              className={`${
+                mobileStep === 1 ? 'block' : 'hidden sm:block'
+              } p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-zinc-200 sm:border-2 sm:border-zinc-900 shadow-2xs sm:shadow-xs space-y-2.5`}
+            >
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                <User className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+                <span>2. Customer Details</span>
               </span>
 
               <GoogleContactsAutofill
@@ -846,18 +948,17 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 }}
               />
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-                <div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase">
                     Customer Name *
                   </label>
                   <input
                     type="text"
-                    required
                     placeholder="Full Name"
                     value={customerName}
                     onChange={(e) => setCustomerName(e.target.value)}
-                    className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -866,11 +967,11 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   </label>
                   <input
                     type="tel"
-                    required
+                    inputMode="tel"
                     placeholder="10-Digit Mobile"
                     value={customerPhone}
                     onChange={(e) => setCustomerPhone(e.target.value)}
-                    className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                   />
                 </div>
                 <div>
@@ -882,23 +983,27 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     placeholder="e.g. Bhuj"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    className="w-full bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 sm:border-2 sm:border-zinc-900 rounded-xl px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:border-zinc-900 focus:outline-none"
                   />
                 </div>
               </div>
             </div>
 
-            {/* 3. Travel Class & PAX Counters (Auto-synced with Passenger Ages!) */}
-            <div className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                  <Train className="w-4 h-4 text-amber-600" />
-                  3. Travel Class &amp; Package
+            {/* STEP 2 ON MOBILE (Always visible on PC): 3. Travel Class & PAX Counters */}
+            <div
+              className={`${
+                mobileStep === 2 ? 'block' : 'hidden sm:block'
+              } p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-zinc-200 sm:border-2 sm:border-zinc-900 shadow-2xs sm:shadow-xs space-y-2.5`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <Train className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600" />
+                  <span>3. Travel Class &amp; Package</span>
                 </span>
                 <button
                   type="button"
                   onClick={() => setShowPricingSettings(!showPricingSettings)}
-                  className="px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                  className="px-2 py-0.5 rounded-lg border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-950 font-bold text-[10px] flex items-center gap-1 cursor-pointer shrink-0"
                 >
                   <Settings size={11} />
                   <span>Rates ({currentChild5To7Percent}% / {currentChild8To11Percent}%)</span>
@@ -912,18 +1017,18 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               )}
 
               {/* Package Rate Selector Buttons */}
-              <div className="grid grid-cols-2 gap-2.5">
+              <div className="grid grid-cols-2 gap-2 sm:gap-2.5">
                 <button
                   type="button"
                   onClick={() => handleTravelClassChange('AC Train')}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex items-center justify-between ${
+                  className={`p-2 sm:p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 ${
                     travelClass === 'AC Train' || travelClass === '3AC Train'
                       ? 'bg-blue-50 border-blue-600 text-zinc-950 ring-1 ring-blue-600'
-                      : 'bg-white border-zinc-300 text-zinc-600 hover:border-zinc-900'
+                      : 'bg-white border-zinc-200 sm:border-zinc-300 text-zinc-600 hover:border-zinc-900'
                   }`}
                 >
                   <span className="font-black text-xs text-zinc-950">🚆 3AC Train</span>
-                  <span className="text-xs font-black text-blue-700 font-mono">
+                  <span className="text-xs font-black text-blue-700 font-mono tabular-nums whitespace-nowrap">
                     ₹{currentAcTrainPrice.toLocaleString('en-IN')}
                   </span>
                 </button>
@@ -931,25 +1036,26 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 <button
                   type="button"
                   onClick={() => handleTravelClassChange('Sleeper Train')}
-                  className={`p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex items-center justify-between ${
+                  className={`p-2 sm:p-2.5 rounded-xl border-2 text-left transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-0.5 ${
                     travelClass === 'Sleeper Train' || travelClass === 'Non-AC Sleeper'
                       ? 'bg-amber-50 border-amber-500 text-zinc-950 ring-1 ring-amber-500'
-                      : 'bg-white border-zinc-300 text-zinc-600 hover:border-zinc-900'
+                      : 'bg-white border-zinc-200 sm:border-zinc-300 text-zinc-600 hover:border-zinc-900'
                   }`}
                 >
                   <span className="font-black text-xs text-zinc-950">🚂 Sleeper</span>
-                  <span className="text-xs font-black text-amber-700 font-mono">
+                  <span className="text-xs font-black text-amber-700 font-mono tabular-nums whitespace-nowrap">
                     ₹{currentSleeperPrice.toLocaleString('en-IN')}
                   </span>
                 </button>
               </div>
 
               {/* PAX Counts: Adults, Kids, Couples */}
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {/* Adults Count */}
-                <div className="bg-zinc-50 p-2 rounded-xl border border-zinc-300">
-                  <label className="block text-[10px] font-black uppercase text-zinc-700 mb-1">
-                    Adults (12+ yrs)
+                <div className="bg-zinc-50 p-2 rounded-xl border border-zinc-200 sm:border-zinc-300">
+                  <label className="block text-[10px] font-black uppercase text-zinc-700 mb-1 truncate">
+                    <span className="sm:hidden">Adults</span>
+                    <span className="hidden sm:inline">Adults (12+ yrs)</span>
                   </label>
                   <div className="flex items-center justify-between">
                     <button
@@ -959,7 +1065,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     >
                       -
                     </button>
-                    <span className="text-sm font-black text-zinc-950 font-mono">{adultsCount}</span>
+                    <span className="text-sm font-black text-zinc-950 font-mono tabular-nums">{adultsCount}</span>
                     <button
                       type="button"
                       onClick={() => handleAdultsStep(1)}
@@ -972,8 +1078,9 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
                 {/* Kids Count (Auto-synced when passenger age < 12) */}
                 <div className="bg-amber-50/70 p-2 rounded-xl border border-amber-300">
-                  <label className="block text-[10px] font-black uppercase text-amber-900 mb-1">
-                    Kids (&lt;12 yrs)
+                  <label className="block text-[10px] font-black uppercase text-amber-900 mb-1 truncate">
+                    <span className="sm:hidden">Kids &lt;12</span>
+                    <span className="hidden sm:inline">Kids (&lt;12 yrs)</span>
                   </label>
                   <div className="flex items-center justify-between">
                     <button
@@ -983,7 +1090,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     >
                       -
                     </button>
-                    <span className="text-sm font-black text-amber-950 font-mono">{kidsCount}</span>
+                    <span className="text-sm font-black text-amber-950 font-mono tabular-nums">{kidsCount}</span>
                     <button
                       type="button"
                       onClick={() => handleKidsStep(1)}
@@ -996,8 +1103,10 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
 
                 {/* Couple Separate Room */}
                 <div className="bg-pink-50/60 p-2 rounded-xl border border-pink-300">
-                  <label className="block text-[10px] font-black uppercase text-pink-800 mb-1 flex items-center gap-1">
-                    <Heart size={10} className="fill-pink-500 text-pink-500" /> Room (+₹{currentCoupleSurcharge})
+                  <label className="block text-[10px] font-black uppercase text-pink-800 mb-1 flex items-center gap-0.5 truncate">
+                    <Heart size={10} className="fill-pink-500 text-pink-500 shrink-0" />
+                    <span className="sm:hidden truncate">Room +₹{currentCoupleSurcharge}</span>
+                    <span className="hidden sm:inline">Room (+₹{currentCoupleSurcharge})</span>
                   </label>
                   <div className="flex items-center justify-between">
                     <button
@@ -1007,7 +1116,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     >
                       -
                     </button>
-                    <span className="text-sm font-black text-pink-700 font-mono">{couplesCount}</span>
+                    <span className="text-sm font-black text-pink-700 font-mono tabular-nums">{couplesCount}</span>
                     <button
                       type="button"
                       onClick={() => handleCoupleCountChange(1)}
@@ -1020,15 +1129,24 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               </div>
             </div>
 
-            {/* 4. Passenger Manifest (Auto-syncs Kids & Fare when Age or MM/YYYY is entered) */}
-            <div className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                  <Users className="w-4 h-4 text-sky-600" />
-                  4. Passengers ({members.length} Pax: {adultsCount} Adult, {kidsCount} Kid)
+            {/* STEP 2 ON MOBILE (Always visible on PC): 4. Passenger Manifest */}
+            <div
+              className={`${
+                mobileStep === 2 ? 'block' : 'hidden sm:block'
+              } p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-zinc-200 sm:border-2 sm:border-zinc-900 shadow-2xs sm:shadow-xs space-y-2.5`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5 min-w-0 truncate">
+                  <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 shrink-0" />
+                  <span className="sm:hidden truncate">
+                    4. Pax ({members.length}: {adultsCount}A, {kidsCount}K)
+                  </span>
+                  <span className="hidden sm:inline">
+                    4. Passengers ({members.length} Pax: {adultsCount} Adult, {kidsCount} Kid)
+                  </span>
                 </span>
 
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => setShowAgeCalcTool(!showAgeCalcTool)}
@@ -1041,9 +1159,11 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   <button
                     type="button"
                     onClick={addMemberRow}
-                    className="px-2.5 py-1 bg-zinc-950 hover:bg-black text-white rounded-lg text-[11px] font-black flex items-center gap-1 cursor-pointer"
+                    className="px-2 sm:px-2.5 py-1 bg-zinc-950 hover:bg-black text-white rounded-lg text-[11px] font-black flex items-center gap-1 cursor-pointer"
                   >
-                    <Plus size={12} /> + Add Pax
+                    <Plus size={12} />
+                    <span className="sm:hidden">Add Pax</span>
+                    <span className="hidden sm:inline">+ Add Pax</span>
                   </button>
                 </div>
               </div>
@@ -1155,11 +1275,11 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                         )}
                       </div>
 
-                      {/* MOBILE LAYOUT (Spacious 2 Rows - Full Width Name Input) */}
-                      <div className="sm:hidden space-y-2">
+                      {/* MOBILE LAYOUT (Ultra-Compact 2-Row Card) */}
+                      <div className="sm:hidden space-y-1.5">
                         {/* Mobile Row 1: Index + Full-Width Name + Delete */}
-                        <div className="flex items-center gap-2">
-                          <span className="w-6 h-6 rounded-lg bg-zinc-950 text-white flex items-center justify-center text-[11px] font-black shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-5 h-5 rounded-md bg-zinc-950 text-white flex items-center justify-center text-[10px] font-black shrink-0">
                             {idx + 1}
                           </span>
                           <input
@@ -1167,58 +1287,61 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                             placeholder={`Passenger ${idx + 1} Full Name`}
                             value={m.name}
                             onChange={(e) => updateMember(idx, 'name', e.target.value)}
-                            className="flex-1 min-w-0 bg-white border-2 border-zinc-900 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold text-xs focus:outline-none"
+                            className="flex-1 min-w-0 bg-white border border-zinc-300 rounded-lg px-2 py-1.5 text-zinc-950 font-bold text-xs focus:border-zinc-900 focus:outline-none"
                           />
                           {members.length > 1 && (
                             <button
                               type="button"
                               onClick={() => removeMemberRow(idx)}
-                              className="p-1.5 rounded-lg bg-white border border-rose-300 text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
+                              className="p-1.5 rounded-lg bg-white border border-rose-200 text-rose-600 hover:bg-rose-50 cursor-pointer shrink-0"
                               title="Remove passenger"
                             >
-                              <Trash2 size={14} />
+                              <Trash2 size={13} />
                             </button>
                           )}
                         </div>
 
-                        {/* Mobile Row 2: Age + Gender + DOB Input + Discount Badge */}
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <div className="flex items-center gap-1">
-                            <span className="text-[10px] font-bold text-zinc-500">Age:</span>
-                            <input
-                              type="number"
-                              min={0}
-                              max={110}
-                              placeholder="Age"
-                              value={m.age}
-                              onChange={(e) => updateMember(idx, 'age', e.target.value)}
-                              className="w-12 bg-white border-2 border-zinc-900 rounded-lg px-1 py-1 text-center text-zinc-950 text-xs font-black font-mono focus:outline-none"
-                            />
-                          </div>
+                        {/* Mobile Row 2: Compact 3-Field Strip (Age | Gender | DOB) + Fare Tag */}
+                        <div className="grid grid-cols-[54px_1fr_82px_auto] items-center gap-1.5 pl-6">
+                          <input
+                            type="number"
+                            inputMode="numeric"
+                            min={0}
+                            max={110}
+                            placeholder="Age"
+                            value={m.age}
+                            onChange={(e) => updateMember(idx, 'age', e.target.value)}
+                            className="w-full bg-white border border-zinc-400 rounded-lg px-1.5 py-1 text-center text-zinc-950 text-xs font-black font-mono focus:border-zinc-900 focus:outline-none"
+                          />
 
                           <select
                             value={m.gender}
                             onChange={(e) => updateMember(idx, 'gender', e.target.value)}
-                            className="bg-white border border-zinc-300 rounded-lg px-1.5 py-1 text-zinc-950 text-xs font-bold focus:outline-none"
+                            className="w-full bg-white border border-zinc-300 rounded-lg px-1.5 py-1 text-zinc-950 text-[11px] font-bold focus:outline-none"
                           >
                             <option value="Male">Male</option>
                             <option value="Female">Female</option>
                             <option value="Child">Child</option>
                           </select>
 
-                          <div className="flex items-center gap-1 min-w-0">
-                            <span className="text-[10px] font-bold text-zinc-500">DOB:</span>
-                            <input
-                              type="text"
-                              placeholder="10/2018"
-                              value={memberDobInputs[idx] || ''}
-                              onChange={(e) => handleMemberDobInputChange(idx, e.target.value)}
-                              className="w-20 bg-white border border-zinc-300 rounded-md px-1.5 py-0.5 text-xs font-bold text-zinc-900 font-mono focus:border-zinc-900 focus:outline-none"
-                            />
-                          </div>
+                          <input
+                            type="text"
+                            placeholder="MM/YYYY"
+                            value={memberDobInputs[idx] || ''}
+                            onChange={(e) => handleMemberDobInputChange(idx, e.target.value)}
+                            className="w-full bg-white border border-zinc-300 rounded-lg px-1.5 py-1 text-[11px] font-bold text-zinc-900 font-mono focus:border-zinc-900 focus:outline-none"
+                          />
 
-                          <span className={`px-2 py-0.5 rounded-md border font-black text-[10px] ${discountInfo.color}`}>
-                            {discountInfo.label}
+                          <span
+                            className={`px-1.5 py-1 rounded-md border font-black text-[9px] whitespace-nowrap ${discountInfo.color}`}
+                          >
+                            {discountInfo.label.includes('Adult')
+                              ? '100%'
+                              : discountInfo.label.includes('Free')
+                              ? 'Free'
+                              : discountInfo.label.includes('5-7')
+                              ? `${currentChild5To7Percent}%`
+                              : `${currentChild8To11Percent}%`}
                           </span>
                         </div>
                       </div>
@@ -1246,12 +1369,38 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               </div>
             </div>
 
-            {/* 5. Amount & Payment Details */}
-            <div className="p-3.5 rounded-2xl bg-white border-2 border-zinc-900 shadow-xs space-y-2.5">
+            {/* STEP 3 ON MOBILE (Always visible on PC): Compact Summary Strip + 5. Payment Details */}
+            {mobileStep === 3 && (
+              <div className="sm:hidden px-3 py-2.5 rounded-xl bg-zinc-950 text-white flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-xs font-black truncate">
+                    {customerName.trim() || 'New Customer'} · {members.length} Pax
+                  </p>
+                  <p className="text-[10px] text-zinc-300 truncate">
+                    {tourType === 'Group Tour' ? tourBatchTitle : `Private (${tourDate})`} ·{' '}
+                    {travelClass === 'Sleeper Train' ? 'Sleeper' : '3AC Train'}
+                    {couplesCount > 0 ? ` · ${couplesCount} Room` : ''}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => goToMobileStep(1)}
+                  className="px-2 py-1 rounded-lg bg-zinc-800 text-zinc-200 text-[10px] font-bold shrink-0 cursor-pointer"
+                >
+                  Edit
+                </button>
+              </div>
+            )}
+
+            <div
+              className={`${
+                mobileStep === 3 ? 'block' : 'hidden sm:block'
+              } p-3 sm:p-3.5 rounded-xl sm:rounded-2xl bg-white border border-zinc-200 sm:border-2 sm:border-zinc-900 shadow-2xs sm:shadow-xs space-y-2.5`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
-                  <IndianRupee className="w-4 h-4 text-emerald-600" />
-                  5. Payment Details
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-zinc-900 flex items-center gap-1.5">
+                  <IndianRupee className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
+                  <span>5. Payment Details</span>
                 </span>
 
                 <label className="flex items-center gap-1.5 text-[11px] text-zinc-700 cursor-pointer font-bold select-none">
@@ -1270,10 +1419,10 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 </label>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-2.5">
                 {/* Total Amount */}
                 <div>
-                  <div className="flex items-center justify-between mb-1">
+                  <div className="flex items-center justify-between mb-1 gap-1">
                     <label className="text-[10px] text-zinc-600 font-bold uppercase">
                       Total (₹) *
                     </label>
@@ -1284,7 +1433,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                           setIsManualPrice(false);
                           setTotalAmount(calculatedTotal);
                         }}
-                        className="text-[10px] font-black text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 cursor-pointer"
+                        className="text-[9px] sm:text-[10px] font-black text-blue-700 bg-blue-50 px-1.5 py-0.2 rounded border border-blue-200 cursor-pointer whitespace-nowrap"
                       >
                         Auto: ₹{calculatedTotal.toLocaleString('en-IN')}
                       </button>
@@ -1292,7 +1441,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   </div>
                   <input
                     type="number"
-                    required
+                    inputMode="numeric"
                     value={totalAmount}
                     onChange={(e) => {
                       setTotalAmount(e.target.value);
@@ -1311,6 +1460,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   </label>
                   <input
                     type="number"
+                    inputMode="numeric"
                     placeholder="e.g. 15000"
                     value={advancePaid}
                     onChange={(e) => setAdvancePaid(e.target.value)}
@@ -1319,8 +1469,8 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 </div>
 
                 {/* Baaki / Due */}
-                <div>
-                  <div className="flex items-center justify-between mb-1">
+                <div className="col-span-2 sm:col-span-1">
+                  <div className="hidden sm:flex items-center justify-between mb-1">
                     <label className="text-[10px] text-zinc-600 font-bold uppercase">
                       Baaki Due (₹)
                     </label>
@@ -1334,13 +1484,27 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                       {paymentStatus}
                     </span>
                   </div>
-                  <div className="w-full bg-zinc-100 border border-zinc-300 rounded-xl px-2.5 py-1.5 text-rose-600 font-mono font-black text-sm">
-                    {formatCurrency(balanceDue)}
+                  <div className="w-full bg-zinc-100 border border-zinc-200 sm:border-zinc-300 rounded-xl px-3 sm:px-2.5 py-2 sm:py-1.5 flex sm:block items-center justify-between gap-2">
+                    <div className="flex sm:hidden items-center gap-1.5">
+                      <span className="text-[10px] text-zinc-600 font-bold uppercase">Baaki Due</span>
+                      <span
+                        className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                          paymentStatus === 'Paid'
+                            ? 'bg-emerald-100 text-emerald-800'
+                            : 'bg-rose-100 text-rose-800'
+                        }`}
+                      >
+                        {paymentStatus}
+                      </span>
+                    </div>
+                    <span className="text-rose-600 font-mono font-black text-sm tabular-nums whitespace-nowrap">
+                      {formatCurrency(balanceDue)}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-2.5 pt-1">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 pt-1">
                 <div>
                   <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase">
                     Mode
@@ -1348,7 +1512,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   <select
                     value={paymentMode}
                     onChange={(e) => setPaymentMode(e.target.value as TourPaymentMode)}
-                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 rounded-xl px-2 sm:px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:outline-none"
                   >
                     <option value="Online">📱 Online (UPI/Bank)</option>
                     <option value="UPI">📱 UPI</option>
@@ -1364,7 +1528,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   <select
                     value={walletName}
                     onChange={(e) => setWalletName(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 rounded-xl px-2 sm:px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:outline-none"
                   >
                     {tourWallets.map((w) => (
                       <option key={w.id} value={w.name}>
@@ -1375,7 +1539,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                 </div>
 
                 {/* Booked By Selection (Rizwan, Mustak or Custom Name Input) */}
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <div className="flex items-center justify-between mb-1">
                     <label className="text-[10px] text-zinc-600 font-bold uppercase">
                       Booked By *
@@ -1384,7 +1548,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setBookedBy('Rizwan')}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
+                        className={`px-2 sm:px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
                           bookedBy === 'Rizwan' ? 'bg-blue-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                         }`}
                       >
@@ -1393,7 +1557,7 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                       <button
                         type="button"
                         onClick={() => setBookedBy('Mustak')}
-                        className={`px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
+                        className={`px-2 sm:px-1.5 py-0.5 rounded text-[10px] font-black cursor-pointer ${
                           bookedBy === 'Mustak' ? 'bg-amber-600 text-white' : 'bg-zinc-100 text-zinc-700 hover:bg-zinc-200'
                         }`}
                       >
@@ -1403,15 +1567,14 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                   </div>
                   <input
                     type="text"
-                    required
                     placeholder="e.g. Rizwan / Mustak / Staff"
                     value={bookedBy}
                     onChange={(e) => setBookedBy(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold text-xs focus:border-zinc-900 focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold text-xs focus:border-zinc-900 focus:outline-none"
                   />
                 </div>
 
-                <div>
+                <div className="col-span-2 sm:col-span-1">
                   <label className="block text-[10px] text-zinc-600 mb-1 font-bold uppercase">
                     Special Note
                   </label>
@@ -1420,21 +1583,96 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
                     placeholder="Room / food note (optional)"
                     value={specialNotes}
                     onChange={(e) => setSpecialNotes(e.target.value)}
-                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-1.5 text-zinc-950 font-bold focus:outline-none"
+                    className="w-full bg-white border border-zinc-300 rounded-xl px-2.5 py-2 sm:py-1.5 text-zinc-950 font-bold focus:outline-none"
                   />
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Sticky Footer */}
-          <div className="px-3.5 py-2.5 sm:px-5 sm:py-3 bg-white border-t-2 border-zinc-900 flex items-center justify-between gap-2 shrink-0 safe-bottom sm:pb-3">
+          {/* Mobile 3-Step Sticky Footer (Hidden on PC) */}
+          <div className="sm:hidden px-3.5 py-2.5 bg-white border-t border-zinc-200 flex items-center justify-between gap-2 shrink-0 safe-bottom">
+            <div className="flex items-center gap-1.5 shrink-0">
+              {mobileStep === 1 ? (
+                <>
+                  {editingTourBooking && (
+                    <button
+                      type="button"
+                      onClick={handleDeleteCurrentBooking}
+                      disabled={isSubmitting}
+                      aria-label="Delete booking"
+                      className="p-2 rounded-xl bg-rose-50 text-rose-700 border border-rose-200 cursor-pointer"
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleModalClose}
+                    className="px-3 py-2 rounded-xl bg-zinc-100 text-zinc-800 text-xs font-black border border-zinc-200 cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => goToMobileStep((mobileStep - 1) as 1 | 2)}
+                  className="px-3 py-2 rounded-xl bg-zinc-100 text-zinc-900 text-xs font-black border border-zinc-200 flex items-center gap-1 cursor-pointer"
+                >
+                  <ChevronLeft size={14} />
+                  <span>Back</span>
+                </button>
+              )}
+            </div>
+
+            {/* Live Fare Preview on Step 2 */}
+            {mobileStep === 2 && (
+              <div className="text-center min-w-0">
+                <span className="block text-[9px] font-bold text-zinc-500 uppercase leading-none">
+                  Est. Total
+                </span>
+                <span className="text-xs font-mono font-black text-zinc-950 tabular-nums whitespace-nowrap">
+                  {formatCurrency(numTotal)}
+                </span>
+              </div>
+            )}
+
+            {mobileStep < 3 ? (
+              <button
+                type="button"
+                onClick={handleMobileNext}
+                className="px-4 py-2 rounded-xl bg-zinc-950 hover:bg-black text-white text-xs font-black shadow-sm flex items-center gap-1 cursor-pointer shrink-0"
+              >
+                <span>{mobileStep === 1 ? 'Next: Pax' : 'Next: Payment'}</span>
+                <ChevronRight size={14} />
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50 shrink-0"
+              >
+                <CheckCircle2 size={15} />
+                <span>
+                  {isSubmitting
+                    ? 'Saving...'
+                    : editingTourBooking
+                    ? 'Update Booking'
+                    : 'Save Booking'}
+                </span>
+              </button>
+            )}
+          </div>
+
+          {/* Desktop Sticky Footer (100% Unchanged on PC) */}
+          <div className="hidden sm:flex px-5 py-3 bg-white border-t-2 border-zinc-900 items-center justify-between gap-2 shrink-0">
             {editingTourBooking ? (
               <button
                 type="button"
                 onClick={handleDeleteCurrentBooking}
                 disabled={isSubmitting}
-                className="px-3 sm:px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
+                className="px-3.5 py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-300 text-xs font-black flex items-center gap-1.5 cursor-pointer shrink-0"
               >
                 <Trash2 size={14} />
                 <span>Delete</span>
@@ -1443,28 +1681,21 @@ export const AddTourBookingModal: React.FC<AddTourBookingModalProps> = ({
               <div />
             )}
 
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-2">
               <button
                 type="button"
                 onClick={handleModalClose}
-                className="px-3 sm:px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-black border border-zinc-300 cursor-pointer"
+                className="px-4 py-2 rounded-xl bg-zinc-100 hover:bg-zinc-200 text-zinc-800 text-xs font-black border border-zinc-300 cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 sm:px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-black shadow-md flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
               >
                 <CheckCircle2 size={15} />
-                <span className="sm:hidden">
-                  {isSubmitting
-                    ? 'Saving...'
-                    : editingTourBooking
-                    ? 'Update'
-                    : 'Save Booking'}
-                </span>
-                <span className="hidden sm:inline">
+                <span>
                   {isSubmitting
                     ? 'Saving...'
                     : editingTourBooking

@@ -1,11 +1,21 @@
 import React, { useState } from 'react';
 import { useData } from '../../context/DataContext';
 import { updateStoreSettings } from '../../services/db';
-import { Settings, Download, ShieldCheck, Database, FileSpreadsheet, Check } from 'lucide-react';
+import { Settings, Download, ShieldCheck, Database, FileSpreadsheet, Check, Smartphone } from 'lucide-react';
 import { PricingDiscountSettingsPanel } from '../tourism/PricingDiscountSettingsPanel';
 
 export const SettingsView: React.FC = () => {
-  const { settings, sales, customers, expenses, products, wallets, formatCurrency } = useData();
+  const {
+    settings,
+    sales,
+    customers,
+    expenses,
+    products,
+    wallets,
+    formatCurrency,
+    mobileQuickActions,
+    updateMobileQuickActions,
+  } = useData();
 
   const [businessName, setBusinessName] = useState(settings.businessName || 'Sanzari Store');
   const [currency, setCurrency] = useState(settings.currency || '₹');
@@ -129,6 +139,98 @@ export const SettingsView: React.FC = () => {
       <div className="pt-1">
         <h2 className="text-xl sm:text-2xl font-black tracking-tight text-zinc-950">Settings &amp; Data</h2>
         <p className="text-xs text-zinc-600 font-medium">Business configurations and Excel/CSV data exports</p>
+      </div>
+
+      {/* Mobile Bottom Quick Action Bar Toggles (Mobile Only) */}
+      <div className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl bg-white border border-zinc-200/80 shadow-2xs space-y-3.5">
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-zinc-900 uppercase tracking-wider flex items-center gap-1.5">
+              <Smartphone size={14} className="text-zinc-900 shrink-0" />
+              <span>Mobile Bottom Quick Buttons</span>
+            </h3>
+            <p className="text-[11px] text-zinc-500 mt-0.5 leading-snug">
+              Show or hide the floating bottom buttons (+ New Inquiry, + Booking, Date) on mobile screens. PC is unaffected.
+            </p>
+          </div>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={mobileQuickActions.enabled}
+            aria-label="Toggle Mobile Bottom Quick Action Bar"
+            onClick={() => updateMobileQuickActions({ enabled: !mobileQuickActions.enabled })}
+            className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+              mobileQuickActions.enabled ? 'bg-zinc-950' : 'bg-zinc-200'
+            }`}
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${
+                mobileQuickActions.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'
+              }`}
+            />
+          </button>
+        </div>
+
+        <div
+          className={`divide-y divide-zinc-200/80 rounded-2xl border border-zinc-200/80 bg-zinc-50/60 overflow-hidden transition-opacity ${
+            mobileQuickActions.enabled ? 'opacity-100' : 'opacity-55'
+          }`}
+        >
+          {(
+            [
+              {
+                key: 'showInquiry',
+                label: '+ New Inquiry Button',
+                desc: 'Quickly create a new tour inquiry from bottom bar',
+              },
+              {
+                key: 'showBooking',
+                label: '+ Booking Button',
+                desc: 'Quickly open Add Tour Booking from bottom bar',
+              },
+              {
+                key: 'showDate',
+                label: '+ Date Folder Button',
+                desc: 'Quickly add a new tour departure date folder',
+              },
+            ] as const
+          ).map((item) => {
+            const isOn = mobileQuickActions.enabled && mobileQuickActions[item.key];
+            return (
+              <div
+                key={item.key}
+                className="px-3.5 py-2.5 flex items-center justify-between gap-3 bg-white/80"
+              >
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-zinc-900">{item.label}</p>
+                  <p className="text-[11px] text-zinc-500 truncate">{item.desc}</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={isOn}
+                  aria-label={`Toggle ${item.label}`}
+                  onClick={() => {
+                    const nextVal = !mobileQuickActions[item.key];
+                    updateMobileQuickActions({
+                      [item.key]: nextVal,
+                      ...(nextVal ? { enabled: true } : {}),
+                    });
+                  }}
+                  className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors cursor-pointer ${
+                    isOn ? 'bg-zinc-950' : 'bg-zinc-200'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-xs transition-transform ${
+                      isOn ? 'translate-x-[22px]' : 'translate-x-0.5'
+                    }`}
+                  />
+                </button>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Store Preferences Form */}

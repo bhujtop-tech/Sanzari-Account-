@@ -178,6 +178,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
   const cardRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const [canScrollLeft, setCanScrollLeft] = useState(false);
   const [canScrollRight, setCanScrollRight] = useState(false);
+  const [activeSlideIndex, setActiveSlideIndex] = useState(0);
 
   // Build unified Group + Private Upcoming & Running tours list
   const allActiveTours = useMemo<UnifiedTourItem[]>(() => {
@@ -376,10 +377,15 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
     if (!el) {
       setCanScrollLeft(false);
       setCanScrollRight(false);
+      setActiveSlideIndex(0);
       return;
     }
     setCanScrollLeft(el.scrollLeft > 8);
     setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 8);
+    if (el.clientWidth > 0) {
+      const approxIdx = Math.round(el.scrollLeft / (el.clientWidth + 12));
+      setActiveSlideIndex(Math.max(0, approxIdx));
+    }
   }, []);
 
   useEffect(() => {
@@ -394,7 +400,10 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
   const handleSlide = (direction: 'prev' | 'next') => {
     const el = sliderRef.current;
     if (!el) return;
-    const step = Math.max(300, Math.round(el.clientWidth * 0.78));
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+    const step = isMobile
+      ? el.clientWidth + 12
+      : Math.max(300, Math.round(el.clientWidth * 0.78));
     el.scrollBy({
       left: direction === 'next' ? step : -step,
       behavior: 'smooth',
@@ -496,17 +505,17 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
   };
 
   return (
-    <section className="bg-white rounded-3xl border-2 border-zinc-900 shadow-sm overflow-hidden">
+    <section className="bg-white rounded-2xl sm:rounded-3xl border border-zinc-200/90 sm:border-2 sm:border-zinc-900 shadow-sm overflow-hidden">
       {/* Header Zone */}
-      <div className="p-4 sm:p-6 border-b border-zinc-200 flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+      <div className="p-3.5 sm:p-6 border-b border-zinc-200 flex flex-col lg:flex-row lg:items-center justify-between gap-2.5 sm:gap-3">
         <div className="space-y-0.5">
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-zinc-900 shrink-0" />
-            <h2 className="text-base sm:text-lg font-black text-zinc-950 tracking-tight">
+            <h2 className="text-[15px] sm:text-lg font-black text-zinc-950 tracking-tight">
               Upcoming &amp; Running Tours
             </h2>
           </div>
-          <p className="text-xs text-zinc-600 font-medium">
+          <p className="text-[11px] sm:text-xs text-zinc-600 font-medium leading-snug">
             Group &amp; Private departures · 2-day pre-departure alerts · 9-day live journey &amp; route checklist
           </p>
         </div>
@@ -514,13 +523,13 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
         {/* Interactive Filter Controls */}
         <div className="flex flex-col sm:flex-row sm:flex-wrap items-stretch sm:items-center gap-2">
           {/* Status Segmented Control */}
-          <div className="flex items-center gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200 overflow-x-auto no-scrollbar max-w-full">
+          <div className="flex items-center gap-0.5 sm:gap-1 p-1 bg-zinc-100 rounded-xl border border-zinc-200 overflow-x-auto no-scrollbar max-w-full">
             {(
               [
-                { id: 'all', label: `All Active (${counts.all})` },
-                { id: 'reminder', label: `2-Day Alerts (${counts.reminder})` },
-                { id: 'running', label: `Running (${counts.running})` },
-                { id: 'upcoming', label: `Upcoming (${counts.upcoming})` },
+                { id: 'all', mobileLabel: `All (${counts.all})`, label: `All Active (${counts.all})` },
+                { id: 'reminder', mobileLabel: `Alerts (${counts.reminder})`, label: `2-Day Alerts (${counts.reminder})` },
+                { id: 'running', mobileLabel: `Running (${counts.running})`, label: `Running (${counts.running})` },
+                { id: 'upcoming', mobileLabel: `Upcoming (${counts.upcoming})`, label: `Upcoming (${counts.upcoming})` },
               ] as const
             ).map((tab) => {
               const active = statusFilter === tab.id;
@@ -529,7 +538,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                   key={tab.id}
                   type="button"
                   onClick={() => setStatusFilter(tab.id)}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
+                  className={`flex-auto sm:flex-none text-center px-2 sm:px-3 py-1.5 rounded-lg text-[11px] sm:text-xs font-bold transition-colors whitespace-nowrap shrink-0 cursor-pointer ${
                     active
                       ? tab.id === 'reminder'
                         ? 'bg-amber-600 text-white shadow-2xs'
@@ -539,7 +548,8 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                       : 'text-zinc-700 hover:text-zinc-950 hover:bg-white'
                   }`}
                 >
-                  {tab.label}
+                  <span className="sm:hidden">{tab.mobileLabel}</span>
+                  <span className="hidden sm:inline">{tab.label}</span>
                 </button>
               );
             })}
@@ -576,10 +586,10 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
 
       {/* Urgent 2-Day Departure Reminder Strip (Shows automatically for both Private & Group departing in 0-2 days) */}
       {reminderTours.length > 0 && (
-        <div className="px-4 sm:px-6 py-3 bg-amber-50 border-b border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-          <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+        <div className="px-3.5 sm:px-6 py-2.5 sm:py-3 bg-amber-50 border-b border-amber-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-2.5">
+          <div className="flex items-start sm:items-center gap-2 sm:gap-2.5 min-w-0">
             <Bell className="w-4 h-4 text-amber-700 shrink-0 mt-0.5 sm:mt-0" />
-            <div className="text-xs text-amber-950 leading-snug">
+            <div className="text-[11px] sm:text-xs text-amber-950 leading-snug">
               <strong className="font-black">
                 2-Day Departure Reminder ({reminderTours.length}{' '}
                 {reminderTours.length === 1 ? 'Tour' : 'Tours'}):
@@ -615,7 +625,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
           <button
             type="button"
             onClick={() => setStatusFilter(statusFilter === 'reminder' ? 'all' : 'reminder')}
-            className="px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold whitespace-nowrap shrink-0 self-start sm:self-center transition-colors cursor-pointer"
+            className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-[11px] sm:text-xs font-bold whitespace-nowrap shrink-0 self-start sm:self-center transition-colors cursor-pointer"
           >
             {statusFilter === 'reminder' ? 'Show All Tours' : 'View Alerts Only'}
           </button>
@@ -662,11 +672,17 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
           )}
         </div>
       ) : (
-        <div className="p-4 sm:p-5 space-y-3.5 bg-zinc-50/40">
+        <div className="p-3.5 sm:p-5 space-y-3 sm:space-y-3.5 bg-zinc-50/40">
           {/* Slider Toolbar: Count + Prev / Next Arrows */}
           <div className="flex items-center justify-between gap-2">
-            <span className="text-xs font-semibold text-zinc-600 font-mono tabular-nums">
-              {visibleTours.length} {visibleTours.length === 1 ? 'Tour' : 'Tours'} · Swipe or slide cards
+            <span className="text-[11px] sm:text-xs font-semibold text-zinc-600 font-mono tabular-nums">
+              <span className="sm:hidden">
+                {Math.min(activeSlideIndex + 1, visibleTours.length)} / {visibleTours.length}{' '}
+                {visibleTours.length === 1 ? 'Tour' : 'Tours'} · Swipe cards
+              </span>
+              <span className="hidden sm:inline">
+                {visibleTours.length} {visibleTours.length === 1 ? 'Tour' : 'Tours'} · Swipe or slide cards
+              </span>
             </span>
 
             <div className="flex items-center gap-1.5">
@@ -695,7 +711,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
           <div
             ref={sliderRef}
             onScroll={updateScrollControls}
-            className="flex items-stretch gap-3.5 overflow-x-auto snap-x snap-mandatory pb-1.5 -mx-1 px-1 no-scrollbar"
+            className="flex items-stretch gap-3 sm:gap-3.5 overflow-x-auto snap-x snap-mandatory pb-1.5 sm:-mx-1 sm:px-1 no-scrollbar"
           >
             {visibleTours.map((tour) => {
               const isExpanded = expandedKey === tour.key;
@@ -740,7 +756,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                   ref={(node) => {
                     cardRefs.current[tour.key] = node;
                   }}
-                  className={`w-[88%] sm:w-[310px] lg:w-[324px] shrink-0 snap-start rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 sm:gap-3.5 transition-colors ${cardSurfaceClass}`}
+                  className={`w-full sm:w-[310px] lg:w-[324px] shrink-0 snap-center sm:snap-start rounded-2xl p-3.5 sm:p-4 flex flex-col justify-between gap-3 sm:gap-3.5 transition-colors ${cardSurfaceClass}`}
                 >
                   {/* Top: Date Callout + Status Kicker & Identity */}
                   <div className="space-y-2.5">
@@ -785,7 +801,7 @@ export const UpcomingRunningToursCard: React.FC<UpcomingRunningToursCardProps> =
                           >
                             {tour.tourCategory === 'Private' ? 'Private Package' : 'Group Tour'}
                           </span>
-                          <span aria-hidden="true" className="text-zinc-300">
+                          <span aria-hidden="true" className="text-zinc-400">
                             ·
                           </span>
                           <span className="text-zinc-600 font-semibold truncate">

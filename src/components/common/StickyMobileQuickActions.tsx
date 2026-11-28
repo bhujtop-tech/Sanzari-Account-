@@ -6,12 +6,12 @@ import { Plus, ShoppingBag, Receipt, ArrowDownLeft, FolderPlus } from 'lucide-re
 export const StickyMobileQuickActions: React.FC = () => {
   const {
     businessMode,
+    mobileQuickActions,
     setIsAddSaleOpen,
     setIsAddExpenseOpen,
     setIsAddPaymentOpen,
     setIsAddTourBookingOpen,
     setIsAddTourBatchOpen,
-    setIsAddTourExpenseOpen,
     setIsAddTourInquiryOpen,
   } = useData();
   const { userPermissions } = useAuth();
@@ -20,42 +20,62 @@ export const StickyMobileQuickActions: React.FC = () => {
   const canExpense = userPermissions?.canAddExpense ?? true;
 
   if (businessMode === 'tourism') {
+    const showAnyTourismBtn =
+      mobileQuickActions.enabled &&
+      (mobileQuickActions.showInquiry ||
+        mobileQuickActions.showBooking ||
+        mobileQuickActions.showDate);
+
     return (
       <>
         {/* Mobile Floating Action Bar directly above Bottom Nav */}
-        <div className="fixed bottom-[62px] left-0 right-0 z-30 pointer-events-none flex justify-center px-3 pb-1 md:hidden">
-          <div className="pointer-events-auto bg-zinc-950/95 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-zinc-800 flex items-center gap-1.5 w-full max-w-md justify-between">
-            {/* Quick Floating Add Inquiry Button */}
-            <button
-              type="button"
-              onClick={() => setIsAddTourInquiryOpen(true)}
-              className="flex-1 min-h-[38px] py-2 px-3 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-transform cursor-pointer whitespace-nowrap"
-            >
-              <Plus size={14} className="stroke-[3] shrink-0" />
-              <span>New Inquiry</span>
-            </button>
+        {showAnyTourismBtn && (
+          <div className="fixed bottom-[62px] left-0 right-0 z-30 pointer-events-none flex justify-center px-3 pb-1 md:hidden">
+            <div className="pointer-events-auto bg-zinc-950/95 backdrop-blur-md text-white p-1.5 rounded-2xl shadow-xl border border-zinc-800 flex items-center gap-1.5 w-full max-w-md justify-between">
+              {/* Quick Floating Add Inquiry Button */}
+              {mobileQuickActions.showInquiry && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddTourInquiryOpen(true)}
+                  className="flex-1 min-h-[38px] py-2 px-3 rounded-xl bg-white hover:bg-zinc-100 text-zinc-950 font-black text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-transform cursor-pointer whitespace-nowrap"
+                >
+                  <Plus size={14} className="stroke-[3] shrink-0" />
+                  <span>New Inquiry</span>
+                </button>
+              )}
 
-            {/* Quick Floating Add Booking Button */}
-            <button
-              type="button"
-              onClick={() => setIsAddTourBookingOpen(true)}
-              className="min-h-[38px] py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1 border border-zinc-700 active:scale-[0.98] transition-transform cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              <Plus size={13} className="stroke-[2.5] shrink-0" />
-              <span>Booking</span>
-            </button>
+              {/* Quick Floating Add Booking Button */}
+              {mobileQuickActions.showBooking && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddTourBookingOpen(true)}
+                  className={`${
+                    mobileQuickActions.showInquiry ? 'shrink-0' : 'flex-1'
+                  } min-h-[38px] py-2 px-3 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs flex items-center justify-center gap-1 border border-zinc-700 active:scale-[0.98] transition-transform cursor-pointer whitespace-nowrap`}
+                >
+                  <Plus size={13} className="stroke-[2.5] shrink-0" />
+                  <span>Booking</span>
+                </button>
+              )}
 
-            {/* Quick Floating Add Tour Date Button */}
-            <button
-              type="button"
-              onClick={() => setIsAddTourBatchOpen(true)}
-              className="min-h-[38px] py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-bold text-xs flex items-center justify-center gap-1 border border-zinc-800 active:scale-[0.98] transition-transform cursor-pointer shrink-0 whitespace-nowrap"
-            >
-              <FolderPlus size={13} className="shrink-0" />
-              <span>Date</span>
-            </button>
+              {/* Quick Floating Add Tour Date Button */}
+              {mobileQuickActions.showDate && (
+                <button
+                  type="button"
+                  onClick={() => setIsAddTourBatchOpen(true)}
+                  className={`${
+                    mobileQuickActions.showInquiry || mobileQuickActions.showBooking
+                      ? 'shrink-0'
+                      : 'flex-1'
+                  } min-h-[38px] py-2 px-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-200 font-bold text-xs flex items-center justify-center gap-1 border border-zinc-800 active:scale-[0.98] transition-transform cursor-pointer whitespace-nowrap`}
+                >
+                  <FolderPlus size={13} className="shrink-0" />
+                  <span>Date</span>
+                </button>
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Floating Action Button (FAB) on bottom-right for desktop/tablet */}
         <div className="hidden md:flex fixed bottom-6 right-6 z-30 pointer-events-auto">
@@ -71,7 +91,7 @@ export const StickyMobileQuickActions: React.FC = () => {
     );
   }
 
-  if (!canSale && !canExpense) return null;
+  if (!mobileQuickActions.enabled || (!canSale && !canExpense)) return null;
 
   return (
     <div className="fixed bottom-[68px] left-0 right-0 z-30 pointer-events-none flex justify-center px-4 pb-1 md:hidden">

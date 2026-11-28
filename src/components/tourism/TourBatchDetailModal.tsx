@@ -33,6 +33,7 @@ import {
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
 import { CancelTourBookingModal } from './CancelTourBookingModal';
+import { TourWhatsAppShareModal } from './TourWhatsAppShareModal';
 
 interface TourBatchDetailModalProps {
   isOpen: boolean;
@@ -69,6 +70,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
   const [manifestSearchQuery, setManifestSearchQuery] = useState('');
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [cancelModalBooking, setCancelModalBooking] = useState<TourBooking | null>(null);
+  const [whatsappModalBooking, setWhatsappModalBooking] = useState<TourBooking | null>(null);
   const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [expandedBookingIds, setExpandedBookingIds] = useState<Record<string, boolean>>({});
@@ -341,29 +343,7 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
 
   const handleWhatsAppShareBooking = (e: React.MouseEvent, b: TourBooking) => {
     e.stopPropagation();
-    const total = Number(b.totalAmount || 0);
-    const adv = Number(b.advancePaid || 0);
-    const due = Math.max(0, total - adv);
-    const memberText = b.members
-      .map((m, i) => `${i + 1}. ${m.name} (${m.age ? `${m.age} yrs` : 'Adult'}, ${m.gender})`)
-      .join('\n');
-    const msg =
-      `*SANZARI TOURS & TRAVELS*\n*Group Booking Details (${batch.title})*\n\n` +
-      `📌 *Booking ID:* ${b.bookingNumber}\n` +
-      `👤 *Customer:* ${b.customerName} (${b.customerPhone})\n` +
-      `📍 *Destination:* ${b.destination} (${b.tourDate})\n` +
-      `🚆 *Travel Class:* ${b.travelClass}\n\n` +
-      `*Passengers (${b.membersCount} Pax):*\n${memberText}\n\n` +
-      `💰 *Total Amount:* ₹${total.toLocaleString('en-IN')}\n` +
-      `✅ *Received:* ₹${adv.toLocaleString('en-IN')} (${(b.walletName || 'Rizwan').replace(' (Tour)', '')} • ${b.paymentMode || 'UPI'})\n` +
-      (due === 0
-        ? `🎉 *Status:* FULL PAID\n`
-        : `⏳ *Baaki Due:* ₹${due.toLocaleString('en-IN')}\n`) +
-      (b.specialNotes ? `📝 *Notes:* ${b.specialNotes}\n` : '');
-
-    const phoneClean = (b.customerPhone || '').replace(/[^0-9]/g, '');
-    const phoneWithCode = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
-    window.open(`https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`, '_blank');
+    setWhatsappModalBooking(b);
   };
 
   return (
@@ -2127,6 +2107,13 @@ export const TourBatchDetailModal: React.FC<TourBatchDetailModalProps> = ({
         isOpen={isPDFModalOpen}
         onClose={() => setIsPDFModalOpen(false)}
         initialBatchId={batch.id}
+      />
+
+      <TourWhatsAppShareModal
+        isOpen={Boolean(whatsappModalBooking)}
+        onClose={() => setWhatsappModalBooking(null)}
+        booking={whatsappModalBooking}
+        batchTitle={batch.title}
       />
 
       {copiedName && (

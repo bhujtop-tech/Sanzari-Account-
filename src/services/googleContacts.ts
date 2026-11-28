@@ -214,15 +214,19 @@ export const saveCustomerToContactsCache = async (customer: {
   await persistContactsCache([item]);
 };
 
+export type GoogleContactsSignInResult =
+  | { cancelled: false; accessToken: string; email: string }
+  | { cancelled: true };
+
 /**
  * Sign in with Google to obtain OAuth Access Token with contacts.readonly scope
  */
-export const signInForGoogleContacts = async (): Promise<{ accessToken: string; email: string }> => {
+export const signInForGoogleContacts = async (): Promise<GoogleContactsSignInResult> => {
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const credential = GoogleAuthProvider.credentialFromResult(result);
     if (!credential?.accessToken) {
-      throw new Error('Google OAuth Access Token not returned. Please try again.');
+      throw new Error('Google access token was not returned. Please try again.');
     }
     cachedAccessToken = credential.accessToken;
     cachedEmail = result.user.email || 'sanzaritourism@gmail.com';
@@ -239,12 +243,34 @@ export const signInForGoogleContacts = async (): Promise<{ accessToken: string; 
       // ignore
     }
     return {
+      cancelled: false,
       accessToken: credential.accessToken,
       email: cachedEmail,
     };
   } catch (error: any) {
-    console.error('Google Contacts Auth Error:', error);
-    throw new Error(error.message || 'Google Contacts Sign-In failed');
+    const code = String(error?.code || '');
+    const msg = String(error?.message || '');
+
+    // User closed or cancelled the sign-in popup — treat as a clean cancellation, not a fatal error
+    if (
+      code === 'auth/popup-closed-by-user' ||
+      code === 'auth/cancelled-popup-request' ||
+      msg.includes('popup-closed-by-user') ||
+      msg.includes('cancelled-popup-request')
+    ) {
+      return { cancelled: true };
+    }
+
+    if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
+      throw new Error('Google sign-in popup was blocked by your browser. Please allow popups and try again.');
+    }
+
+    if (code === 'auth/network-request-failed') {
+      throw new Error('Network error while connecting Google Contacts. Please check your connection and try again.');
+    }
+
+    console.warn('Google Contacts Auth notice:', code || msg);
+    throw new Error('Could not connect Google Contacts right now. Please try again.');
   }
 };
 

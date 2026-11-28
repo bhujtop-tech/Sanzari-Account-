@@ -150,18 +150,22 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
   }, [contacts, tourBookings, tourInquiries, customers]);
 
   const handleConnect = async () => {
+    if (isAuthenticating) return;
     setIsAuthenticating(true);
     setErrorMsg(null);
     try {
       const res = await signInForGoogleContacts();
+      if (res.cancelled) {
+        return;
+      }
       setAccessToken(res.accessToken);
       setGoogleEmail(res.email);
       setIsConnected(true);
       await loadContacts(res.accessToken, res.email);
       setIsExpanded(true);
     } catch (err: any) {
-      console.error('Failed to connect Google Contacts:', err);
-      setErrorMsg(err?.message || 'Failed to connect Google Contacts. Please try again.');
+      console.warn('Google Contacts connect notice:', err?.message || err);
+      setErrorMsg(err?.message || 'Could not connect Google Contacts. Please try again.');
     } finally {
       setIsAuthenticating(false);
     }
@@ -398,9 +402,17 @@ export const GoogleContactsAutofill: React.FC<GoogleContactsAutofillProps> = ({
           <button
             type="button"
             onClick={handleConnect}
-            className="text-[11px] font-black underline hover:text-rose-900 cursor-pointer"
+            className="text-[11px] font-black underline hover:text-rose-900 cursor-pointer shrink-0"
           >
             Sync Now
+          </button>
+          <button
+            type="button"
+            onClick={() => setErrorMsg(null)}
+            aria-label="Dismiss error"
+            className="text-rose-500 hover:text-rose-800 cursor-pointer shrink-0"
+          >
+            <X size={13} />
           </button>
         </div>
       )}

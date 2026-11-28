@@ -28,6 +28,7 @@ import { BookingsSkeleton } from '../common/Skeleton';
 import { ReceiveTourPaymentModal } from './ReceiveTourPaymentModal';
 import { TourPDFExportModal } from './TourPDFExportModal';
 import { CancelTourBookingModal } from './CancelTourBookingModal';
+import { TourWhatsAppShareModal } from './TourWhatsAppShareModal';
 import { resolveBookedBy } from './TourCommissionView';
 
 interface TourBookingsViewProps {
@@ -55,6 +56,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   });
   const [paymentModalBooking, setPaymentModalBooking] = useState<TourBooking | null>(null);
   const [cancelModalBooking, setCancelModalBooking] = useState<TourBooking | null>(null);
+  const [whatsappModalBooking, setWhatsappModalBooking] = useState<TourBooking | null>(null);
   const [isPDFModalOpen, setIsPDFModalOpen] = useState(false);
   const [copiedName, setCopiedName] = useState<string | null>(null);
   const [openMenuBookingId, setOpenMenuBookingId] = useState<string | null>(null);
@@ -185,33 +187,7 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
   };
 
   const handleWhatsAppSend = (b: TourBooking) => {
-    const total = Number(b.totalAmount || 0);
-    const adv = Number(b.advancePaid || 0);
-    const due = Math.max(0, total - adv);
-    const memberText = b.members
-      .map((m, i) => `${i + 1}. ${m.name} (${m.age ? `${m.age} yrs` : 'Adult'})`)
-      .join('\n');
-    const msg =
-      `*SANZARI TOURS & TRAVELS*\n*Tour Booking Confirmation*\n\n` +
-      `📌 *Booking No:* ${b.bookingNumber}\n` +
-      `👤 *Customer Name:* ${b.customerName}\n` +
-      `📍 *Destination:* ${b.destination}\n` +
-      `📅 *Tour Date:* ${b.tourDate}\n` +
-      `🚆 *Travel Mode:* ${b.travelClass}\n` +
-      `👥 *Tour Type:* ${b.tourType}\n\n` +
-      `*Travelers (${b.membersCount} Members):*\n${memberText}\n\n` +
-      `💰 *Total Amount:* ₹${total.toLocaleString('en-IN')}\n` +
-      `✅ *Total Paid (Received):* ₹${adv.toLocaleString('en-IN')} (${b.paymentMode || 'Online'})\n` +
-      (due === 0
-        ? `🎉 *Payment Status:* FULL PAID (₹0 Due)\n\n`
-        : `⚠️ *Remaining Due:* ₹${due.toLocaleString('en-IN')}\n\n`) +
-      (b.specialNotes ? `📝 *Note:* ${b.specialNotes}\n\n` : '') +
-      `Thank you for booking with Sanzari Tours & Travels!`;
-
-    const phoneClean = (b.customerPhone || '').replace(/[^0-9]/g, '');
-    const phoneWithCode = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
-    const url = `https://wa.me/${phoneWithCode}?text=${encodeURIComponent(msg)}`;
-    window.open(url, '_blank');
+    setWhatsappModalBooking(b);
   };
 
   const formatShortDate = (dStr?: string) => {
@@ -1555,6 +1531,14 @@ export const TourBookingsView: React.FC<TourBookingsViewProps> = () => {
         onClose={() => setIsPDFModalOpen(false)}
         initialBatchId={selectedBatchId}
         initialPaymentFilter={statusFilter === 'Cancelled' ? 'ALL' : statusFilter}
+      />
+
+      {/* Editable WhatsApp Share & Payment Reminder Modal */}
+      <TourWhatsAppShareModal
+        isOpen={Boolean(whatsappModalBooking)}
+        onClose={() => setWhatsappModalBooking(null)}
+        booking={whatsappModalBooking}
+        batchTitle={whatsappModalBooking?.tourBatchTitle}
       />
 
       {copiedName && (

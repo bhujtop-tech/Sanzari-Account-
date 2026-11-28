@@ -237,6 +237,20 @@ export const DEFAULT_TOUR_PRICING: TourPricingSettings = {
   commissionRatePerPax: 200,
 };
 
+export interface MobileQuickActionsConfig {
+  enabled: boolean;
+  showInquiry: boolean;
+  showBooking: boolean;
+  showDate: boolean;
+}
+
+export const DEFAULT_MOBILE_QUICK_ACTIONS: MobileQuickActionsConfig = {
+  enabled: true,
+  showInquiry: true,
+  showBooking: true,
+  showDate: true,
+};
+
 // ==========================================
 // INQUIRY & CUSTOM TOUR PACKAGE MANAGEMENT
 // ==========================================

@@ -23,6 +23,8 @@ import {
   CustomTourPackage,
   TourPricingSettings,
   DEFAULT_TOUR_PRICING,
+  MobileQuickActionsConfig,
+  DEFAULT_MOBILE_QUICK_ACTIONS,
   AuditLog,
   MissedCall,
 } from '../types';
@@ -127,6 +129,10 @@ interface DataContextType {
   // Tour Pricing & Discount Settings
   tourPricingSettings: TourPricingSettings;
   updateTourPricing: (data: Partial<TourPricingSettings>) => Promise<void>;
+
+  // Mobile Bottom Quick Actions Visibility Config (Mobile Only)
+  mobileQuickActions: MobileQuickActionsConfig;
+  updateMobileQuickActions: (patch: Partial<MobileQuickActionsConfig>) => void;
 
   // Tour Inquiries & Custom Packages
   tourInquiries: TourInquiry[];
@@ -271,6 +277,31 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setBusinessMode = (mode: BusinessMode) => {
     setBusinessModeState(mode);
     localStorage.setItem('sz_business_mode', mode);
+  };
+
+  // Mobile Bottom Quick Actions Visibility Config (Mobile Only, per-device)
+  const [mobileQuickActions, setMobileQuickActionsState] = useState<MobileQuickActionsConfig>(() => {
+    try {
+      const saved = localStorage.getItem('sz_mobile_quick_actions');
+      if (saved) {
+        return { ...DEFAULT_MOBILE_QUICK_ACTIONS, ...JSON.parse(saved) };
+      }
+    } catch {
+      // ignore
+    }
+    return DEFAULT_MOBILE_QUICK_ACTIONS;
+  });
+
+  const updateMobileQuickActions = (patch: Partial<MobileQuickActionsConfig>) => {
+    setMobileQuickActionsState((prev) => {
+      const next = { ...prev, ...patch };
+      try {
+        localStorage.setItem('sz_mobile_quick_actions', JSON.stringify(next));
+      } catch {
+        // ignore
+      }
+      return next;
+    });
   };
 
   // State Declarations with REAL data only (no mock fallbacks)
@@ -1120,6 +1151,8 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         upcomingTourBatches,
         recentActivity,
         availableMonths,
+        mobileQuickActions,
+        updateMobileQuickActions,
         formatCurrency,
         formatDate,
       }}
